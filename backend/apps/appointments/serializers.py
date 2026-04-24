@@ -8,14 +8,6 @@ class AppointmentBookingSerializer(serializers.Serializer):
     start_time = serializers.TimeField()
     end_time = serializers.TimeField()
     reason = serializers.CharField(required=False, allow_blank=True)
-    # Telemedicine
-    is_virtual = serializers.BooleanField(default=False, required=False)
-    meeting_provider = serializers.ChoiceField(
-        choices=Appointment.MeetingProvider.choices,
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-    )
 
 class ReceptionistAppointmentBookingSerializer(AppointmentBookingSerializer):
     patient_id = serializers.IntegerField()
@@ -62,10 +54,6 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             "status",
             "reason",
             "queue_token",
-            # Telemedicine
-            "is_virtual",
-            "meeting_provider",
-            "meeting_link",
         ]
 
 class AppointmentStatusUpdateSerializer(serializers.Serializer):

@@ -153,18 +153,7 @@ export default function AppointmentsPage() {
                     View Record
                   </button>
                 )}
-                
-                {/* JOIN VIRTUAL CONSULTATION (PATIENT & DOCTOR) */}
-                {appt.is_virtual && ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"].includes(appt.status) && (
-                  <button
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded font-medium shadow-sm transition-colors"
-                    onClick={() =>
-                      router.push(`/dashboard/telemedicine/${appt.id}`)
-                    }
-                  >
-                    📹 Join Call
-                  </button>
-                )}
+
 
               </td>
 

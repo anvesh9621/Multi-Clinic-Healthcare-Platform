@@ -61,21 +61,6 @@ class Appointment(models.Model):
     
     follow_up_date = models.DateField(blank=True, null=True, help_text="Suggested follow-up date by doctor")
 
-    # ── Telemedicine ──────────────────────────────────────────────────────
-    class MeetingProvider(models.TextChoices):
-        GOOGLE_MEET = "GOOGLE_MEET", "Google Meet"
-        ZOOM = "ZOOM", "Zoom"
-        CUSTOM_WEBRTC = "CUSTOM_WEBRTC", "Custom WebRTC"
-
-    is_virtual = models.BooleanField(default=False)
-    meeting_provider = models.CharField(
-        max_length=20,
-        choices=MeetingProvider.choices,
-        blank=True,
-        null=True,
-    )
-    meeting_link = models.URLField(blank=True, null=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

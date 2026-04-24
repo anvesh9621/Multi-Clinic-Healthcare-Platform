@@ -3,7 +3,7 @@ from .views import (
     BookAppointmentView, AppointmentListView, AppointmentDetailView,
     AppointmentStatusUpdateView, SlotAvailabilityView,
     ReceptionistBookAppointmentView, DoctorRescheduleAppointmentView,
-    DoctorRunningLateView, GenerateMeetingLinkView,
+    DoctorRunningLateView,
 )
 
 urlpatterns = [
@@ -15,5 +15,4 @@ urlpatterns = [
     path("slots/", SlotAvailabilityView.as_view(), name="slot-availability"),
     path("<int:pk>/reschedule/", DoctorRescheduleAppointmentView.as_view(), name="appointment-reschedule"),
     path("running-late/", DoctorRunningLateView.as_view(), name="appointments-running-late"),
-    path("<int:pk>/meeting-link/", GenerateMeetingLinkView.as_view(), name="appointment-meeting-link"),
 ]

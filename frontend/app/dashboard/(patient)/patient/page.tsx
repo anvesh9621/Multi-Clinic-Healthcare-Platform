@@ -27,7 +27,6 @@ interface Appointment {
   status: string;
   doctor_name: string;
   clinic_name: string;
-  is_virtual?: boolean;
 }
 
 export default function PatientDashboard() {
@@ -301,15 +300,6 @@ export default function PatientDashboard() {
                     >
                       Fill Intake Form &gt;
                     </Link>
-                    
-                    {appt.is_virtual && (
-                      <Link
-                        href={`/dashboard/telemedicine/${appt.id}`}
-                        className="text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 px-3 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
-                      >
-                        <span className="text-[10px]">📹</span> Join Virtual Call
-                      </Link>
-                    )}
                   </div>
                 </div>
               ))}

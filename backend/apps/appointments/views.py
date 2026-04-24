@@ -20,7 +20,6 @@ from .services import (
     get_available_slots,
     reschedule_appointment,
     notify_running_late,
-    generate_meeting_link,
 )
 from .models import Appointment
 
@@ -58,8 +57,6 @@ class BookAppointmentView(APIView):
                 start_time=data["start_time"],
                 end_time=data["end_time"],
                 reason=data.get("reason"),
-                is_virtual=data.get("is_virtual", False),
-                meeting_provider=data.get("meeting_provider"),
             )
         except Exception as e:
             return Response({"detail": f"Server Error: {str(e)}", "trace": traceback.format_exc()}, status=status.HTTP_400_BAD_REQUEST)
@@ -70,7 +67,7 @@ class BookAppointmentView(APIView):
             action_type=AuditLog.ActionChoices.BOOK,
             object_type="Appointment",
             object_id=appointment.id,
-            description="Appointment booked" + (" (virtual)" if appointment.is_virtual else ""),
+            description="Appointment booked",
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
@@ -78,7 +75,6 @@ class BookAppointmentView(APIView):
             {
                 "success": True,
                 "appointment_id": appointment.id,
-                "is_virtual": appointment.is_virtual,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -112,8 +108,6 @@ class ReceptionistBookAppointmentView(APIView):
             start_time=data["start_time"],
             end_time=data["end_time"],
             reason=data.get("reason"),
-            is_virtual=data.get("is_virtual", False),
-            meeting_provider=data.get("meeting_provider"),
         )
 
         log_action(
@@ -131,7 +125,6 @@ class ReceptionistBookAppointmentView(APIView):
                 "success": True,
                 "appointment_id": appointment.id,
                 "message": "Appointment booked successfully by Receptionist.",
-                "is_virtual": appointment.is_virtual,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -358,48 +351,4 @@ class DoctorRunningLateView(APIView):
         })
 
 
-class GenerateMeetingLinkView(APIView):
-    """
-    POST /appointments/<pk>/meeting-link/
-    Generates (or returns existing) meeting link for a virtual appointment.
-    Callable by the doctor who owns it, clinic admin/receptionist, or super-admin.
-    Idempotent: returns existing link if already generated.
-    """
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request, pk):
-        appointment = Appointment.objects.filter(id=pk).first()
-        if not appointment:
-            return Response({"error": "Appointment not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if not appointment.is_virtual:
-            return Response(
-                {"error": "This is not a virtual appointment."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = request.user
-        if user.role == "DOCTOR" and appointment.doctor_clinic.doctor.user != user:
-            raise PermissionDenied("You can only generate links for your own appointments.")
-        if user.role in ["CLINIC_ADMIN", "RECEPTIONIST"] and appointment.clinic != user.clinic:
-            raise PermissionDenied("Unauthorized access.")
-        if user.role == "PATIENT":
-            raise PermissionDenied("Patients cannot generate meeting links.")
-
-        # Idempotent: return existing link if already set
-        if appointment.meeting_link:
-            return Response({"success": True, "meeting_link": appointment.meeting_link})
-
-        link = generate_meeting_link(appointment)
-
-        log_action(
-            user=request.user,
-            clinic=appointment.clinic,
-            action_type=AuditLog.ActionChoices.UPDATE,
-            object_type="Appointment",
-            object_id=appointment.id,
-            description="Meeting link generated",
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
-
-        return Response({"success": True, "meeting_link": link})

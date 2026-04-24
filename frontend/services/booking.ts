@@ -27,8 +27,6 @@ export interface BookingPayload {
   start_time: string;
   end_time: string;
   reason?: string;
-  is_virtual?: boolean;
-  meeting_provider?: string;
 }
 
 export const getClinics = async (): Promise<Clinic[]> => {

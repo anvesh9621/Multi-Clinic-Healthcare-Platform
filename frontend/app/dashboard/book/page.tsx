@@ -184,9 +184,7 @@ export default function BookingWizard() {
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [reason, setReason] = useState("");
 
-  // Telemedicine
-  const [isVirtual, setIsVirtual] = useState(false);
-  const [meetingProvider, setMeetingProvider] = useState<"GOOGLE_MEET" | "ZOOM" | "CUSTOM_WEBRTC">("GOOGLE_MEET");
+  const [reason, setReason] = useState("");
 
   // ── Derived: unique specialties at selected clinic ───────────────────────
   const availableSpecialties = useMemo(() => {
@@ -316,8 +314,6 @@ export default function BookingWizard() {
         start_time: selectedSlot,
         end_time: endTime,
         reason: reason || "General consultation",
-        is_virtual: isVirtual,
-        meeting_provider: isVirtual ? meetingProvider : undefined,
       });
       setBookingSuccess(true);
     } catch (err: unknown) {
@@ -373,14 +369,7 @@ export default function BookingWizard() {
               <span className="text-gray-500">Time</span>
               <span className="font-semibold text-gray-900">{selectedSlot}</span>
             </div>
-            {isVirtual && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Type</span>
-                <span className="font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
-                  📹 Virtual — {meetingProvider === "GOOGLE_MEET" ? "Google Meet" : meetingProvider === "ZOOM" ? "Zoom" : "Jitsi / WebRTC"}
-                </span>
-              </div>
-            )}
+
             <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
               <span className="text-gray-500">Status</span>
               <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs">
@@ -873,71 +862,7 @@ export default function BookingWizard() {
               </div>
             </div>
 
-            {/* ── Virtual / In-person toggle ── */}
-            <div className="mb-6">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Consultation Type</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setIsVirtual(false)}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                    !isVirtual
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
-                  }`}
-                >
-                  <MapPinned className="w-5 h-5 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="font-semibold text-sm">In-Person</p>
-                    <p className="text-xs opacity-70">Visit the clinic</p>
-                  </div>
-                  {!isVirtual && <CheckCircle className="w-4 h-4 ml-auto" />}
-                </button>
-                <button
-                  onClick={() => setIsVirtual(true)}
-                  className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                    isVirtual
-                      ? "border-violet-500 bg-violet-50 text-violet-700"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
-                  }`}
-                >
-                  <Video className="w-5 h-5 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="font-semibold text-sm">Virtual</p>
-                    <p className="text-xs opacity-70">Video consultation</p>
-                  </div>
-                  {isVirtual && <CheckCircle className="w-4 h-4 ml-auto" />}
-                </button>
-              </div>
 
-              {/* Provider selector */}
-              {isVirtual && (
-                <div className="mt-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Choose platform</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {[
-                      { id: "GOOGLE_MEET", label: "Google Meet", emoji: "🎥" },
-                      { id: "ZOOM", label: "Zoom", emoji: "💻" },
-                      { id: "CUSTOM_WEBRTC", label: "Jitsi (Free)", emoji: "🌐" },
-                    ].map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setMeetingProvider(p.id as any)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-                          meetingProvider === p.id
-                            ? "border-violet-500 bg-violet-600 text-white shadow-sm"
-                            : "border-gray-200 bg-white text-gray-600 hover:border-violet-300"
-                        }`}
-                      >
-                        <span>{p.emoji}</span> {p.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    A meeting link will be generated by your doctor after confirming the appointment.
-                  </p>
-                </div>
-              )}
-            </div>
 
             <div className="mb-6">
               <label className="block text-sm font-semibold text-gray-700 mb-2">

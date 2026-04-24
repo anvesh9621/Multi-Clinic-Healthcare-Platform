@@ -22,8 +22,6 @@ def book_appointment(
     start_time,
     end_time,
     reason=None,
-    is_virtual=False,
-    meeting_provider=None,
 ):
     """
     Books appointment with full validation.
@@ -85,40 +83,12 @@ def book_appointment(
             end_time=end_time_actual,
             time_range=(start_datetime, end_datetime),
             reason=reason,
-            is_virtual=is_virtual,
-            meeting_provider=meeting_provider if is_virtual else None,
         )
 
     return appointment
 
 
-def generate_meeting_link(appointment):
-    """
-    Auto-generates a meeting link for a virtual appointment.
-    For Google Meet / Zoom we create a deterministic room URL.
-    For CUSTOM_WEBRTC we build a random room on a public WebRTC relay.
-    Saves the link onto the appointment and returns it.
-    """
-    import uuid
-    import secrets
 
-    provider = appointment.meeting_provider
-    room_id = secrets.token_urlsafe(10)  # e.g. "aB3kP9xQmR"
-
-    if provider == "GOOGLE_MEET":
-        # Generate a Google Meet-style room code (xxx-xxxx-xxx)
-        code = f"{room_id[:3]}-{room_id[3:7]}-{room_id[7:10]}".lower()
-        link = f"https://meet.google.com/{code}"
-    elif provider == "ZOOM":
-        meeting_id = str(uuid.uuid4().int)[:11]  # 11-digit meeting ID
-        link = f"https://zoom.us/j/{meeting_id}"
-    else:
-        # Custom WebRTC using Jitsi Meet (free, open-source, no account needed)
-        link = f"https://meet.jit.si/mediclinic-{room_id}"
-
-    appointment.meeting_link = link
-    appointment.save(update_fields=["meeting_link"])
-    return link
 
 def reschedule_appointment(*, appointment, new_date, new_start_time, new_end_time, reason=None, user=None):
     """
