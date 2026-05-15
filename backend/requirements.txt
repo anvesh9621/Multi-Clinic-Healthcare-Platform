@@ -1,0 +1,72 @@
+# ── Core Framework ────────────────────────────────────────────────────────────
+Django==6.0.2
+asgiref==3.11.1
+sqlparse==0.5.5
+
+# ── Django REST Framework ─────────────────────────────────────────────────────
+djangorestframework==3.16.1
+djangorestframework_simplejwt==5.5.1
+PyJWT==2.11.0
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+django-cors-headers==4.9.0
+
+# ── Database ──────────────────────────────────────────────────────────────────
+psycopg2-binary==2.9.11
+
+# ── Environment & Config ──────────────────────────────────────────────────────
+python-dotenv==1.2.2
+
+# ── Media / File Handling ─────────────────────────────────────────────────────
+pillow==12.1.1
+
+# ── Celery & Redis (Async Tasks / Email Queue) ────────────────────────────────
+celery==5.6.3
+redis==7.4.0
+kombu==5.6.2
+amqp==5.3.1
+billiard==4.2.4
+vine==5.1.0
+
+# ── Celery CLI Dependencies ───────────────────────────────────────────────────
+click==8.3.3
+click-didyoumean==0.3.1
+click-plugins==1.1.1.2
+click-repl==0.3.0
+prompt_toolkit==3.0.52
+wcwidth==0.7.0
+colorama==0.4.6
+
+# ── Stripe (Payments) ─────────────────────────────────────────────────────────
+stripe==14.4.1
+
+# ── Twilio (SMS Notifications) ────────────────────────────────────────────────
+twilio==9.10.3
+
+# ── HTTP & Networking ─────────────────────────────────────────────────────────
+requests==2.32.5
+urllib3==2.6.0
+certifi==2026.2.25
+charset-normalizer==3.4.6
+idna==3.11
+
+# ── Async HTTP (aiohttp — used by some Celery transports) ─────────────────────
+aiohttp==3.13.3
+aiohttp-retry==2.9.1
+aiohappyeyeballs==2.6.1
+aiosignal==1.4.0
+frozenlist==1.8.0
+multidict==6.7.1
+yarl==1.23.0
+propcache==0.4.1
+attrs==26.1.0
+
+# ── Date & Time ───────────────────────────────────────────────────────────────
+python-dateutil==2.9.0.post0
+six==1.17.0
+tzdata==2025.3
+tzlocal==5.3.1
+
+# ── Typing ────────────────────────────────────────────────────────────────────
+typing_extensions==4.15.0
+packaging==26.2
