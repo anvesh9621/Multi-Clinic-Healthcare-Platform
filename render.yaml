@@ -4,11 +4,11 @@ databases:
     user: mediclinic_user
     plan: free
 
-  - name: mediclinic-redis
-    plan: free
-    type: redis
-
 services:
+  - type: redis
+    name: mediclinic-redis
+    plan: free
+
   - type: web
     name: mediclinic-backend
     env: python
@@ -20,15 +20,18 @@ services:
           name: mediclinic-db
           property: connectionString
       - key: REDIS_URL
-        fromDatabase:
+        fromService:
+          type: redis
           name: mediclinic-redis
           property: connectionString
       - key: CELERY_BROKER_URL
-        fromDatabase:
+        fromService:
+          type: redis
           name: mediclinic-redis
           property: connectionString
       - key: CELERY_RESULT_BACKEND
-        fromDatabase:
+        fromService:
+          type: redis
           name: mediclinic-redis
           property: connectionString
       - key: SECRET_KEY
@@ -59,15 +62,18 @@ services:
           name: mediclinic-db
           property: connectionString
       - key: REDIS_URL
-        fromDatabase:
+        fromService:
+          type: redis
           name: mediclinic-redis
           property: connectionString
       - key: CELERY_BROKER_URL
-        fromDatabase:
+        fromService:
+          type: redis
           name: mediclinic-redis
           property: connectionString
       - key: CELERY_RESULT_BACKEND
-        fromDatabase:
+        fromService:
+          type: redis
           name: mediclinic-redis
           property: connectionString
       - key: SECRET_KEY
