@@ -15,7 +15,7 @@ services:
     name: mediclinic-backend
     env: python
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
-    startCommand: "gunicorn config.wsgi:application"
+    startCommand: "celery -A config worker --concurrency=1 --loglevel=info & gunicorn config.wsgi:application"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -52,51 +52,3 @@ services:
         sync: false
       - key: STRIPE_SUBSCRIPTION_WEBHOOK_SECRET
         sync: false
-
-  - type: worker
-    name: mediclinic-celery
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery -A config worker --loglevel=info"
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mediclinic-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: mediclinic-redis
-          property: connectionString
-      - key: CELERY_BROKER_URL
-        fromService:
-          type: redis
-          name: mediclinic-redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          type: redis
-          name: mediclinic-redis
-          property: connectionString
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: mediclinic-backend
-          envVarKey: SECRET_KEY
-      - key: DEBUG
-        value: "False"
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: mediclinic-backend
-          envVarKey: FRONTEND_URL
-      - key: EMAIL_HOST_USER
-        fromService:
-          type: web
-          name: mediclinic-backend
-          envVarKey: EMAIL_HOST_USER
-      - key: EMAIL_HOST_PASSWORD
-        fromService:
-          type: web
-          name: mediclinic-backend
-          envVarKey: EMAIL_HOST_PASSWORD
