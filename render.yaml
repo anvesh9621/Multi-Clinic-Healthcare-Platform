@@ -3,11 +3,13 @@ databases:
     databaseName: mediclinic
     user: mediclinic_user
     plan: free
+    ipAllowList: []
 
 services:
   - type: redis
     name: mediclinic-redis
     plan: free
+    ipAllowList: []
 
   - type: web
     name: mediclinic-backend
