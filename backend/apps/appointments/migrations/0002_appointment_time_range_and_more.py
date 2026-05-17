@@ -2,6 +2,7 @@
 
 import django.contrib.postgres.constraints
 import django.contrib.postgres.fields.ranges
+from django.contrib.postgres.operations import BtreeGistExtension
 from django.conf import settings
 from django.db import migrations
 
@@ -17,6 +18,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        BtreeGistExtension(),
         migrations.AddField(
             model_name='appointment',
             name='time_range',
