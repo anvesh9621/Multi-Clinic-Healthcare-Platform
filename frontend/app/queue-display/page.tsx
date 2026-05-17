@@ -9,6 +9,7 @@ type Appointment = {
   status: string;
   queue_token: string;
   start_time: string;
+  appointment_date: string;
 };
 
 export default function TVQueueDisplay() {
