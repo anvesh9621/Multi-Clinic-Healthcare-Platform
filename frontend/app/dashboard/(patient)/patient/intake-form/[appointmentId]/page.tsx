@@ -2,12 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { getIntakeForm, updateIntakeForm, IntakeFormData } from "@/services/patients";
 import { toast } from "react-hot-toast";
 
@@ -76,20 +70,21 @@ export default function IntakeFormPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Card className="mb-6">
-          <CardHeader>
+        <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Medical Information</CardTitle>
-                <CardDescription>Review and easily update your known medical history.</CardDescription>
+                <h3 className="text-lg font-semibold leading-none tracking-tight">Medical Information</h3>
+                <p className="text-sm text-gray-500 mt-1.5">Review and easily update your known medical history.</p>
               </div>
-              {form.is_completed && <Badge className="bg-green-500">Completed</Badge>}
+              {form.is_completed && <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-500 text-white">Completed</span>}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          </div>
+          <div className="p-6 space-y-6">
             <div className="space-y-2">
-              <Label>Reported Allergies</Label>
-              <Textarea
+              <label className="text-sm font-medium leading-none opacity-70">Reported Allergies</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="List any drug or food allergies here..."
                 value={form.allergies_update || ""}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({ ...form, allergies_update: e.target.value })}
@@ -99,8 +94,9 @@ export default function IntakeFormPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Current Medications</Label>
-              <Textarea
+              <label className="text-sm font-medium leading-none opacity-70">Current Medications</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="List current prescription medications..."
                 value={form.current_medications_update || ""}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({ ...form, current_medications_update: e.target.value })}
@@ -109,41 +105,54 @@ export default function IntakeFormPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Any new notes or concerns?</Label>
-              <Textarea
+              <label className="text-sm font-medium leading-none opacity-70">Any new notes or concerns?</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="Describe any new symptoms or reasons for the visit..."
                 value={form.medical_history_notes || ""}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({ ...form, medical_history_notes: e.target.value })}
                 disabled={form.is_completed}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Digital Signature</CardTitle>
-            <CardDescription>Confirm that the information provided is accurate to the best of your knowledge.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold leading-none tracking-tight">Digital Signature</h3>
+            <p className="text-sm text-gray-500 mt-1.5">Confirm that the information provided is accurate to the best of your knowledge.</p>
+          </div>
+          <div className="p-6">
             <div className="flex items-center space-x-3">
-              <Switch
+              <input
+                type="checkbox"
                 id="signature"
+                className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                 checked={form.signature_provided}
-                onCheckedChange={(val: boolean) => setForm({ ...form, signature_provided: val })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, signature_provided: e.target.checked })}
                 disabled={form.is_completed}
               />
-              <Label htmlFor="signature">I confirm the above information is accurate</Label>
+              <label htmlFor="signature" className="text-sm font-medium leading-none">I confirm the above information is accurate</label>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {!form.is_completed && (
           <div className="flex justify-end gap-4">
-            <Button variant="outline" type="button" onClick={() => router.back()}>Cancel</Button>
-            <Button type="submit" disabled={saving || !form.signature_provided}>
+            <button 
+              type="button" 
+              onClick={() => router.back()}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 border border-gray-200 bg-white hover:bg-gray-100 hover:text-gray-900 h-10 px-4 py-2"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={saving || !form.signature_provided}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 bg-blue-600 text-white hover:bg-blue-700 h-10 px-4 py-2 disabled:pointer-events-none disabled:opacity-50"
+            >
               {saving ? "Submitting..." : "Submit Intake Form"}
-            </Button>
+            </button>
           </div>
         )}
       </form>
