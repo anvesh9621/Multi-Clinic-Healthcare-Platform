@@ -208,9 +208,8 @@ CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localho
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-# In development (DEBUG=True), run tasks synchronously — no Redis needed.
-# In production, set DEBUG=False and point CELERY_BROKER_URL to real Redis.
-CELERY_TASK_ALWAYS_EAGER = DEBUG
+# In development (DEBUG=True) or when forced, run tasks synchronously — no Redis needed.
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', str(DEBUG)).lower() in ('true', '1', 't')
 
 # ── Stripe ────────────────────────────────────────────────────────────────────
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "sk_test_dummy")
