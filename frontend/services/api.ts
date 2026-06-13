@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: `${baseURL}/api`,
 });
 
 // ── Request interceptor: attach access token ──────────────────────────────
@@ -62,7 +64,7 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          "http://127.0.0.1:8000/api/accounts/token/refresh/",
+          `${baseURL}/api/token/refresh/`,
           { refresh: refreshToken }
         );
         const newAccess: string = data.access;
