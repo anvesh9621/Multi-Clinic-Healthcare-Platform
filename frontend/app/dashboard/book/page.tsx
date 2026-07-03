@@ -300,30 +300,20 @@ export default function BookingWizard() {
   const handleConfirm = async () => {
     if (!selectedDoctor || !selectedDate || !selectedSlot) return;
     setLoading(true);
-    setError("");
-    try {
-      const endDate = new Date(`1970-01-01T${selectedSlot}:00`);
-      endDate.setMinutes(endDate.getMinutes() + 30);
-      const endTime = endDate.toTimeString().slice(0, 8);
+    
+    const endDate = new Date(`1970-01-01T${selectedSlot}:00`);
+    endDate.setMinutes(endDate.getMinutes() + 30);
+    const endTime = endDate.toTimeString().slice(0, 8);
 
-      await bookAppointment({
-        doctor_clinic_id: selectedDoctor.id,
-        appointment_date: selectedDate,
-        start_time: selectedSlot,
-        end_time: endTime,
-        reason: reason || "General consultation",
-      });
-      setBookingSuccess(true);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string; non_field_errors?: string[] } } };
-      const msg =
-        axiosErr?.response?.data?.detail ||
-        axiosErr?.response?.data?.non_field_errors?.[0] ||
-        "Booking failed. Please try a different slot.";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
+    const params = new URLSearchParams({
+      date: selectedDate,
+      start_time: selectedSlot,
+      end_time: endTime,
+      reason: reason || "General consultation"
+    });
+
+    // Instead of booking instantly, send them to the payment selection page
+    window.location.href = `/book/${selectedDoctor.id}/payment?${params.toString()}`;
   };
 
   // ── SUCCESS STATE ────────────────────────────────────────────────────────

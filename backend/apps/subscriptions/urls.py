@@ -1,14 +1,14 @@
 from django.urls import path
 from .views import (
-    SubscriptionStatusView,
-    CreateCheckoutSessionView,
-    CancelSubscriptionView,
-    SubscriptionWebhookView,
+    CreateSubscriptionView, SubscriptionStatusView, CancelSubscriptionView,
+    VerifySubscriptionView, SubscriptionInvoiceListView, SubscriptionInvoiceDownloadView
 )
 
 urlpatterns = [
-    path('current/',           SubscriptionStatusView.as_view(),      name='subscription-status'),
-    path('create-checkout/',   CreateCheckoutSessionView.as_view(),    name='create-checkout'),
-    path('cancel/',            CancelSubscriptionView.as_view(),       name='cancel-subscription'),
-    path('webhook/',           SubscriptionWebhookView.as_view(),      name='subscription-webhook'),
+    path('create/', CreateSubscriptionView.as_view()),
+    path('verify/', VerifySubscriptionView.as_view()),
+    path('status/', SubscriptionStatusView.as_view()),
+    path('cancel/', CancelSubscriptionView.as_view()),
+    path('invoices/', SubscriptionInvoiceListView.as_view()),
+    path('invoices/<int:pk>/download/', SubscriptionInvoiceDownloadView.as_view()),
 ]

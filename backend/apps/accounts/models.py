@@ -14,7 +14,7 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Email is required")
 
-        email = self.normalize_email(email)
+        email = self.normalize_email(email.strip()).lower()
 
         # Only staff roles require clinic (patients can register globally without a clinic)
         if role in [

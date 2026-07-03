@@ -269,10 +269,17 @@ def get_available_slots(*, doctor_clinic_id, date):
         all_slots.append(current_time.time())
         current_time += timedelta(minutes=slot_duration)
 
-    # Fetch existing appointments
+    # Fetch booked slots — SCHEDULED and CONFIRMED both block slots.
+    # Only CANCELLED and NO_SHOW free a slot.
     booked_appointments = Appointment.objects.filter(
         doctor_clinic=doctor_clinic,
         appointment_date=date,
+        status__in=[
+            Appointment.StatusChoices.SCHEDULED,
+            Appointment.StatusChoices.CONFIRMED,
+            Appointment.StatusChoices.WAITING,
+            Appointment.StatusChoices.IN_PROGRESS,
+        ]
     ).values_list("start_time", flat=True)
 
     available_slots = [

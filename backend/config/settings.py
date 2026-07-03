@@ -30,12 +30,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
 
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     frontend_url,
@@ -66,6 +67,7 @@ INSTALLED_APPS = [
     'apps.inventory.apps.InventoryConfig',
     'apps.subscriptions.apps.SubscriptionsConfig',
     "corsheaders",
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -75,8 +77,9 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.subscriptions.middleware.SubscriptionEnforcementMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -211,9 +214,31 @@ CELERY_TASK_SERIALIZER = 'json'
 # In development (DEBUG=True) or when forced, run tasks synchronously — no Redis needed.
 CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', str(DEBUG)).lower() in ('true', '1', 't')
 
-# ── Stripe ────────────────────────────────────────────────────────────────────
-STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "sk_test_dummy")
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_SUBSCRIPTION_WEBHOOK_SECRET = os.environ.get("STRIPE_SUBSCRIPTION_WEBHOOK_SECRET", "")
+# ── Razorpay ──────────────────────────────────────────────────────────────────
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
+RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET')
+
+# Plan IDs (create these in Razorpay dashboard first)
+RAZORPAY_PLAN_IDS = {
+    'professional': os.environ.get('RAZORPAY_PLAN_ID_PROFESSIONAL'),
+    'enterprise': os.environ.get('RAZORPAY_PLAN_ID_ENTERPRISE'),
+}
+
+# Our platform GST details
+PLATFORM_GSTIN = os.environ.get('PLATFORM_GSTIN', default='')
+PLATFORM_NAME = 'MediClinic'
+PLATFORM_ADDRESS = os.environ.get('PLATFORM_ADDRESS', default='')
+HSN_SAC_CODE = '998314'  # Software SaaS services
+
+# ── Celery Beat Schedule ──────────────────────────────────────────────────────
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'cancel-unpaid-appointments': {
+        'task': 'apps.appointments.tasks.cancel_unpaid_appointments',
+        'schedule': crontab(minute='*/5'),  # Every 5 minutes
+    },
+}
 
 CELERY_TASK_EAGER_PROPAGATES = True

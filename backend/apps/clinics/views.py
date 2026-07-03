@@ -72,8 +72,8 @@ class ClinicRegistrationView(APIView):
 
         result = serializer.save()
 
-        # In production, this is where you would call Stripe API to create a Customer
-        # e.g., stripe.Customer.create(...) and update the clinic object.
+        # In production, this is where you would call Razorpay API to create a Customer
+        # e.g., client.customer.create(...) and update the clinic object.
         
         return Response(
             {
@@ -84,3 +84,115 @@ class ClinicRegistrationView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+from apps.accounts.permissions import IsSuperAdmin
+from .serializers import SuperAdminClinicCreateSerializer
+
+class SuperAdminCreateClinicView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def post(self, request):
+        serializer = SuperAdminClinicCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        clinic = serializer.save()
+
+        log_action(
+            user=request.user,
+            clinic=clinic,
+            action_type=AuditLog.ActionChoices.CREATE,
+            object_type="Clinic",
+            object_id=clinic.id,
+            description=f"Super Admin created clinic {clinic.name}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Clinic created successfully.",
+                "clinic_id": clinic.id,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+from django.shortcuts import get_object_or_404
+from .models import Clinic
+
+class ClinicToggleStatusView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def patch(self, request, pk):
+        clinic = get_object_or_404(Clinic, pk=pk)
+        clinic.is_active = not clinic.is_active
+        clinic.save()
+
+        # If deactivating, optionally deactivate all users? Let's just keep it simple.
+        # If clinic is inactive, users won't be able to log in or use the platform (we should probably check is_active in our middleware or permissions, but for now just updating the flag is fine).
+
+        action = AuditLog.ActionChoices.UPDATE
+        log_action(
+            user=request.user,
+            clinic=clinic,
+            action_type=action,
+            object_type="Clinic",
+            object_id=clinic.id,
+            description=f"Super Admin {'activated' if clinic.is_active else 'suspended'} clinic {clinic.name}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response({
+            "success": True,
+            "message": f"Clinic {'activated' if clinic.is_active else 'suspended'} successfully.",
+            "is_active": clinic.is_active
+        })
+
+
+class SuperAdminChangePlanView(APIView):
+    """
+    POST /api/clinics/super-admin/<int:pk>/change-plan/
+    Super Admin manually upgrades or downgrades a clinic's subscription plan.
+    Used as the final step in the manual fallback flow after a payment link is paid.
+    Body: { "plan": "professional" | "enterprise" | "starter" }
+    """
+    permission_classes = [IsSuperAdmin]
+
+    VALID_PLANS = ['starter', 'professional', 'enterprise']
+
+    def post(self, request, pk):
+        clinic = get_object_or_404(Clinic, pk=pk)
+        plan = request.data.get('plan', '').lower()
+
+        if plan not in self.VALID_PLANS:
+            return Response(
+                {'error': f'Invalid plan. Must be one of: {", ".join(self.VALID_PLANS)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from apps.subscriptions.models import Subscription
+        sub, _ = Subscription.objects.get_or_create(clinic=clinic)
+        sub.plan = plan
+        sub.status = 'active' if plan != 'starter' else 'inactive'
+        sub.save()
+
+        log_action(
+            user=request.user,
+            clinic=clinic,
+            action_type=AuditLog.ActionChoices.UPDATE,
+            object_type='Subscription',
+            object_id=sub.id,
+            description=f"Super Admin manually changed clinic plan to '{plan}'",
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+
+        return Response({
+            'success': True,
+            'message': f"Clinic plan updated to '{plan}' successfully.",
+            'clinic': clinic.name,
+            'plan': plan,
+        })
+

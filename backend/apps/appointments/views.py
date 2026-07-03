@@ -28,6 +28,15 @@ from apps.patients.models import Patient
 from apps.accounts.permissions import IsPatient, IsDoctor, IsClinicAdminOrReceptionist
 from apps.audit.services import log_action
 from apps.audit.models import AuditLog
+from apps.billing.models import Invoice
+from apps.notifications.models import Notification
+from apps.billing.razorpay_client import get_razorpay_client
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BookAppointmentView(APIView):
@@ -71,13 +80,134 @@ class BookAppointmentView(APIView):
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
-        return Response(
-            {
-                "success": True,
-                "appointment_id": appointment.id,
-            },
-            status=status.HTTP_201_CREATED,
+        # Auto-create invoice for self-booked appointments
+        consultation_fee = getattr(doctor_clinic, 'consultation_fee', None) or 0
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            appointment=appointment,
+            amount=consultation_fee,
+            total_amount=consultation_fee,
+            status='draft',
+            payment_method='pending',
         )
+
+        pay_method = request.data.get('payment_method', 'pay_at_clinic')
+        pay_now = (pay_method == 'razorpay_online') or request.data.get('pay_now', False)
+
+        if pay_now and request.user.role == 'PATIENT':
+            # Validate clinic can receive payments
+            if getattr(clinic, 'linked_account_status', None) != 'kyc_verified':
+                # Fall back gracefully — clinic not verified for payouts
+                appointment.status = Appointment.StatusChoices.CONFIRMED
+                appointment.payment_flow = 'pay_at_clinic'
+                appointment.save(update_fields=['status', 'payment_flow'])
+                invoice.status = 'pending_at_clinic'
+                invoice.save(update_fields=['status'])
+
+                return Response({
+                    'appointment_id': appointment.id,
+                    'status': 'CONFIRMED',
+                    'payment_required': False,
+                    'pay_now_unavailable': True,
+                    'message': (
+                        f'Online payment is not available for this clinic. '
+                        f'Your appointment is confirmed. Please pay '
+                        f'\u20b9{invoice.total_amount} at the clinic on arrival.'
+                    )
+                }, status=status.HTTP_201_CREATED)
+
+            # Generate 30-minute Razorpay payment link
+            expires_at = timezone.now() + timedelta(minutes=30)
+            client = get_razorpay_client()
+
+            try:
+                payment_link = client.payment_link.create({
+                    'amount': int(invoice.total_amount * 100),
+                    'currency': 'INR',
+                    'description': f'Consultation with Dr. {doctor_clinic.doctor.user.get_full_name()}',
+                    'expire_by': int(expires_at.timestamp()),
+                    'options': {
+                        'order': {
+                            'transfers': [{
+                                'account': clinic.razorpay_linked_account_id,
+                                'amount': int(invoice.total_amount * 100),
+                                'currency': 'INR',
+                            }]
+                        }
+                    },
+                    'callback_url': f'{settings.FRONTEND_URL}/book/payment-status?appointment_id={appointment.id}',
+                    'callback_method': 'get',
+                    'notify': {'sms': False, 'email': False},
+                })
+
+                invoice.razorpay_payment_link_id = payment_link['id']
+                invoice.razorpay_payment_link_url = payment_link.get('long_url', payment_link.get('short_url', ''))
+                invoice.razorpay_payment_link_short_url = payment_link.get('short_url', '')
+                invoice.payment_link_expires_at = expires_at
+                invoice.status = 'pending'
+                invoice.save()
+
+                appointment.payment_flow = 'pay_now'
+                appointment.save(update_fields=['payment_flow'])
+
+                return Response({
+                    'appointment_id': appointment.id,
+                    'status': 'SCHEDULED',
+                    'payment_required': True,
+                    'payment_link_url': invoice.razorpay_payment_link_url,
+                    'short_url': invoice.razorpay_payment_link_short_url,
+                    'expires_at': expires_at.isoformat(),
+                    'message': 'Complete payment within 30 minutes to confirm your appointment. Your slot is reserved.',
+                }, status=status.HTTP_201_CREATED)
+
+            except Exception as e:
+                logger.error(f'Razorpay payment link creation failed: {e}')
+                # Fall back gracefully — confirm without payment
+                appointment.status = Appointment.StatusChoices.CONFIRMED
+                appointment.payment_flow = 'pay_at_clinic'
+                appointment.save(update_fields=['status', 'payment_flow'])
+                invoice.status = 'pending_at_clinic'
+                invoice.save(update_fields=['status'])
+
+                return Response({
+                    'appointment_id': appointment.id,
+                    'status': 'CONFIRMED',
+                    'payment_required': False,
+                    'pay_now_unavailable': True,
+                    'message': 'We could not initiate online payment. Your appointment is confirmed. Please pay at the clinic.',
+                }, status=status.HTTP_201_CREATED)
+
+        else:
+            # pay_at_clinic or receptionist-booked (receptionist always treated as not applicable)
+            appointment.status = Appointment.StatusChoices.CONFIRMED
+            appointment.payment_flow = 'pay_at_clinic' if request.user.role == 'PATIENT' else 'not_applicable'
+            appointment.save(update_fields=['status', 'payment_flow'])
+            invoice.status = 'pending_at_clinic'
+            invoice.save(update_fields=['status'])
+
+            # Send notification to patient
+            try:
+                doctor_name = doctor_clinic.doctor.user.get_full_name()
+                Notification.objects.create(
+                    recipient=request.user,
+                    notification_type='APPOINTMENT',
+                    title='Appointment Confirmed',
+                    message=(
+                        f'Your appointment with Dr. {doctor_name} on '
+                        f'{appointment.appointment_date} at {appointment.start_time} '
+                        f'is confirmed. Please pay \u20b9{invoice.total_amount} at the clinic on arrival.'
+                    )
+                )
+            except Exception as e:
+                logger.error(f'Failed to send appointment notification: {e}')
+
+            return Response({
+                'appointment_id': appointment.id,
+                'status': 'CONFIRMED',
+                'payment_required': False,
+                'message': f'Appointment confirmed. Please pay \u20b9{invoice.total_amount} at the clinic on arrival.',
+            }, status=status.HTTP_201_CREATED)
 
 
 class ReceptionistBookAppointmentView(APIView):

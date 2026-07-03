@@ -22,10 +22,14 @@ import {
   ShieldCheck,
   BarChart3,
   CreditCard,
+  Landmark,
+  Settings,
 } from "lucide-react";
 import { PageLoader } from "@/components/ui/Skeleton";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { SubscriptionProvider, useSubscription } from "@/context/SubscriptionContext";
+import { AlertCircle } from "lucide-react";
 
 interface NavItem {
   label: string;
@@ -40,9 +44,9 @@ const COMMON_NAV: NavItem[] = [
 
 const ROLE_NAV: Record<string, NavItem[]> = {
   PATIENT: [
-    { label: "Book Appointment", href: "/dashboard/book",    icon: CalendarPlus },
-    { label: "Medical History",  href: "/dashboard/history", icon: ClipboardList },
-    { label: "Billing & Payments", href: "/dashboard/billing", icon: Receipt },
+    { label: "Book Appointment", href: "/dashboard/book",            icon: CalendarPlus },
+    { label: "Medical History",  href: "/dashboard/history",         icon: ClipboardList },
+    { label: "My Invoices",      href: "/dashboard/patient/invoices", icon: Receipt },
   ],
   DOCTOR: [
     { label: "Live Queue",    href: "/dashboard/doctor",            icon: LayoutDashboard },
@@ -57,6 +61,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: "Doctor Schedules",     href: "/dashboard/admin/schedules",     icon: Clock },
     { label: "Clinic Inventory",     href: "/dashboard/admin/inventory",     icon: Package },
     { label: "Subscription",         href: "/dashboard/admin/subscription",  icon: CreditCard },
+    { label: "Bank Account",         href: "/dashboard/admin/bank",          icon: Landmark },
   ],
   RECEPTIONIST: [
     { label: "Manage Patients",  href: "/dashboard/receptionist/patients", icon: Users },
@@ -68,6 +73,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
   SUPER_ADMIN: [
     { label: "Platform Overview", href: "/dashboard/super-admin",          icon: ShieldCheck },
     { label: "All Clinics",       href: "/dashboard/super-admin#clinics",  icon: BarChart3 },
+    { label: "Platform Settings", href: "/dashboard/super-admin/settings", icon: Settings },
   ],
 };
 
@@ -90,6 +96,25 @@ function NavLink({ href, icon: Icon, label, active }: NavItem & { active: boolea
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full -ml-px hidden sm:block" />
       )}
     </Link>
+  );
+}
+
+function SubscriptionBanner({ userRole }: { userRole: string }) {
+  const { subscription } = useSubscription();
+  // Only CLINIC_ADMIN sees the subscription warning banner
+  if (userRole !== 'CLINIC_ADMIN') return null;
+  if (!subscription || !subscription.show_warning) return null;
+  const graceEnd = subscription.grace_period_end
+    ? new Date(subscription.grace_period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'soon';
+  return (
+    <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-center justify-center gap-3 relative z-20">
+      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+      <p className="text-red-700 text-sm font-medium">
+        Payment failed. Account suspends on {graceEnd}.
+        {' '}<a href="/dashboard/admin/subscription" className="underline font-bold">Update billing →</a>
+      </p>
+    </div>
   );
 }
 
@@ -138,8 +163,9 @@ export default function DashboardLayout({
     : user.email[0].toUpperCase();
 
   return (
-    <NotificationProvider>
-      <div className="flex min-h-screen bg-gray-50 transition-colors duration-300 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
+    <SubscriptionProvider userRole={user.role}>
+      <NotificationProvider>
+        <div className="flex min-h-screen bg-gray-50 transition-colors duration-300 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
       
       {/* Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
@@ -257,11 +283,14 @@ export default function DashboardLayout({
           <NotificationBell />
         </header>
         
+        <SubscriptionBanner userRole={user.role} />
+        
         <div className="p-6 max-w-7xl mx-auto animate-fade-in relative z-10 w-full flex-1 min-h-0">
           {children}
         </div>
       </main>
-    </div>
-    </NotificationProvider>
+      </div>
+      </NotificationProvider>
+    </SubscriptionProvider>
   );
 }

@@ -21,10 +21,20 @@ class Clinic(models.Model):
         default=SubscriptionChoices.BASIC
     )
     
-    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
-    stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
-    subscription_status = models.CharField(max_length=50, blank=True, null=True, help_text="e.g. active, past_due, canceled")
-    subscription_end_date = models.DateTimeField(blank=True, null=True)
+    # Razorpay Route — for receiving patient payments
+    razorpay_linked_account_id = models.CharField(max_length=100, blank=True)
+    linked_account_status = models.CharField(max_length=30, default='not_started',
+        choices=[('not_started','Not Started'),('kyc_submitted','KYC Submitted'),
+                 ('kyc_under_review','Under Review'),('kyc_verified','Verified'),
+                 ('kyc_rejected','Rejected')])
+    kyc_rejection_reason = models.TextField(blank=True)
+    
+    # Bank details (store for reference after KYC)
+    bank_account_number = models.CharField(max_length=50, blank=True)
+    bank_ifsc = models.CharField(max_length=20, blank=True)
+    bank_account_name = models.CharField(max_length=100, blank=True)
+    business_pan = models.CharField(max_length=10, blank=True)
+    gstin = models.CharField(max_length=15, blank=True)
 
     is_active = models.BooleanField(default=True)
 

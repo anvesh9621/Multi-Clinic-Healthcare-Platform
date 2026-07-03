@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { PageLoader } from "@/components/ui/Skeleton";
 
+import { useQuery } from "@tanstack/react-query";
+
 interface Appointment {
   id: number;
   appointment_date: string;
@@ -29,33 +31,19 @@ interface Appointment {
 }
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
   const { user } = useContext(AuthContext);
   const router = useRouter();
 
-  const fetchAppointments = async () => {
-    try {
+  const { data: appointmentsData, isLoading: loading, refetch: fetchAppointments } = useQuery({
+    queryKey: ["appointments"],
+    queryFn: async () => {
       const data = await getAppointments();
-      // Ensure we get an array
-      const appts = Array.isArray(data) ? data : data.results || [];
-      setAppointments(appts);
-    } catch {
-      console.error("Failed to fetch appointments");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (Array.isArray(data) ? data : data.results || []) as Appointment[];
+    },
+    refetchInterval: 15000,
+  });
 
-  useEffect(() => {
-    fetchAppointments();
-    // Poll every 15 seconds for real-time updates
-    const intervalId = setInterval(() => {
-      fetchAppointments();
-    }, 15000);
-
-    return () => clearInterval(intervalId);
-  }, []);
+  const appointments = appointmentsData || [];
 
   const handleStatusChange = async (id: number, status: string) => {
     try {

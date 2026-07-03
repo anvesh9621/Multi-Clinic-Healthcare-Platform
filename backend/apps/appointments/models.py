@@ -59,6 +59,16 @@ class Appointment(models.Model):
     notes = models.TextField(blank=True, null=True)
     queue_token = models.CharField(max_length=20, blank=True, null=True)
     
+    payment_flow = models.CharField(
+        max_length=20,
+        choices=[
+            ('not_applicable', 'Not Applicable'),
+            ('pay_now', 'Pay Now'),
+            ('pay_at_clinic', 'Pay at Clinic'),
+        ],
+        default='not_applicable'
+    )
+    
     follow_up_date = models.DateField(blank=True, null=True, help_text="Suggested follow-up date by doctor")
 
     created_at = models.DateTimeField(auto_now_add=True)

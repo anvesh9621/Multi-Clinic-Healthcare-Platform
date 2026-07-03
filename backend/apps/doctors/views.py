@@ -226,10 +226,14 @@ class CreateDoctorScheduleView(APIView):
         return Response({"success": True, "schedule_id": schedule.id}, status=status.HTTP_201_CREATED)
 
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+
 class PublicSpecialtyListView(APIView):
     """Public — returns a list of unique specialties that have active doctors."""
     permission_classes = [AllowAny]
 
+    @method_decorator(cache_page(60 * 15))
     def get(self, request):
         active_doctors = Doctor.objects.filter(clinic_associations__is_active=True)
         specialties = active_doctors.values_list('specialization', flat=True).distinct()
@@ -240,6 +244,7 @@ class PublicDoctorListView(APIView):
     """Public — returns active doctors filtered by specialty. Includes basic profile details."""
     permission_classes = [AllowAny]
 
+    @method_decorator(cache_page(60 * 15))
     def get(self, request):
         specialty = request.query_params.get("specialty")
         queryset = Doctor.objects.filter(clinic_associations__is_active=True).distinct()

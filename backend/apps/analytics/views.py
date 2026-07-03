@@ -110,6 +110,35 @@ class SuperAdminStatsView(APIView):
                 "total_patients": clinic.appointments.values("patient").distinct().count(),
             })
 
+        from apps.audit.models import AuditLog
+        from datetime import timedelta
+
+        # 7-day trend
+        trend_data = []
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            day_rev = Invoice.objects.filter(
+                status="PAID", created_at__date=d
+            ).aggregate(total=Sum("total_amount"))["total"] or 0
+            day_appts = Appointment.objects.filter(appointment_date=d).count()
+            trend_data.append({
+                "date": d.strftime("%b %d"),
+                "revenue": float(day_rev),
+                "appointments": day_appts
+            })
+
+        # Recent 10 audit logs
+        recent_logs = []
+        for log in AuditLog.objects.select_related("user", "clinic").order_by("-timestamp")[:10]:
+            recent_logs.append({
+                "id": log.id,
+                "timestamp": log.timestamp,
+                "action": log.action_type,
+                "user": log.user.get_full_name() if log.user else "System",
+                "clinic": log.clinic.name if log.clinic else "Platform",
+                "description": log.description
+            })
+
         return Response({
             "success": True,
             "data": {
@@ -120,5 +149,7 @@ class SuperAdminStatsView(APIView):
                 "appointments_today": appointments_today,
                 "total_revenue_paid": float(total_revenue),
                 "clinic_breakdown": clinic_breakdown,
+                "trend_data": trend_data,
+                "recent_logs": recent_logs,
             }
         })

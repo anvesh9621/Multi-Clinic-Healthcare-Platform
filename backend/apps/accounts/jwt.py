@@ -8,7 +8,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        email = attrs.get("email")
+        email = attrs.get("email", "").strip().lower()
         password = attrs.get("password")
 
         user = authenticate(email=email, password=password)

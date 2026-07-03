@@ -64,11 +64,11 @@ export function SkeletonGrid({ count = 4, cols = 2 }: { count?: number; cols?: n
   );
 }
 
-/** Full-page loading overlay */
+/** Localized page content loader */
 export function PageLoader({ message = "Loading..." }: { message?: string }) {
   return (
-    <div className="min-h-screen bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm flex items-center justify-center fixed inset-0 z-50">
-      <div className="flex flex-col items-center gap-6 glass p-10 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-700/50 animate-fade-in-up">
+    <div className="w-full py-24 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-6 p-8 rounded-3xl animate-fade-in-up">
         <div className="relative w-16 h-16 flex items-center justify-center">
           <div className="absolute inset-0 rounded-full border-4 border-indigo-100 dark:border-slate-700" />
           <div className="absolute inset-0 rounded-full border-4 border-t-cyan-400 border-r-indigo-500 border-b-transparent border-l-transparent animate-spin blur-[1px]" />
@@ -76,7 +76,7 @@ export function PageLoader({ message = "Loading..." }: { message?: string }) {
             <div className="w-3 h-3 bg-white rounded-sm -rotate-45" />
           </div>
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-300 font-semibold tracking-wide uppercase heading-font">{message}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold tracking-wide uppercase heading-font">{message}</p>
       </div>
     </div>
   );

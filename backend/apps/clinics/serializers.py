@@ -64,3 +64,9 @@ class ClinicRegistrationSerializer(serializers.Serializer):
                 "clinic": clinic,
                 "admin": user
             }
+
+class SuperAdminClinicCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import Clinic
+        model = Clinic
+        fields = ['id', 'name', 'address', 'subscription_plan']

@@ -1,248 +1,251 @@
-import stripe
-import json
-from datetime import datetime
-
-from django.conf import settings
-from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from apps.subscriptions.permissions import IsClinicAdminOnly, IsClinicAdminOrSuperAdmin
+from django.conf import settings
+from apps.billing.razorpay_client import get_razorpay_client
+from .models import Subscription
+import hmac
+import hashlib
+import logging
 
-from .models import Subscription, PLAN_STRIPE_DATA
-from .serializers import SubscriptionSerializer
+logger = logging.getLogger(__name__)
 
-stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', 'sk_test_dummy')
+class CreateSubscriptionView(APIView):
+    permission_classes = [IsAuthenticated, IsClinicAdminOnly]
+
+    def post(self, request):
+        clinic = getattr(request.user, 'clinic', None)
+        if not clinic:
+            return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        plan = request.data.get('plan')
+        if not plan or plan not in ['professional', 'enterprise']:
+            return Response({'error': 'Valid plan is required (professional or enterprise).'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            client = get_razorpay_client()
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
+        sub, _ = Subscription.objects.get_or_create(clinic=clinic)
+        
+        # 1. Create Customer if needed
+        if not sub.razorpay_customer_id:
+            customer_data = {
+                "name": clinic.name,
+                "email": request.user.email,
+                "contact": request.user.phone_number if hasattr(request.user, 'phone_number') and request.user.phone_number else "",
+                "fail_existing": "0",
+            }
+            try:
+                customer = client.customer.create(data=customer_data)
+                sub.razorpay_customer_id = customer['id']
+                sub.save()
+            except Exception as e:
+                return Response({'error': f"Customer creation failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 2. Create Subscription
+        plan_id = settings.RAZORPAY_PLAN_IDS.get(plan)
+        if not plan_id:
+            return Response({'error': f'Razorpay Plan ID for {plan} is missing. Please add RAZORPAY_PLAN_ID_{plan.upper()} to your .env file.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        subscription_data = {
+            'plan_id': plan_id,
+            'customer_notify': 1,
+            'quantity': 1,
+            'total_count': 120,  # 10 years — effectively indefinite
+            'notes': {
+                'clinic_id': str(clinic.id),
+                'clinic_name': clinic.name,
+            }
+        }
+
+        try:
+            rzp_sub = client.subscription.create(data=subscription_data)
+            sub.razorpay_subscription_id = rzp_sub['id']
+            sub.razorpay_plan_id = plan_id
+            sub.plan = plan
+            sub.status = 'created'  # Will become active after e-mandate + first charge
+            sub.save()
+
+            # Get the publishable key to send to frontend
+            from apps.billing.models import PlatformSettings
+            settings_obj = PlatformSettings.objects.first()
+            key_id = (settings_obj.razorpay_key_id if settings_obj and settings_obj.razorpay_key_id
+                      else getattr(settings, 'RAZORPAY_KEY_ID', ''))
+
+            return Response({
+                'subscription_id': rzp_sub['id'],
+                'razorpay_key': key_id,
+            })
+        except Exception as e:
+            logger.error(f"Subscription creation failed: {e}")
+            return Response({'error': f"Subscription creation failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class SubscriptionStatusView(APIView):
-    """GET — returns the current subscription for the authenticated clinic."""
-    permission_classes = [IsAuthenticated]
+    # SUPER_ADMIN can also call this to inspect any clinic's status
+    permission_classes = [IsAuthenticated, IsClinicAdminOrSuperAdmin]
 
     def get(self, request):
         clinic = getattr(request.user, 'clinic', None)
         if not clinic:
-            return Response({'error': 'No clinic associated with your account.'}, status=400)
+            return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        sub = getattr(clinic, 'subscription', None)
+        if not sub:
+            return Response({
+                'status': 'inactive',
+                'plan': 'starter',
+                'trial_end': None,
+                'current_period_end': None,
+                'grace_period_end': None,
+                'show_warning': False,
+                'warning_message': ''
+            })
 
-        sub, _ = Subscription.objects.get_or_create(
-            clinic=clinic,
-            defaults={'plan': 'STARTER', 'status': 'ACTIVE'},
-        )
-        return Response(SubscriptionSerializer(sub).data)
+        show_warning = False
+        warning_message = ''
+        
+        if sub.status == 'past_due':
+            show_warning = True
+            grace_end_str = sub.grace_period_end.strftime('%B %d, %Y') if sub.grace_period_end else "soon"
+            warning_message = f"Payment failed. Update your payment method to avoid suspension on {grace_end_str}."
 
-
-class CreateCheckoutSessionView(APIView):
-    """POST { plan: 'PROFESSIONAL' | 'ENTERPRISE' } — creates a Stripe Checkout Session."""
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        plan = request.data.get('plan', '').upper()
-        clinic = getattr(request.user, 'clinic', None)
-
-        if not clinic:
-            return Response({'error': 'No clinic associated with your account.'}, status=400)
-
-        if plan not in PLAN_STRIPE_DATA:
-            return Response({'error': f'Invalid plan "{plan}". Choose PROFESSIONAL or ENTERPRISE.'}, status=400)
-
-        plan_data = PLAN_STRIPE_DATA[plan]
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-
-        try:
-            sub, _ = Subscription.objects.get_or_create(
-                clinic=clinic,
-                defaults={'plan': 'STARTER', 'status': 'ACTIVE'},
-            )
-
-            # Get or create Stripe Customer
-            customer_id = sub.stripe_customer_id
-            if not customer_id:
-                customer = stripe.Customer.create(
-                    email=request.user.email,
-                    name=clinic.name,
-                    metadata={'clinic_id': str(clinic.id)},
-                )
-                customer_id = customer.id
-                sub.stripe_customer_id = customer_id
-                sub.save()
-
-            session = stripe.checkout.Session.create(
-                customer=customer_id,
-                payment_method_types=['card'],
-                mode='subscription',
-                line_items=[{
-                    'price_data': {
-                        'currency': 'usd',
-                        'unit_amount': plan_data['amount'],
-                        'recurring': {'interval': 'month'},
-                        'product_data': {
-                            'name': plan_data['name'],
-                            'description': plan_data['description'],
-                        },
-                    },
-                    'quantity': 1,
-                }],
-                subscription_data={
-                    'trial_period_days': 14,
-                    'metadata': {
-                        'clinic_id': str(clinic.id),
-                        'plan': plan,
-                    },
-                },
-                success_url=f"{frontend_url}/subscribe/success?session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{frontend_url}/subscribe/cancel",
-                metadata={
-                    'clinic_id': str(clinic.id),
-                    'plan': plan,
-                },
-            )
-
-            sub.stripe_checkout_session_id = session.id
-            sub.save()
-
-            return Response({'url': session.url, 'session_id': session.id})
-
-        except stripe.error.StripeError as e:
-            return Response({'error': str(e.user_message)}, status=400)
-        except Exception as e:
-            return Response({'error': str(e)}, status=400)
+        return Response({
+            'status': sub.status,
+            'plan': sub.plan,
+            'trial_end': sub.trial_end,
+            'current_period_end': sub.current_period_end,
+            'grace_period_end': sub.grace_period_end,
+            'show_warning': show_warning,
+            'warning_message': warning_message
+        })
 
 
 class CancelSubscriptionView(APIView):
-    """POST — cancels the active subscription at period end."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsClinicAdminOnly]
 
     def post(self, request):
         clinic = getattr(request.user, 'clinic', None)
         if not clinic:
-            return Response({'error': 'No clinic associated.'}, status=400)
-
+            return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        sub = getattr(clinic, 'subscription', None)
+        if not sub or not sub.razorpay_subscription_id:
+            return Response({'error': 'No active subscription found.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        client = get_razorpay_client()
+        
         try:
-            sub = Subscription.objects.get(clinic=clinic)
-        except Subscription.DoesNotExist:
-            return Response({'error': 'No subscription found.'}, status=404)
-
-        if not sub.stripe_subscription_id:
-            return Response({'error': 'No active Stripe subscription.'}, status=400)
-
-        try:
-            stripe.Subscription.modify(
-                sub.stripe_subscription_id,
-                cancel_at_period_end=True,
-            )
-            sub.status = 'CANCELED'
+            client.subscription.cancel(sub.razorpay_subscription_id, {"cancel_at_cycle_end": 0})
+            sub.status = 'cancelled'
             sub.save()
-            return Response({'message': 'Subscription will be canceled at the end of the billing period.'})
-        except stripe.error.StripeError as e:
-            return Response({'error': str(e.user_message)}, status=400)
+            return Response({'message': 'Subscription cancelled successfully.'})
+        except Exception as e:
+            return Response({'error': f"Subscription cancellation failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class SubscriptionWebhookView(APIView):
-    """Stripe webhook — updates subscription status on events."""
-    permission_classes = [AllowAny]
+class VerifySubscriptionView(APIView):
+    """
+    POST /api/subscriptions/verify/
+    Called by frontend after Razorpay e-mandate succeeds.
+    Verifies the HMAC signature and marks the subscription as active.
+    """
+    permission_classes = [IsAuthenticated, IsClinicAdminOnly]
 
     def post(self, request):
-        payload = request.body
-        sig_header = request.headers.get('STRIPE_SIGNATURE', '')
-        webhook_secret = getattr(settings, 'STRIPE_SUBSCRIPTION_WEBHOOK_SECRET', '')
+        clinic = getattr(request.user, 'clinic', None)
+        if not clinic:
+            return Response({'error': 'Not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
 
+        payment_id = request.data.get('razorpay_payment_id', '')
+        subscription_id = request.data.get('razorpay_subscription_id', '')
+        signature = request.data.get('razorpay_signature', '')
+
+        if not all([payment_id, subscription_id, signature]):
+            return Response(
+                {'error': 'razorpay_payment_id, razorpay_subscription_id, and razorpay_signature are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Retrieve secret key
+        from apps.billing.models import PlatformSettings
+        settings_obj = PlatformSettings.objects.first()
+        secret = (settings_obj.razorpay_key_secret if settings_obj and settings_obj.razorpay_key_secret
+                  else getattr(settings, 'RAZORPAY_KEY_SECRET', ''))
+
+        if not secret:
+            return Response({'error': 'Payment gateway secret is not configured.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # HMAC-SHA256 verification
+        message = f"{payment_id}|{subscription_id}"
+        expected_signature = hmac.new(
+            secret.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_signature, signature):
+            logger.warning(f"Subscription payment signature mismatch for clinic {clinic.id}")
+            return Response({'error': 'Payment verification failed. Invalid signature.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Signature valid — activate the subscription
+        sub, _ = Subscription.objects.get_or_create(clinic=clinic)
+        sub.razorpay_subscription_id = subscription_id
+        sub.status = 'active'
+        sub.save()
+
+        logger.info(f"Subscription verified and activated for clinic {clinic.id} (sub_id={subscription_id})")
+        return Response({'success': True, 'message': 'Subscription activated successfully.'})
+
+
+class SubscriptionInvoiceListView(APIView):
+    permission_classes = [IsAuthenticated, IsClinicAdminOnly]
+
+    def get(self, request):
+        clinic = getattr(request.user, 'clinic', None)
+        if not clinic:
+            return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        from apps.billing.models import SubscriptionInvoice
+        invoices = SubscriptionInvoice.objects.filter(clinic=clinic).order_by('-issued_at')
+        
+        data = []
+        for inv in invoices:
+            data.append({
+                'id': inv.id,
+                'invoice_number': inv.invoice_number,
+                'total_amount': str(inv.total_amount),
+                'period_start': inv.period_start,
+                'period_end': inv.period_end,
+                'issued_at': inv.issued_at,
+                'has_pdf': bool(inv.pdf_path)
+            })
+            
+        return Response(data)
+
+
+class SubscriptionInvoiceDownloadView(APIView):
+    permission_classes = [IsAuthenticated, IsClinicAdminOnly]
+
+    def get(self, request, pk):
+        clinic = getattr(request.user, 'clinic', None)
+        if not clinic:
+            return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
+            
+        from apps.billing.models import SubscriptionInvoice
+        from django.http import FileResponse
+        import os
+        
         try:
-            if webhook_secret:
-                event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-            else:
-                event = json.loads(payload.decode('utf-8'))
-        except (stripe.error.SignatureVerificationError, Exception) as e:
-            return Response({'error': str(e)}, status=400)
-
-        event_type = event['type']
-        data = event['data']['object']
-
-        if event_type == 'checkout.session.completed':
-            self._handle_checkout_complete(data)
-
-        elif event_type in ('customer.subscription.updated', 'customer.subscription.created'):
-            self._handle_subscription_update(data)
-
-        elif event_type == 'customer.subscription.deleted':
-            self._handle_subscription_deleted(data)
-
-        elif event_type == 'invoice.payment_failed':
-            self._handle_payment_failed(data)
-
-        return Response(status=200)
-
-    # ── Handlers ──────────────────────────────────────────────────────────────
-
-    def _handle_checkout_complete(self, session):
-        clinic_id = session.get('metadata', {}).get('clinic_id')
-        plan = session.get('metadata', {}).get('plan')
-        stripe_sub_id = session.get('subscription')
-
-        if not (clinic_id and plan):
-            return
-
-        try:
-            sub = Subscription.objects.get(clinic_id=int(clinic_id))
-            sub.plan = plan
-            sub.stripe_subscription_id = stripe_sub_id
-            sub.status = 'TRIALING'
-            sub.save()
-        except Subscription.DoesNotExist:
-            pass
-
-    def _handle_subscription_update(self, stripe_sub):
-        clinic_id = stripe_sub.get('metadata', {}).get('clinic_id')
-        plan = stripe_sub.get('metadata', {}).get('plan')
-
-        if not clinic_id:
-            return
-
-        STATUS_MAP = {
-            'active':     'ACTIVE',
-            'trialing':   'TRIALING',
-            'past_due':   'PAST_DUE',
-            'canceled':   'CANCELED',
-            'incomplete': 'INACTIVE',
-            'unpaid':     'PAST_DUE',
-        }
-
-        try:
-            sub = Subscription.objects.get(clinic_id=int(clinic_id))
-            if plan:
-                sub.plan = plan
-            sub.status = STATUS_MAP.get(stripe_sub.get('status', ''), 'ACTIVE')
-
-            period_end = stripe_sub.get('current_period_end')
-            if period_end:
-                sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
-
-            trial_end = stripe_sub.get('trial_end')
-            if trial_end:
-                sub.trial_end = datetime.fromtimestamp(trial_end, tz=timezone.utc)
-
-            sub.save()
-        except Subscription.DoesNotExist:
-            pass
-
-    def _handle_subscription_deleted(self, stripe_sub):
-        try:
-            sub = Subscription.objects.get(stripe_subscription_id=stripe_sub['id'])
-            sub.status = 'CANCELED'
-            sub.plan = 'STARTER'
-            sub.save()
-        except Subscription.DoesNotExist:
-            pass
-
-    def _handle_payment_failed(self, invoice):
-        stripe_sub_id = invoice.get('subscription')
-        if stripe_sub_id:
-            try:
-                sub = Subscription.objects.get(stripe_subscription_id=stripe_sub_id)
-                sub.status = 'PAST_DUE'
-                sub.save()
-            except Subscription.DoesNotExist:
-                pass
+            inv = SubscriptionInvoice.objects.get(id=pk, clinic=clinic)
+        except SubscriptionInvoice.DoesNotExist:
+            return Response({'error': 'Invoice not found.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if not inv.pdf_path or not os.path.exists(inv.pdf_path):
+            return Response({'error': 'PDF not generated yet.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        return FileResponse(open(inv.pdf_path, 'rb'), content_type='application/pdf', filename=f"{inv.invoice_number}.pdf")

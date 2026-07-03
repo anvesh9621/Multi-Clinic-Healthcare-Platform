@@ -1,9 +1,8 @@
 from django.db import models
 from django.utils import timezone
 
-
 PLAN_FEATURES = {
-    'STARTER': {
+    'starter': {
         'max_doctors': 1,
         'analytics': False,
         'billing': False,
@@ -12,77 +11,54 @@ PLAN_FEATURES = {
         'label': 'Starter',
         'price': 0,
     },
-    'PROFESSIONAL': {
+    'professional': {
         'max_doctors': 10,
         'analytics': True,
         'billing': True,
         'inventory': True,
         'multi_clinic': False,
         'label': 'Professional',
-        'price': 49,
+        'price': 999,
     },
-    'ENTERPRISE': {
+    'enterprise': {
         'max_doctors': None,
         'analytics': True,
         'billing': True,
         'inventory': True,
         'multi_clinic': True,
         'label': 'Enterprise',
-        'price': 199,
+        'price': 2999,
     },
 }
-
-PLAN_STRIPE_DATA = {
-    'PROFESSIONAL': {
-        'amount': 4900,
-        'name': 'MediClinic Professional',
-        'description': 'Up to 10 doctors, unlimited appointments, billing & analytics',
-    },
-    'ENTERPRISE': {
-        'amount': 19900,
-        'name': 'MediClinic Enterprise',
-        'description': 'Unlimited doctors, multi-clinic, white-label, dedicated support',
-    },
-}
-
 
 class Subscription(models.Model):
-
-    class PlanChoices(models.TextChoices):
-        STARTER      = 'STARTER',      'Starter'
-        PROFESSIONAL = 'PROFESSIONAL', 'Professional'
-        ENTERPRISE   = 'ENTERPRISE',   'Enterprise'
-
-    class StatusChoices(models.TextChoices):
-        ACTIVE   = 'ACTIVE',    'Active'
-        TRIALING = 'TRIALING',  'Trialing'
-        PAST_DUE = 'PAST_DUE',  'Past Due'
-        CANCELED = 'CANCELED',  'Canceled'
-        INACTIVE = 'INACTIVE',  'Inactive'
-
-    clinic = models.OneToOneField(
-        'clinics.Clinic',
-        on_delete=models.CASCADE,
-        related_name='subscription',
-    )
-    plan = models.CharField(
-        max_length=20,
-        choices=PlanChoices.choices,
-        default=PlanChoices.STARTER,
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=StatusChoices.choices,
-        default=StatusChoices.ACTIVE,
-    )
-
-    stripe_customer_id          = models.CharField(max_length=255, blank=True, null=True)
-    stripe_subscription_id      = models.CharField(max_length=255, blank=True, null=True)
-    stripe_checkout_session_id  = models.CharField(max_length=255, blank=True, null=True)
-
-    trial_end           = models.DateTimeField(null=True, blank=True)
-    current_period_end  = models.DateTimeField(null=True, blank=True)
-
+    clinic = models.OneToOneField('clinics.Clinic', on_delete=models.CASCADE, related_name='subscription')
+    
+    # Razorpay IDs
+    razorpay_customer_id = models.CharField(max_length=100, blank=True)
+    razorpay_subscription_id = models.CharField(max_length=100, blank=True)
+    razorpay_plan_id = models.CharField(max_length=100, blank=True)
+    
+    # Plan
+    plan = models.CharField(max_length=50, default='starter',
+        choices=[('starter','Starter'),('professional','Professional'),('enterprise','Enterprise')])
+    
+    # Status — single source of truth
+    status = models.CharField(max_length=30, default='trialing',
+        choices=[('trialing','Trialing'),('active','Active'),('past_due','Past Due'),
+                 ('halted','Halted'),('cancelled','Cancelled'),('expired','Expired')])
+    
+    # Dates
+    trial_end = models.DateTimeField(null=True, blank=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    
+    # Grace period tracking
+    payment_failed_at = models.DateTimeField(null=True, blank=True)
+    grace_period_end = models.DateTimeField(null=True, blank=True)  # failed_at + 10 days
+    
+    # GST
+    clinic_gstin = models.CharField(max_length=15, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -91,8 +67,8 @@ class Subscription(models.Model):
 
     @property
     def features(self):
-        return PLAN_FEATURES.get(self.plan, PLAN_FEATURES['STARTER'])
+        return PLAN_FEATURES.get(self.plan, PLAN_FEATURES['starter'])
 
     @property
     def is_active(self):
-        return self.status in [self.StatusChoices.ACTIVE, self.StatusChoices.TRIALING]
+        return self.status in ['active', 'trialing', 'past_due']

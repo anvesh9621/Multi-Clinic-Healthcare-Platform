@@ -20,4 +20,8 @@ export const getCurrentUser = async () => {
 export const logout = () => {
   localStorage.removeItem("access");
   localStorage.removeItem("refresh");
+  // Hard redirect to clear React Query cache and AuthContext state
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
 };

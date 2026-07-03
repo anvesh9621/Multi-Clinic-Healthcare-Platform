@@ -134,3 +134,72 @@ class PasswordResetConfirmView(APIView):
             {"success": True, "message": "Password reset successfully. You can now log in."},
             status=status.HTTP_200_OK,
         )
+
+from .permissions import IsSuperAdmin
+from .serializers import ClinicAdminCreateSerializer
+
+class SuperAdminCreateClinicAdminView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def post(self, request):
+        serializer = ClinicAdminCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        admin_user = serializer.save()
+
+        log_action(
+            user=request.user,
+            clinic=admin_user.clinic,
+            action_type=AuditLog.ActionChoices.CREATE,
+            object_type="User",
+            object_id=admin_user.id,
+            description=f"Super Admin created clinic admin {admin_user.email}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Clinic admin created successfully.",
+                "admin_id": admin_user.id,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+from rest_framework_simplejwt.tokens import RefreshToken
+
+class SuperAdminImpersonateView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def post(self, request):
+        clinic_id = request.data.get("clinic_id")
+        if not clinic_id:
+            return Response({"success": False, "error": "clinic_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find the clinic admin for this clinic
+        admin_user = User.objects.filter(clinic_id=clinic_id, role=User.RoleChoices.CLINIC_ADMIN).first()
+        if not admin_user:
+            return Response({"success": False, "error": "No Clinic Admin found for this clinic."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Generate tokens
+        refresh = RefreshToken.for_user(admin_user)
+
+        log_action(
+            user=request.user,
+            clinic=admin_user.clinic,
+            action_type=AuditLog.ActionChoices.LOGIN,
+            object_type="User",
+            object_id=admin_user.id,
+            description=f"Super Admin impersonated Clinic Admin {admin_user.email}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response({
+            "success": True,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        })

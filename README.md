@@ -51,11 +51,13 @@ It is designed around **five distinct user roles**, each with their own dashboar
 ## ✨ Features
 
 ### For Patients
-- 🗓️ Self-service appointment booking with real-time slot availability
+- 🗓️ **5-Step Booking Wizard**: Seamless single-page flow (Clinic → Doctor → Date/Time → Pay).
+- 💳 **Online & In-Clinic Payments**: Integrated with Razorpay (UPI, Cards, Netbanking) with fallback to "Pay at Clinic".
+- 👤 **Inline Authentication**: Register or login without losing your booking progress.
 - 📋 Pre-visit digital intake form (symptoms, allergies, medications)
 - 🩺 View medical records and doctor notes after consultation
 - 💊 Access digital prescriptions
-- 💳 View and pay invoices online via Stripe
+- 💳 View and pay invoices online via Razorpay/Stripe
 - 🔔 Appointment confirmation and reminder notifications
 
 ### For Doctors
@@ -102,7 +104,7 @@ It is designed around **five distinct user roles**, each with their own dashboar
 | Database | PostgreSQL 15 | Primary datastore |
 | Auth | `djangorestframework-simplejwt` | JWT (30-min access / 7-day refresh) |
 | Async Tasks | Celery + Redis | Non-blocking emails & background jobs |
-| Payments | Stripe | Checkout Sessions, Webhooks, PaymentIntents |
+| Payments | Stripe & Razorpay | Stripe (B2B SaaS Subscriptions), Razorpay (B2C Patient Payments) |
 | Email | SMTP via Gmail | Transactional emails |
 | Media | Local filesystem (`/media/`) | Doctor profile photos |
 
@@ -336,10 +338,15 @@ FRONTEND_URL=http://localhost:3000
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
-# Stripe
+# Stripe (Subscriptions)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_SUBSCRIPTION_WEBHOOK_SECRET=whsec_...
+
+# Razorpay (Patient Payments)
+RAZORPAY_KEY_ID=rzp_test_...
+RAZORPAY_KEY_SECRET=your-secret...
+RAZORPAY_WEBHOOK_SECRET=your-webhook-secret...
 ```
 
 ### Frontend (`frontend/.env.local`)

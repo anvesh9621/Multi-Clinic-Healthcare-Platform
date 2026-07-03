@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import api from "@/services/api";
 
+import { useQuery } from "@tanstack/react-query";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DoctorEntry {
   id: number;
@@ -59,10 +61,6 @@ const initialForm: FormData = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminDoctorsPage() {
   const [activeTab, setActiveTab] = useState<"doctors" | "invites">("doctors");
-
-  const [doctors, setDoctors] = useState<DoctorEntry[]>([]);
-  const [invitesList, setInvitesList] = useState<InvitationEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<FormData>(initialForm);
@@ -71,31 +69,31 @@ export default function AdminDoctorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const { data: doctorsData, isLoading: loadingDoctors, refetch: refetchDoctors } = useQuery({
+    queryKey: ["admin_doctors"],
+    queryFn: async () => {
+      const res = await api.get("/doctors/");
+      const data = res.data;
+      return (Array.isArray(data) ? data : data.results || []) as DoctorEntry[];
+    },
+  });
+
+  const { data: invitesList, isLoading: loadingInvites, refetch: refetchInvites } = useQuery({
+    queryKey: ["admin_invitations"],
+    queryFn: async () => {
+      const res = await api.get("/doctors/invitations/");
+      return res.data as InvitationEntry[];
+    },
+  });
+
+  const doctors = doctorsData || [];
+  const invites = invitesList || [];
+  const loading = activeTab === "doctors" ? loadingDoctors : loadingInvites;
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   };
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      if (activeTab === "doctors") {
-         const res = await api.get("/doctors/");
-         const data = res.data;
-         setDoctors(Array.isArray(data) ? data : data.results || []);
-      } else {
-         const res = await api.get("/doctors/invitations/");
-         setInvitesList(res.data);
-      }
-    } catch {
-      if (activeTab === "doctors") setDoctors([]);
-      else setInvitesList([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filteredDoctors = doctors.filter((d) => {
     const q = search.toLowerCase();
@@ -106,7 +104,7 @@ export default function AdminDoctorsPage() {
     );
   });
 
-  const filteredInvites = invitesList.filter((i) => 
+  const filteredInvites = invites.filter((i) => 
     i.email.toLowerCase().includes(search.toLowerCase()) ||
     i.specialization.toLowerCase().includes(search.toLowerCase())
   );
@@ -134,7 +132,7 @@ export default function AdminDoctorsPage() {
           specialization: form.specialization
       });
       setInviteSuccess(emailArray);
-      fetchData();
+      refetchInvites();
       showToast(`${emailArray.length} invitation(s) sent successfully.`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: any } };
@@ -207,7 +205,7 @@ export default function AdminDoctorsPage() {
           onClick={() => setActiveTab("invites")}
           className={`pb-4 text-sm font-bold transition-colors relative ${activeTab === "invites" ? "text-blue-600" : "text-gray-500 hover:text-gray-900"}`}
         >
-          Sent Invitations ({invitesList.length})
+          Sent Invitations ({invites.length})
           {activeTab === "invites" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full" />}
         </button>
       </div>
