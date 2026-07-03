@@ -42,7 +42,7 @@ razorpay==1.4.1
 reportlab==4.1.0
 
 # ── Celery Beat ───────────────────────────────────────────────────────────────
-django-celery-beat==2.6.0
+django-celery-beat
 
 # ── Twilio (SMS Notifications) ────────────────────────────────────────────────
 twilio==9.10.3
