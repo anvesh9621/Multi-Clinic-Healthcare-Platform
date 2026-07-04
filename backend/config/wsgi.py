@@ -17,7 +17,10 @@ if 'pkg_resources' not in sys.modules:
     class FakeDistribution:
         def __init__(self, version="1.4.1"):
             self.version = version
+    class DistributionNotFound(Exception):
+        pass
     m.require = lambda *args, **kwargs: [FakeDistribution()]
+    m.DistributionNotFound = DistributionNotFound
     sys.modules['pkg_resources'] = m
 
 from django.core.wsgi import get_wsgi_application
