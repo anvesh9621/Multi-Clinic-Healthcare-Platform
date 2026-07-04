@@ -38,6 +38,7 @@ wcwidth==0.7.0
 colorama==0.4.6
 
 # ── Razorpay (Payments) ───────────────────────────────────────────────────────
+setuptools
 razorpay==1.4.1
 reportlab==4.1.0
 
