@@ -2,8 +2,16 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+import types
 
-
+# Monkeypatch for razorpay compatibility with modern python environments
+if 'pkg_resources' not in sys.modules:
+    m = types.ModuleType('pkg_resources')
+    class FakeDistribution:
+        def __init__(self, version="1.4.1"):
+            self.version = version
+    m.require = lambda *args, **kwargs: [FakeDistribution()]
+    sys.modules['pkg_resources'] = m
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
