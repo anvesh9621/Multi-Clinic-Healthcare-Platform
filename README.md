@@ -11,7 +11,8 @@ From appointment booking to billing, prescriptions to inventory — all in one p
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Stripe](https://img.shields.io/badge/Stripe-Integrated-635BFF?style=flat-square&logo=stripe&logoColor=white)](https://stripe.com/)
-[![License](https://img.shields.io/badge/License-Proprietary-red?style=flat-square)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Lint](https://github.com/anvesh9621/Multi-Clinic-Healthcare-Platform/actions/workflows/lint.yml/badge.svg)](https://github.com/anvesh9621/Multi-Clinic-Healthcare-Platform/actions/workflows/lint.yml)
 
 [Features](#-features) · [Tech Stack](#-tech-stack) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Environment Variables](#-environment-variables) · [API Reference](#-api-reference) · [Roles & Permissions](#-roles--permissions) · [Subscription Plans](#-subscription-plans)
 
@@ -458,21 +459,19 @@ Every significant action (create, update, delete, login, logout, book, cancel) i
 
 ## 🤝 Contributing
 
-This is a proprietary project. Contributions are restricted to authorized team members only.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-If you are part of the development team:
-1. Create a feature branch from `main`: `git checkout -b feature/your-feature-name`
-2. Commit with clear messages: `git commit -m "feat: add prescription PDF export"`
-3. Open a pull request against `main` with a detailed description
+1. Fork the repository
+2. Create your feature branch: `git checkout -b feature/your-feature-name`
+3. Commit your changes: `git commit -m "feat: add prescription PDF export"`
+4. Push to the branch: `git push origin feature/your-feature-name`
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is **proprietary and confidential**.  
-Unauthorized copying, distribution, or modification is strictly prohibited.
-
-© 2025 MediClinic. All rights reserved.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
