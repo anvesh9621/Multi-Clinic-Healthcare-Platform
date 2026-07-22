@@ -2,8 +2,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import ListCreateAPIView, ListAPIView
 from rest_framework import status
+from apps.core.tenancy import ClinicQuerysetMixin
 from apps.core.tenancy import get_user_clinic
 
 from .models import DoctorClinic, DoctorSchedule, Doctor, DoctorLeave
@@ -142,15 +143,12 @@ class DoctorInvitationStatusView(APIView):
             return Response({"isValid": False, "error": "Invalid invitation token."}, status=status.HTTP_404_NOT_FOUND)
 
 
-class AdminDoctorInvitationListView(APIView):
-    """Clinic Admin views all sent invitations."""
+class AdminDoctorInvitationListView(ClinicQuerysetMixin, ListAPIView):
+    """Clinic Admin views all sent invitations, scoped to their clinic."""
     permission_classes = [IsClinicAdmin]
-
-    def get(self, request):
-        clinic = request.user.clinic
-        invites = DoctorInvitation.objects.filter(clinic=clinic).order_by("-created_at")
-        serializer = DoctorInvitationSerializer(invites, many=True)
-        return Response(serializer.data)
+    serializer_class = DoctorInvitationSerializer
+    queryset = DoctorInvitation.objects.order_by("-created_at")
+    clinic_field = 'clinic'
 
 
 class DoctorProfileView(APIView):

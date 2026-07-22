@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from apps.accounts.permissions import IsClinicAdminOrReceptionist, IsClinicAdmin, IsPatient
+from apps.core.tenancy import get_user_clinic
 from .models import Invoice
 from apps.billing.razorpay_client import get_razorpay_client
 from apps.notifications.models import Notification
@@ -52,7 +53,7 @@ class InvoiceListView(APIView):
         if user.role == 'PATIENT':
             qs = Invoice.objects.filter(patient__user=user)
         elif user.role in ('CLINIC_ADMIN', 'RECEPTIONIST'):
-            clinic = getattr(user, 'clinic', None)
+            clinic = get_user_clinic(user)
             if not clinic:
                 return qs
             qs = Invoice.objects.filter(clinic=clinic)

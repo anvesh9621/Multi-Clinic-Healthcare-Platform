@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from apps.subscriptions.permissions import IsClinicAdminOnly, IsClinicAdminOrSuperAdmin
+from apps.core.tenancy import get_user_clinic
 from django.conf import settings
 from apps.billing.razorpay_client import get_razorpay_client
 from .models import Subscription
@@ -206,7 +207,7 @@ class SubscriptionInvoiceListView(APIView):
     permission_classes = [IsAuthenticated, IsClinicAdminOnly]
 
     def get(self, request):
-        clinic = getattr(request.user, 'clinic', None)
+        clinic = get_user_clinic(request.user)
         if not clinic:
             return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
             
@@ -232,7 +233,7 @@ class SubscriptionInvoiceDownloadView(APIView):
     permission_classes = [IsAuthenticated, IsClinicAdminOnly]
 
     def get(self, request, pk):
-        clinic = getattr(request.user, 'clinic', None)
+        clinic = get_user_clinic(request.user)
         if not clinic:
             return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
             
