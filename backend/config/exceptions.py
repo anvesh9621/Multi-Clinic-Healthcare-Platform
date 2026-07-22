@@ -42,11 +42,14 @@ def custom_exception_handler(exc, context):
         )
 
     # Fallback for unexpected errors
-    raise exc
-    # return Response(
-    #     {
-    #         "success": False,
-    #         "message": "Internal server error."
-    #     },
-    #     status=status.HTTP_500_INTERNAL_SERVER_ERROR
-    # )
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.exception("Unexpected error in API endpoint")
+    
+    return Response(
+        {
+            "success": False,
+            "message": "Internal server error."
+        },
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+    )

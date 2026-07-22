@@ -55,7 +55,6 @@ class BookAppointmentView(APIView):
         if doctor_clinic.clinic_id != clinic.id:
             raise ValueError("Doctor does not belong to this clinic.")
 
-        import traceback
         try:
             appointment = book_appointment(
                 clinic=clinic,
@@ -68,7 +67,8 @@ class BookAppointmentView(APIView):
                 reason=data.get("reason"),
             )
         except Exception as e:
-            return Response({"detail": f"Server Error: {str(e)}", "trace": traceback.format_exc()}, status=status.HTTP_400_BAD_REQUEST)
+            logger.exception("Appointment booking failed")
+            return Response({"detail": "We couldn't complete this booking. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
             user=request.user,
