@@ -245,38 +245,59 @@ class DoctorAcceptInviteSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid invitation token.")
 
     def save(self):
-        token = self.validated_data["token"]
-        invite = DoctorInvitation.objects.get(token=token)
-
-        user = User.objects.create_user(
-            email=invite.email,
-            password=self.validated_data["password"],
-            role="DOCTOR",
-            clinic=invite.clinic,
-            first_name=self.validated_data["first_name"],
-            last_name=self.validated_data.get("last_name", "")
-        )
-
-        doctor = Doctor.objects.create(
-            user=user,
-            specialization=self.validated_data["specialization"],
-            experience_years=self.validated_data.get("experience_years", 0),
-            qualifications=self.validated_data.get("qualifications", ""),
-            languages_spoken=self.validated_data.get("languages_spoken", []),
-            about=self.validated_data.get("bio", ""),
-            education=self.validated_data.get("education", [])
-        )
-
-        DoctorClinic.objects.create(
-            doctor=doctor,
-            clinic=invite.clinic,
-            consultation_fee=self.validated_data.get("consultation_fee", 500)
-        )
-
-        invite.status = "ACCEPTED"
-        invite.save()
+        from django.db import transaction
         
-        return user
+        token = self.validated_data["token"]
+        
+        with transaction.atomic():
+            invite = DoctorInvitation.objects.get(token=token)
+            
+            user = User.objects.filter(email=invite.email).first()
+            if user:
+                if user.role != "DOCTOR":
+                    raise serializers.ValidationError("This email is already registered with a different role.")
+                
+                doctor, created = Doctor.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        "specialization": self.validated_data["specialization"],
+                        "experience_years": self.validated_data.get("experience_years", 0),
+                        "qualifications": self.validated_data.get("qualifications", ""),
+                        "languages_spoken": self.validated_data.get("languages_spoken", []),
+                        "about": self.validated_data.get("bio", ""),
+                        "education": self.validated_data.get("education", [])
+                    }
+                )
+            else:
+                user = User.objects.create_user(
+                    email=invite.email,
+                    password=self.validated_data["password"],
+                    role="DOCTOR",
+                    clinic=invite.clinic,
+                    first_name=self.validated_data["first_name"],
+                    last_name=self.validated_data.get("last_name", "")
+                )
+        
+                doctor = Doctor.objects.create(
+                    user=user,
+                    specialization=self.validated_data["specialization"],
+                    experience_years=self.validated_data.get("experience_years", 0),
+                    qualifications=self.validated_data.get("qualifications", ""),
+                    languages_spoken=self.validated_data.get("languages_spoken", []),
+                    about=self.validated_data.get("bio", ""),
+                    education=self.validated_data.get("education", [])
+                )
+        
+            DoctorClinic.objects.get_or_create(
+                doctor=doctor,
+                clinic=invite.clinic,
+                defaults={"consultation_fee": self.validated_data.get("consultation_fee", 500)}
+            )
+        
+            invite.status = "ACCEPTED"
+            invite.save()
+            
+            return user
 
 
 class DoctorReviewSerializer(serializers.ModelSerializer):
