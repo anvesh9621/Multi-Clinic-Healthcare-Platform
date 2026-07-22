@@ -17,9 +17,9 @@ def get_owned_appointment_or_403(appointment_id, user):
 
     Rules:
       - PATIENT  → must be the patient on the appointment.
-      - DOCTOR   → must be the doctor assigned to the appointment (doctor_clinic.doctor.user).
-      - CLINIC_ADMIN / RECEPTIONIST / SUPER_ADMIN → allowed unconditionally
-        (they already pass clinic-level tenancy checks at the view level).
+      - DOCTOR   → must be the doctor assigned to the appointment.
+      - CLINIC_ADMIN / RECEPTIONIST → must belong to the clinic the appointment is at.
+      - SUPER_ADMIN → allowed unconditionally.
 
     Returns the Appointment on success.
     Raises NotFound if the appointment does not exist.
@@ -29,6 +29,7 @@ def get_owned_appointment_or_403(appointment_id, user):
         appointment = Appointment.objects.select_related(
             "patient__user",
             "doctor_clinic__doctor__user",
+            "clinic",
         ).get(id=appointment_id)
     except Appointment.DoesNotExist:
         raise NotFound("Appointment not found.")
@@ -41,5 +42,16 @@ def get_owned_appointment_or_403(appointment_id, user):
         if appointment.doctor_clinic.doctor.user != user:
             raise PermissionDenied("You can only access records for your own appointments.")
 
-    # CLINIC_ADMIN, RECEPTIONIST, SUPER_ADMIN: no additional object-level check needed.
+    elif user.role in ("CLINIC_ADMIN", "RECEPTIONIST"):
+        from apps.core.tenancy import get_user_clinic
+        clinic = get_user_clinic(user)
+        if not clinic or appointment.clinic != clinic:
+            raise PermissionDenied("You can only access records for your own clinic.")
+
+    elif user.role == "SUPER_ADMIN":
+        pass  # Global access is correct for SUPER_ADMIN
+
+    else:
+        raise PermissionDenied("You do not have access to this record.")
+
     return appointment

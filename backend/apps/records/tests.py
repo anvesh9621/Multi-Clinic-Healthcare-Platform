@@ -18,6 +18,13 @@ class MedicalRecordOwnershipTests(TestCase):
         self.doctor_b = self.env["doctor_b"]
         self.patient_1 = self.env["patient_1"]
         self.patient_2 = self.env["patient_2"]
+        
+        from apps.core.test_utils import create_user
+        self.receptionist_a = create_user(
+            email="receptionist_a@test.com", 
+            role="RECEPTIONIST", 
+            clinic=self.env["clinic_a"]
+        )
 
         # Appointment at clinic A for patient_1
         self.appointment_a = Appointment.objects.create(
@@ -53,6 +60,12 @@ class MedicalRecordOwnershipTests(TestCase):
     def test_doctor_cannot_get_another_clinics_appointment(self):
         """Doctor A cannot GET an appointment owned by Doctor B — must 403."""
         self.client.force_authenticate(user=self.doctor_a.doctor.user)
+        response = self.client.get(f"/api/records/consultation/{self.appointment_b.id}/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_receptionist_cannot_get_another_clinics_appointment(self):
+        """Receptionist at Clinic A cannot GET an appointment at Clinic B — must 403."""
+        self.client.force_authenticate(user=self.receptionist_a)
         response = self.client.get(f"/api/records/consultation/{self.appointment_b.id}/")
         self.assertEqual(response.status_code, 403)
 
