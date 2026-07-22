@@ -35,6 +35,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from apps.core.tenancy import get_user_clinic
+from apps.appointments.permissions import get_owned_appointment
 import logging
 
 logger = logging.getLogger(__name__)
@@ -293,21 +294,7 @@ class AppointmentDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _get_appointment(self, pk, user):
-        appointment = Appointment.objects.filter(id=pk).first()
-        if not appointment:
-            raise NotFound("Appointment not found.")
-
-        # Permission check
-        if user.role == "SUPER_ADMIN":
-            return appointment
-        if user.role == "PATIENT" and appointment.patient.user != user:
-            raise PermissionDenied("Unauthorized access.")
-        if user.role == "DOCTOR" and appointment.doctor_clinic.doctor.user != user:
-            raise PermissionDenied("Unauthorized access.")
-        if user.role in ["CLINIC_ADMIN", "RECEPTIONIST"] and appointment.clinic != user.clinic:
-            raise PermissionDenied("Unauthorized access.")
-
-        return appointment
+        return get_owned_appointment(pk, user)
 
     def get(self, request, pk):
         appointment = self._get_appointment(pk, request.user)
@@ -349,23 +336,9 @@ class AppointmentStatusUpdateView(UpdateAPIView):
     def get_object(self):
         appointment = super().get_object()
         user = self.request.user
-
-        if user.role == "SUPER_ADMIN":
-            return appointment
-
-        if user.role == "PATIENT":
-            if appointment.patient.user != user:
-                raise PermissionDenied("Unauthorized access.")
-
-        elif user.role == "DOCTOR":
-            if appointment.doctor_clinic.doctor.user != user:
-                raise PermissionDenied("Unauthorized access.")
-
-        elif user.role in ["CLINIC_ADMIN", "RECEPTIONIST"]:
-            if appointment.clinic != user.clinic:
-                raise PermissionDenied("Unauthorized access.")
-
-        return appointment
+        # Re-check ownership using the shared helper (super().get_object() only
+        # does the queryset lookup; ownership enforcement is our responsibility).
+        return get_owned_appointment(appointment.pk, user)
 
     def patch(self, request, *args, **kwargs):
         appointment = self.get_object()
