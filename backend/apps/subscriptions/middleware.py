@@ -47,10 +47,15 @@ class SubscriptionEnforcementMiddleware:
             clinic = getattr(user, 'clinic', None)
             if clinic:
                 sub = getattr(clinic, 'subscription', None)
-                if sub and sub.status == 'past_due' and sub.grace_period_end:
-                    if timezone.now() > sub.grace_period_end:
+                if not sub or sub.status not in ('trialing', 'active'):
+                    in_grace = (
+                        sub and sub.status == 'past_due'
+                        and sub.grace_period_end
+                        and timezone.now() <= sub.grace_period_end
+                    )
+                    if not in_grace:
                         return JsonResponse({
-                            'error': 'Account suspended due to unpaid invoices. Please update your payment method to restore access.'
+                            'error': 'Account suspended or inactive. Please update your payment method or contact support to restore access.'
                         }, status=403)
                         
         return self.get_response(request)
