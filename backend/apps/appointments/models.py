@@ -89,6 +89,7 @@ class Appointment(models.Model):
                     ("doctor_clinic", RangeOperators.EQUAL),
                     ("time_range", RangeOperators.OVERLAPS),
                 ],
+                condition=models.Q(status__in=["SCHEDULED", "CONFIRMED", "WAITING", "IN_PROGRESS"])
             )
         ]
 

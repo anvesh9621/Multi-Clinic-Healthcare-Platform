@@ -219,6 +219,10 @@ def change_appointment_status(*, appointment, new_status, user, follow_up_date=N
     appointment.status = new_status
     
     update_fields = ["status"]
+
+    if new_status in ["CANCELLED", "NO_SHOW"]:
+        appointment.time_range = None
+        update_fields.append("time_range")
     
     if follow_up_date:
         appointment.follow_up_date = follow_up_date
