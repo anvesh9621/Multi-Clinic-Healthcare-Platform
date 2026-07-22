@@ -196,6 +196,20 @@ class IntakeFormView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, appointment_id):
+        from apps.appointments.models import Appointment
+        from rest_framework.exceptions import PermissionDenied
+        
+        appointment = get_object_or_404(Appointment, id=appointment_id)
+        user = request.user
+        
+        is_patient = hasattr(user, 'patient_profile') and user.patient_profile == appointment.patient
+        is_doctor = user == appointment.doctor_clinic.doctor.user
+        is_clinic_staff = user.role in ["CLINIC_ADMIN", "RECEPTIONIST"] and user.clinic == appointment.clinic
+        is_super_admin = user.role == "SUPER_ADMIN"
+        
+        if not (is_patient or is_doctor or is_clinic_staff or is_super_admin):
+            raise PermissionDenied("You do not have permission to view this intake form.")
+
         # Allow both patient and doctor/staff to see it
         intake, created = IntakeForm.objects.get_or_create(
             appointment_id=appointment_id,
