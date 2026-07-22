@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.permissions import IsClinicAdminOrReceptionist, IsClinicStaff
-from apps.core.tenancy import get_user_clinic
+from apps.core.tenancy import get_user_clinic, ClinicQuerysetMixin
 from apps.audit.services import log_action
 from apps.audit.models import AuditLog
 
@@ -135,21 +135,15 @@ class PatientRegistrationView(APIView):
         )
 
 
-class PatientListView(ListAPIView):
+class PatientListView(ClinicQuerysetMixin, ListAPIView):
     permission_classes = [IsClinicStaff]
     serializer_class = PatientListSerializer
-    
+    queryset = Patient.objects.all().order_by('-created_at')
+    clinic_field = 'user__clinic'
+
     def get_queryset(self):
-        user = self.request.user
-        clinic = get_user_clinic(user)
-        
-        queryset = Patient.objects.all().order_by('-created_at')
-        
-        if clinic is None and user.role == "SUPER_ADMIN":
-            pass
-        else:
-            queryset = queryset.filter(user__clinic=clinic)
-            
+        queryset = super().get_queryset()
+
         search_query = self.request.query_params.get('search', None)
         if search_query:
             from django.db.models import Q
@@ -157,7 +151,7 @@ class PatientListView(ListAPIView):
                 Q(user__email__icontains=search_query) |
                 Q(phone__icontains=search_query)
             )
-            
+
         return queryset
 
 from apps.appointments.serializers import AppointmentListSerializer

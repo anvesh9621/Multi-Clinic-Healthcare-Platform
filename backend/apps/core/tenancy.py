@@ -21,6 +21,7 @@ class ClinicQuerysetMixin:
     Intended for CLINIC_ADMIN, RECEPTIONIST, DOCTOR, or SUPER_ADMIN scoped views.
     Raises PermissionDenied if used by PATIENT roles.
     """
+    clinic_field = 'clinic'
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -36,7 +37,8 @@ class ClinicQuerysetMixin:
             return queryset
 
         # Otherwise filter by clinic
-        return queryset.filter(clinic=clinic)
+        filter_kwargs = {self.clinic_field: clinic}
+        return queryset.filter(**filter_kwargs)
 
 
 class PatientOwnedQuerysetMixin:
@@ -45,6 +47,7 @@ class PatientOwnedQuerysetMixin:
     Intended for PATIENT scoped views.
     Assumes the model has a `patient` field that relates to the Patient profile.
     """
+    patient_field = 'patient'
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -53,4 +56,5 @@ class PatientOwnedQuerysetMixin:
         if not hasattr(user, 'patient_profile'):
             raise PermissionDenied("This view requires a patient profile.")
             
-        return queryset.filter(patient=user.patient_profile)
+        filter_kwargs = {self.patient_field: user.patient_profile}
+        return queryset.filter(**filter_kwargs)

@@ -34,6 +34,7 @@ from apps.billing.razorpay_client import get_razorpay_client
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+from apps.core.tenancy import get_user_clinic
 import logging
 
 logger = logging.getLogger(__name__)
@@ -278,7 +279,8 @@ class AppointmentListView(ListAPIView):
             )
 
         if user.role in ["CLINIC_ADMIN", "RECEPTIONIST"]:
-            return Appointment.objects.filter(clinic=user.clinic)
+            clinic = get_user_clinic(user)
+            return Appointment.objects.filter(clinic=clinic)
 
         return Appointment.objects.none()
 

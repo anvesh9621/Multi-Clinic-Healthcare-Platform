@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListCreateAPIView
 from rest_framework import status
+from apps.core.tenancy import get_user_clinic
 
 from .models import DoctorClinic, DoctorSchedule, Doctor, DoctorLeave
 from .serializers import (
@@ -72,9 +73,10 @@ class DoctorLeaveListCreateView(ListCreateAPIView):
         user = self.request.user
         if getattr(user, "role", None) == "DOCTOR":
             return DoctorLeave.objects.filter(doctor_clinic__doctor__user=user)
-        # Clinic admins could see all leaves for their clinic
+        # Clinic admins/receptionists see all leaves for their clinic
         if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
-             return DoctorLeave.objects.filter(doctor_clinic__clinic=user.clinic)
+            clinic = get_user_clinic(user)
+            return DoctorLeave.objects.filter(doctor_clinic__clinic=clinic)
         return DoctorLeave.objects.all()
 
     def perform_create(self, serializer):
@@ -90,7 +92,8 @@ class DoctorLeaveDetailView(RetrieveUpdateDestroyAPIView):
         if getattr(user, "role", None) == "DOCTOR":
             return DoctorLeave.objects.filter(doctor_clinic__doctor__user=user)
         if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
-             return DoctorLeave.objects.filter(doctor_clinic__clinic=user.clinic)
+            clinic = get_user_clinic(user)
+            return DoctorLeave.objects.filter(doctor_clinic__clinic=clinic)
         return DoctorLeave.objects.all()
 
 

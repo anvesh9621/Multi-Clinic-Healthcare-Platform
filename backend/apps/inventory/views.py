@@ -4,16 +4,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import InventoryItem, StockTransaction
 from .serializers import InventoryItemSerializer, StockTransactionSerializer
+from apps.core.tenancy import ClinicQuerysetMixin
 
-class InventoryItemViewSet(viewsets.ModelViewSet):
+class InventoryItemViewSet(ClinicQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = InventoryItemSerializer
     permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        user = self.request.user
-        if hasattr(user, 'clinic') and user.clinic:
-            return InventoryItem.objects.filter(clinic=user.clinic).order_by('name')
-        return InventoryItem.objects.none()
+    queryset = InventoryItem.objects.order_by('name')
 
     def perform_create(self, serializer):
         user = self.request.user
