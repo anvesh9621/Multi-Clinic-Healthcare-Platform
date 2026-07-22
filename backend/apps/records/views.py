@@ -121,7 +121,7 @@ class PatientHistoryView(generics.ListAPIView):
             
         # Patients can see their own records, but EXCLUDE private_notes
         if user.role == "PATIENT":
-            if user.patient.id != int(patient_id):
+            if user.patient_profile.id != int(patient_id):
                 raise PermissionDenied()
             # Explicitly defer private_notes at DB level, or handle in serializer
             # Note: The easiest way to hide private notes is overriding to_representation in the serializer 
