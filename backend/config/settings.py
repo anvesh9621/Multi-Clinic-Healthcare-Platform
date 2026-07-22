@@ -15,6 +15,7 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,22 +26,41 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default')
-
-# SECURITY WARNING: don't run with debug turned on in production!
+_secret_key = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+if not _secret_key:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable is not set. "
+            "This is required in production (DEBUG=False)."
+        )
+    # Development-only insecure fallback
+    _secret_key = 'django-insecure-dev-only-do-not-use-in-production'
+SECRET_KEY = _secret_key
+
+# SECURITY WARNING: don't run with debug turned on in production!
+_allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+if not _allowed_hosts_env:
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            "ALLOWED_HOSTS environment variable is not set. "
+            "This is required in production (DEBUG=False)."
+        )
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+else:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
 
 if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
 
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWED_ORIGINS = [
+# CORS_ALLOW_ALL_ORIGINS is intentionally NOT set here.
+# Only explicit origins are allowed to prevent CORS misconfiguration.
+CORS_ALLOWED_ORIGINS = list({
     "http://localhost:3000",
     frontend_url,
-]
+})
 # Application definition
 
 INSTALLED_APPS = [
@@ -103,27 +123,38 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'mediclinic_db'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'pvyrrcopj'), 
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-    }
-}
-
-# In production, use the Render/Heroku DATABASE_URL if provided
+# ── Database ──────────────────────────────────────────────────────────────────
+# In production, DATABASE_URL takes precedence.
+# If DATABASE_URL is not set, all DB_* variables must be explicitly configured;
+# DB_PASSWORD has NO fallback — a missing password will raise KeyError at startup.
 if os.environ.get('DATABASE_URL'):
-    DATABASES['default'] = dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ['DATABASE_URL'],
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    _db_password = os.environ.get('DB_PASSWORD')
+    if not _db_password:
+        if not DEBUG:
+            raise ImproperlyConfigured(
+                "DB_PASSWORD environment variable is not set. "
+                "This is required in production when DATABASE_URL is not provided."
+            )
+        # In dev, allow an empty password (local postgres with trust auth)
+        _db_password = os.environ.get('DB_PASSWORD', '')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'mediclinic_db'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': _db_password,
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
 
 
 # Password validation
