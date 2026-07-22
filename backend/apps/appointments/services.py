@@ -201,8 +201,9 @@ def change_appointment_status(*, appointment, new_status, user, follow_up_date=N
     """
 
     allowed_transitions = {
-        "SCHEDULED": ["CONFIRMED", "CANCELLED", "IN_PROGRESS"],
-        "CONFIRMED": ["COMPLETED", "CANCELLED", "NO_SHOW", "IN_PROGRESS"],
+        "SCHEDULED": ["CONFIRMED", "WAITING", "CANCELLED", "IN_PROGRESS"],
+        "CONFIRMED": ["WAITING", "COMPLETED", "CANCELLED", "NO_SHOW", "IN_PROGRESS"],
+        "WAITING": ["IN_PROGRESS", "CANCELLED", "NO_SHOW"],
         "IN_PROGRESS": ["COMPLETED"],
         "COMPLETED": [],
         "CANCELLED": [],

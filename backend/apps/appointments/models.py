@@ -81,6 +81,8 @@ class Appointment(models.Model):
             models.Index(fields=["doctor_clinic"]),
             models.Index(fields=["status"]),
         ]
+        
+        unique_together = ("clinic", "appointment_date", "queue_token")
 
         constraints = [
             ExclusionConstraint(
@@ -99,7 +101,24 @@ class Appointment(models.Model):
     def save(self, *args, **kwargs):
         if not self.queue_token:
             import random, string
-            letters = ''.join(random.choices(string.ascii_uppercase, k=1))
-            numbers = ''.join(random.choices(string.digits, k=3))
-            self.queue_token = f"{letters}-{numbers}"
+            max_retries = 10
+            for _ in range(max_retries):
+                letters = ''.join(random.choices(string.ascii_uppercase, k=1))
+                numbers = ''.join(random.choices(string.digits, k=3))
+                candidate_token = f"{letters}-{numbers}"
+                
+                # Check if this token is already used in this clinic on this date
+                exists = Appointment.objects.filter(
+                    clinic=self.clinic,
+                    appointment_date=self.appointment_date,
+                    queue_token=candidate_token
+                ).exists()
+                
+                if not exists:
+                    self.queue_token = candidate_token
+                    break
+            else:
+                # If we somehow loop 10 times without a unique token
+                raise ValueError("Could not generate a unique queue token. Please try again.")
+
         super().save(*args, **kwargs)

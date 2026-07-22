@@ -117,6 +117,20 @@ class DoctorInviteToken(models.Model):
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            from django.utils import timezone
+            from datetime import timedelta
+            self.expires_at = timezone.now() + timedelta(hours=48)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        from django.utils import timezone
+        return not self.is_used and self.expires_at > timezone.now()
 
     def __str__(self):
-        return f"Invite for {self.user.email} ({'used' if self.is_used else 'pending'})"
+        return f"Invite for {self.user.email} ({'used' if self.is_used else 'pending'})"
+
