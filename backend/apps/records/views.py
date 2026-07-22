@@ -152,7 +152,7 @@ class PrescriptionTemplateViewSet(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         # Infer doctor_clinic from logged in doctor
-        doctor_clinic = self.request.user.doctor.doctorclinic_set.first()
+        doctor_clinic = self.request.user.doctor_profile.clinic_associations.first()
         serializer.save(doctor_clinic=doctor_clinic)
 
 
