@@ -9,3 +9,6 @@ python manage.py collectstatic --no-input
 
 # Run database migrations
 python manage.py migrate
+
+# Run tests to prevent deploying broken code
+python manage.py test --no-input
