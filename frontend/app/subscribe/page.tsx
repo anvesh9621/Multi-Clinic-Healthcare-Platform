@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { subscriptionService } from "@/services/subscriptions";
 import { useContext } from "react";
 import { AuthContext } from "@/context/AuthContext";
+import { subscriptionService } from "@/services/subscriptions";
 import {
   Check, X, Zap, Building2, Rocket, ArrowLeft, Loader2,
   ShieldCheck, CreditCard, Lock,
@@ -13,13 +13,12 @@ import {
 
 const PLANS = [
   {
-    id: "PROFESSIONAL" as const,
+    id: "professional" as const,
     name: "Professional",
-    price: 49,
+    price: 999,
     icon: Zap,
     color: "blue",
     description: "For growing clinics that need powerful tools",
-    trial: "14-day free trial",
     features: [
       "Up to 10 Doctor accounts",
       "Unlimited appointments",
@@ -34,13 +33,12 @@ const PLANS = [
     missing: ["Multi-clinic management", "White-label branding"],
   },
   {
-    id: "ENTERPRISE" as const,
+    id: "enterprise" as const,
     name: "Enterprise",
-    price: 199,
+    price: 2999,
     icon: Building2,
     color: "purple",
     description: "For hospital networks & multi-branch clinics",
-    trial: "14-day free trial",
     features: [
       "Unlimited Doctor accounts",
       "Unlimited appointments",
@@ -55,20 +53,29 @@ const PLANS = [
   },
 ];
 
+const loadRazorpayScript = (): Promise<boolean> =>
+  new Promise((resolve) => {
+    if ((window as any).Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
 function SubscribePageInner() {
   const { user } = useContext(AuthContext);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const preSelected = searchParams.get("plan")?.toUpperCase() as "PROFESSIONAL" | "ENTERPRISE" | null;
+  const preSelected = searchParams.get("plan")?.toLowerCase() as "professional" | "enterprise" | null;
 
-  const [selectedPlan, setSelectedPlan] = useState<"PROFESSIONAL" | "ENTERPRISE">(
-    preSelected === "ENTERPRISE" ? "ENTERPRISE" : "PROFESSIONAL"
+  const [selectedPlan, setSelectedPlan] = useState<"professional" | "enterprise">(
+    preSelected === "enterprise" ? "enterprise" : "professional"
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // If not logged in as clinic admin, redirect to login
     if (user && user.role !== "CLINIC_ADMIN") {
       router.replace("/dashboard");
     }
@@ -76,23 +83,59 @@ function SubscribePageInner() {
 
   const handleSubscribe = async () => {
     if (!user) {
-      router.push(`/login?redirect=/subscribe?plan=${selectedPlan.toLowerCase()}`);
+      router.push(`/login?redirect=/subscribe?plan=${selectedPlan}`);
       return;
     }
 
     setLoading(true);
     setError("");
+
     try {
-      const res = await subscriptionService.createCheckout(selectedPlan);
-      const { url } = res.data;
-      if (url) {
-        window.location.href = url;
-      } else {
-        setError("Failed to create checkout session. Please try again.");
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        setError("Failed to load Razorpay SDK. Please check your connection and try again.");
+        return;
       }
+
+      const res = await subscriptionService.createSubscription(selectedPlan);
+      const { razorpay_key, subscription_id } = res.data;
+
+      const plan = PLANS.find((p) => p.id === selectedPlan)!;
+      const options = {
+        key: razorpay_key,
+        subscription_id,
+        name: "MediClinic",
+        description: `${plan.name} Plan — ₹${plan.price}/month`,
+        handler: async (response: any) => {
+          try {
+            await subscriptionService.verifySubscription({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            router.push("/dashboard/admin/subscription?status=success");
+          } catch {
+            setError("Payment verification failed. Please contact support.");
+          }
+        },
+        prefill: {
+          name: user.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "",
+          email: user.email || "",
+        },
+        theme: { color: "#2563eb" },
+        modal: {
+          ondismiss: () => setLoading(false),
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", (response: any) => {
+        setError(response.error?.description || "Payment failed. Please try again.");
+        setLoading(false);
+      });
+      rzp.open();
     } catch (e: any) {
       setError(e?.response?.data?.error || "Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -109,20 +152,20 @@ function SubscribePageInner() {
         </Link>
         <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
           <Lock className="w-3.5 h-3.5 text-emerald-500" />
-          Secured by Stripe
+          Secured by Razorpay
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-16">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-medium text-sm mb-5 border border-blue-100">
-            <Rocket className="w-3.5 h-3.5" /> Start your free 14-day trial
+            <Rocket className="w-3.5 h-3.5" /> Choose your subscription plan
           </div>
           <h1 className="text-4xl font-bold text-gray-900 tracking-tight mb-3">
             Choose Your Plan
           </h1>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
-            No credit card charged during trial. Cancel anytime. Full features unlocked immediately.
+            Secure recurring billing powered by Razorpay e-mandate. Cancel anytime.
           </p>
         </div>
 
@@ -157,10 +200,10 @@ function SubscribePageInner() {
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{p.name}</span>
                 </div>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="text-4xl font-bold text-gray-900">${p.price}</span>
+                  <span className="text-4xl font-bold text-gray-900">₹{p.price.toLocaleString("en-IN")}</span>
                   <span className="text-gray-500 mb-1">/month</span>
                 </div>
-                <p className="text-xs text-emerald-600 font-semibold mb-4">{p.trial} — then billed monthly</p>
+                <p className="text-xs text-emerald-600 font-semibold mb-4">Recurring via UPI Autopay / Card e-mandate</p>
                 <p className="text-sm text-gray-600 mb-5">{p.description}</p>
 
                 <ul className="space-y-2.5">
@@ -190,12 +233,12 @@ function SubscribePageInner() {
               <div className="flex items-center gap-3">
                 <PlanIcon className="w-5 h-5 text-blue-600" />
                 <span className="text-xl font-bold text-gray-900">{plan.name}</span>
-                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">
-                  14-day free trial
+                <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                  ₹{plan.price.toLocaleString("en-IN")}/month
                 </span>
               </div>
               <p className="text-gray-500 text-sm mt-1">
-                ${plan.price}/month after trial • Cancel anytime
+                Auto-renewed via Razorpay e-mandate • Cancel anytime
               </p>
             </div>
 
@@ -211,12 +254,12 @@ function SubscribePageInner() {
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Redirecting to Stripe...
+                    Opening Razorpay...
                   </>
                 ) : (
                   <>
                     <CreditCard className="w-5 h-5" />
-                    {user ? "Start Free Trial" : "Login to Subscribe"}
+                    {user ? "Subscribe Now" : "Login to Subscribe"}
                   </>
                 )}
               </button>
@@ -225,8 +268,7 @@ function SubscribePageInner() {
 
           <div className="mt-6 pt-6 border-t border-gray-50 flex flex-wrap items-center gap-6 text-xs text-gray-400 font-medium">
             <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> 256-bit SSL encryption</span>
-            <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-blue-400" /> Powered by Stripe</span>
-            <span>No charges during 14-day trial</span>
+            <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-blue-400" /> Powered by Razorpay</span>
             <span>Cancel anytime, no penalties</span>
           </div>
         </div>

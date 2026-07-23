@@ -10,7 +10,7 @@ from apps.patients.models import Patient
 from apps.appointments.models import Appointment
 
 def create_clinic(name="Test Clinic"):
-    clinic = Clinic.objects.create(name=name, domain=f"{name.lower().replace(' ', '')}.test.com")
+    clinic = Clinic.objects.create(name=name)
     return clinic
 
 def create_user(email, role, clinic=None, password="password123"):
