@@ -40,6 +40,8 @@ export default function DoctorDashboard() {
   
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modals state
@@ -58,23 +60,28 @@ export default function DoctorDashboard() {
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
-    if (user && user.role === "DOCTOR") {
-      fetchTodayAppointments();
+    if (user && user.role !== "DOCTOR") {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (user) {
+      fetchAppointments();
       // Poll every 15 seconds for real-time queue updates
       intervalId = setInterval(() => {
-        fetchTodayAppointments();
+        fetchAppointments();
       }, 15000);
-    } else if (user) {
-      router.push("/dashboard");
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [user, router]);
+  }, [user, router, retryCount]);
 
-  const fetchTodayAppointments = async () => {
+  const fetchAppointments = async () => {
     try {
+      setLoading(true);
+      setError(null);
       // In a real app we'd pass today's date to the API filter
       // For now we'll fetch all and filter client-side or assume the API returns relevant ones
       const response = await apiClient.get("/appointments/");
@@ -100,8 +107,9 @@ export default function DoctorDashboard() {
       todayAppointments.sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
       
       setAppointments(todayAppointments);
-    } catch (error) {
-      console.error("Failed to load appointments:", error);
+    } catch (err) {
+      console.error("Failed to load appointments:", err);
+      setError("Couldn't load your appointments right now.");
     } finally {
       setLoading(false);
     }
@@ -122,7 +130,7 @@ export default function DoctorDashboard() {
     try {
       await apiClient.patch(`/appointments/${id}/status/`, { status: "CANCELLED" });
       success("Appointment Cancelled");
-      fetchTodayAppointments();
+      fetchAppointments();
     } catch (error: any) {
       toastError("Error", "Could not cancel appointment.");
     }
@@ -151,13 +159,13 @@ export default function DoctorDashboard() {
       });
       success("Rescheduled", "Appointment rescheduled successfully.");
       setIsRescheduleModalOpen(false);
-      fetchTodayAppointments();
+      fetchAppointments();
     } catch (error: any) {
       toastError("Reschedule Failed", error.response?.data?.error || "Please check doctor availability.");
     }
   };
 
-  if (loading) {
+  if (loading && appointments.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
@@ -198,6 +206,21 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-red-100 shadow-sm text-center px-4">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button 
+            onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}
+            className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* ── LEFT COLUMN: TODAY'S QUEUE ── */}
@@ -346,6 +369,7 @@ export default function DoctorDashboard() {
 
         </div>
       </div>
+      )}
 
       {/* DELAY MODAL */}
       {isDelayModalOpen && (

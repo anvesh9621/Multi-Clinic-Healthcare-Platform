@@ -11,6 +11,8 @@ function HistoryPageContent() {
 
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<number>(0);
@@ -36,10 +38,9 @@ function HistoryPageContent() {
 
         setRecords(data);
 
-      } catch {
-
-        console.error("Failed to load history");
-
+      } catch (err) {
+        console.error("Failed to load history", err);
+        setError("Couldn't load medical history right now.");
       } finally {
 
         setLoading(false);
@@ -50,9 +51,27 @@ function HistoryPageContent() {
 
     loadHistory();
 
-  }, [patientId]);
+  }, [patientId, retryCount]);
 
   if (loading) return <div className="p-6">Loading history...</div>;
+
+  if (error) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-red-100 shadow-sm text-center">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+          <span className="text-3xl">⚠️</span>
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+        <p className="text-gray-500 mb-6">{error}</p>
+        <button 
+          onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}
+          className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

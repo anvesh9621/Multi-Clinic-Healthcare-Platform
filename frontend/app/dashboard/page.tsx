@@ -19,6 +19,8 @@ export default function DashboardPage() {
   const [workload, setWorkload] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [trend, setTrend] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
 
@@ -33,8 +35,9 @@ export default function DashboardPage() {
         setStats(statsData);
         setWorkload(workloadData);
         setTrend(trendData);
-      } catch (error) {
-        console.error("Failed to load dashboard data");
+      } catch (err) {
+        console.error("Failed to load dashboard data", err);
+        setError("Couldn't load your dashboard right now.");
       } finally {
         setLoading(false);
       }
@@ -50,7 +53,7 @@ export default function DashboardPage() {
         loadDashboard();
     }
 
-  }, [user, router]);
+  }, [user, router, retryCount]);
 
   return (
     <div className="space-y-8 pb-10">
@@ -86,6 +89,20 @@ export default function DashboardPage() {
              </div>
           </div>
         </>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-red-100 shadow-sm text-center px-4">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <XCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button 
+            onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}
+            className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
+          >
+            Try Again
+          </button>
+        </div>
       ) : (
         <>
           {stats && (

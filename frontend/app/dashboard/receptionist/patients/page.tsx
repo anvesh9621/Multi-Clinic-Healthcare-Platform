@@ -19,6 +19,8 @@ export default function ReceptionistPatientsPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -32,22 +34,40 @@ export default function ReceptionistPatientsPage() {
     } else if (user) {
       router.push("/dashboard");
     }
-  }, [user, router, searchQuery]);
+  }, [user, router, searchQuery, retryCount]);
 
   const fetchPatients = async (query: string = "") => {
     try {
       const url = query ? `/patients/?search=${encodeURIComponent(query)}` : "/patients/";
       const response = await apiClient.get(url);
       setPatients(response.data.results || response.data);
-    } catch (error) {
-      console.error("Error fetching patients:", error);
-      alert("Failed to load patients.");
+    } catch (err) {
+      console.error("Error fetching patients:", err);
+      setError("Couldn't load patients right now.");
     } finally {
       setLoading(false);
     }
   };
 
   if (loading && patients.length === 0) return <div>Loading patients...</div>;
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-8 p-6 flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-red-100 shadow-sm text-center">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+          <span className="text-3xl">⚠️</span>
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+        <p className="text-gray-500 mb-6">{error}</p>
+        <button 
+          onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}
+          className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 p-6">
