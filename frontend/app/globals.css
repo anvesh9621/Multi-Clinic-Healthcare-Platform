@@ -10,7 +10,6 @@
   --color-warm-surface: #F4F1EA;
   --color-border: #EDEDE8;
 
-  --font-heading: var(--font-sora), var(--font-sans), sans-serif;
   --font-sans: var(--font-inter), -apple-system, sans-serif;
 }
 
@@ -43,6 +42,10 @@
 
 @utility tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+@utility heading-font {
+  font-family: var(--font-heading);
 }
 
 :root {
