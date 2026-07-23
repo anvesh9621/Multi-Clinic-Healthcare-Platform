@@ -24,13 +24,15 @@ export default function DashboardPage() {
 
     const loadDashboard = async () => {
       try {
-        const statsData = await getDashboardStats();
-        const workloadData = await getDoctorWorkload();
-        const trendData = await getAppointmentTrend();
+        const [statsData, workloadData, trendData] = await Promise.all([
+          getDashboardStats(),
+          getDoctorWorkload(),
+          getAppointmentTrend(),
+        ]);
 
         setStats(statsData);
         setWorkload(workloadData);
-        setTrend(trendData)
+        setTrend(trendData);
       } catch (error) {
         console.error("Failed to load dashboard data");
       } finally {
