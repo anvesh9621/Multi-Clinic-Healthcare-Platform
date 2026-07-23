@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Sora } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { QueryProvider } from "@/context/QueryProvider";
@@ -10,6 +10,13 @@ const inter = Inter({
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
   variable: "--font-inter",
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-sora",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable}`}>
+    <html lang="en" className={`${inter.variable} ${sora.variable}`}>
       <body>
         <QueryProvider>
           <AuthProvider>
