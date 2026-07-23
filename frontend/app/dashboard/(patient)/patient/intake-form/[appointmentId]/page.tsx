@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getIntakeForm, updateIntakeForm, IntakeFormData } from "@/services/patients";
-import { toast } from "react-hot-toast";
+import { useToast } from "@/context/ToastContext";
 
 export default function IntakeFormPage() {
   const params = useParams();
   const router = useRouter();
   const appointmentId = Number(params?.appointmentId);
+  const { success, error } = useToast();
 
   const [form, setForm] = useState<IntakeFormData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +21,7 @@ export default function IntakeFormPage() {
       .then(setForm)
       .catch((err) => {
         console.error(err);
-        toast.error("Failed to load intake form.");
+        error("Failed to load intake form.");
       })
       .finally(() => setLoading(false));
   }, [appointmentId]);
@@ -30,7 +31,7 @@ export default function IntakeFormPage() {
     if (!form) return;
 
     if (!form.signature_provided) {
-      toast.error("Digital signature is required to complete the form.");
+      error("Digital signature is required to complete the form.");
       return;
     }
 
@@ -43,10 +44,10 @@ export default function IntakeFormPage() {
         signature_provided: form.signature_provided,
       });
       setForm(updated);
-      toast.success("Intake form submitted successfully!");
+      success("Intake form submitted successfully!");
       router.push("/dashboard/patient");
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "Failed to submit form");
+      error(err?.response?.data?.detail || "Failed to submit form");
     } finally {
       setSaving(false);
     }

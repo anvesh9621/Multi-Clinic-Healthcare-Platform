@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/landing/Button';
 import { Star, X } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useToast } from '@/context/ToastContext';
 
 interface ReviewModalProps {
   doctorId: number;
@@ -14,6 +14,7 @@ interface ReviewModalProps {
 }
 
 export function ReviewModal({ doctorId, doctorName, isOpen, onClose, onSuccess }: ReviewModalProps) {
+  const { success, error } = useToast();
   const [rating, setRating] = useState<number>(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [comment, setComment] = useState("");
@@ -24,7 +25,7 @@ export function ReviewModal({ doctorId, doctorName, isOpen, onClose, onSuccess }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
-      toast.error("Please select a rating.");
+      error("Please select a rating.");
       return;
     }
 
@@ -46,11 +47,11 @@ export function ReviewModal({ doctorId, doctorName, isOpen, onClose, onSuccess }
         throw new Error("Failed to submit review");
       }
 
-      toast.success("Review submitted successfully!");
+      success("Review submitted successfully!");
       onSuccess();
       onClose();
-    } catch (error) {
-      toast.error("Error submitting review.");
+    } catch {
+      error("Error submitting review.");
     } finally {
       setLoading(false);
     }
