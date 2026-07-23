@@ -122,7 +122,7 @@ function SubscribePageInner() {
           name: user.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "",
           email: user.email || "",
         },
-        theme: { color: "#2563eb" },
+        theme: { color: "#0F7B6C" },
         modal: {
           ondismiss: () => setLoading(false),
         },

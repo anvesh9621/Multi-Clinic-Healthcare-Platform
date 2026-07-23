@@ -79,16 +79,16 @@ export default function ClinicMap({ clinics, selectedId, onSelect }: ClinicMapPr
               cursor:pointer;
             ">
               <div style="
-                background: ${isSelected ? "#2563eb" : "#ffffff"};
+                background: ${isSelected ? "#0B5A4F" : "#ffffff"};
                 color: ${isSelected ? "#fff" : "#1e293b"};
-                border: 2.5px solid #2563eb;
+                border: 2.5px solid ${isSelected ? "#0B5A4F" : "#0F7B6C"};
                 border-radius: 10px;
                 padding: 5px 10px;
                 font-family: Inter, sans-serif;
                 font-size: 12px;
                 font-weight: 600;
                 white-space: nowrap;
-                box-shadow: 0 4px 14px rgba(37,99,235,0.25);
+                box-shadow: 0 4px 14px rgba(15,123,108,0.25);
                 transition: all 0.2s ease;
               ">
                 ${clinic.name}
@@ -97,7 +97,7 @@ export default function ClinicMap({ clinics, selectedId, onSelect }: ClinicMapPr
                 width: 0; height: 0;
                 border-left: 6px solid transparent;
                 border-right: 6px solid transparent;
-                border-top: 8px solid ${isSelected ? "#2563eb" : "#2563eb"};
+                border-top: 8px solid ${isSelected ? "#0B5A4F" : "#0F7B6C"};
                 margin-top: -1px;
               "></div>
             </div>
@@ -117,13 +117,13 @@ export default function ClinicMap({ clinics, selectedId, onSelect }: ClinicMapPr
           <div style="font-family: Inter, sans-serif; min-width: 180px; padding: 4px 0;">
             <p style="font-weight: 700; font-size: 14px; color: #0f172a; margin: 0 0 4px 0;">${clinic.name}</p>
             <p style="font-size: 12px; color: #64748b; margin: 0 0 8px 0;">${clinic.address}</p>
-            <p style="font-size: 12px; font-weight: 600; color: #2563eb; margin: 0 0 10px 0;">${doctorText} available</p>
+            <p style="font-size: 12px; font-weight: 600; color: #0F7B6C; margin: 0 0 10px 0;">${doctorText} available</p>
             <button
               onclick="window.__selectClinic(${clinic.id})"
               style="
                 width: 100%;
                 padding: 8px;
-                background: #2563eb;
+                background: #0F7B6C;
                 color: white;
                 border: none;
                 border-radius: 8px;
