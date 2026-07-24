@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import {
   Calendar, Phone, Activity, Stethoscope, CheckCircle2, HeartPulse,
-  type LucideIcon,
+  Bone, Brain, ShieldCheck, type LucideIcon,
 } from "lucide-react";
 
 const PulseDivider = dynamic(
@@ -177,14 +177,29 @@ function QuickServicesSection() {
 
 // ── Specialties ───────────────────────────────────────────────────────────────
 
+function getSpecialtyIcon(name: string): LucideIcon {
+  const n = name.toLowerCase();
+  if (n.includes('cardio')) return HeartPulse;
+  if (n.includes('neuro'))  return Brain;
+  if (n.includes('pedia'))  return ShieldCheck;
+  if (n.includes('ortho'))  return Bone;
+  if (n.includes('ophtha') || n.includes('eye')) return Stethoscope;
+  return Stethoscope;
+}
+
+function getSpecialtyDescription(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('cardio')) return "Advanced heart care, diagnostics, and customized treatment plans.";
+  if (n.includes('neuro'))  return "Comprehensive care for brain, spine, and nervous system disorders.";
+  if (n.includes('pedia'))  return "Compassionate and expert healthcare tailored for children.";
+  if (n.includes('ortho'))  return "Specialized treatments for bone, joint, and muscle conditions.";
+  return `Expert doctors providing specialized care in ${name}.`;
+}
+
 function SpecialtiesSection({
   specialties,
-  getIcon,
-  getDescription,
 }: {
   specialties: string[];
-  getIcon: (s: string) => LucideIcon;
-  getDescription: (s: string) => string;
 }) {
   const { ref, inView, reduced } = useSectionReveal();
   return (
@@ -205,7 +220,7 @@ function SpecialtiesSection({
           {specialties.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {specialties.map((spec, i) => {
-                const Icon = getIcon(spec);
+                const Icon = getSpecialtyIcon(spec);
                 return (
                   <AnimatedItem key={i}>
                     <div className="group border border-border rounded-2xl p-6 hover:shadow-xl hover:border-primary/20 transition-all bg-paper flex flex-col h-full">
@@ -214,7 +229,7 @@ function SpecialtiesSection({
                       </div>
                       <h3 className="text-lg font-bold text-ink mb-2 heading-font">{spec}</h3>
                       <p className="text-muted text-sm leading-relaxed mb-5 flex-grow">
-                        {getDescription(spec)}
+                        {getSpecialtyDescription(spec)}
                       </p>
                       <Link href={`/specialties/${encodeURIComponent(spec)}`} className="block w-full mt-auto">
                         <Button variant="outline" className="w-full">Find Doctor</Button>
@@ -451,18 +466,14 @@ function Footer() {
 
 export function LandingPageSections({
   specialties,
-  getIcon,
-  getDescription,
 }: {
   specialties: string[];
-  getIcon: (s: string) => LucideIcon;
-  getDescription: (s: string) => string;
 }) {
   return (
     <>
       <PulseDivider />
       <QuickServicesSection />
-      <SpecialtiesSection specialties={specialties} getIcon={getIcon} getDescription={getDescription} />
+      <SpecialtiesSection specialties={specialties} />
       <HowItWorksSection />
       <PricingSection />
       <Footer />
