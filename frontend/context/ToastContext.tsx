@@ -23,17 +23,17 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const ICONS: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle className="w-5 h-5 text-emerald-500" />,
-  error:   <XCircle    className="w-5 h-5 text-red-500" />,
-  warning: <AlertTriangle className="w-5 h-5 text-amber-500" />,
-  info:    <Info       className="w-5 h-5 text-blue-500" />,
+  success: <CheckCircle className="w-5 h-5 text-primary" />,
+  error:   <XCircle    className="w-5 h-5 text-accent" />,
+  warning: <AlertTriangle className="w-5 h-5 text-accent" />,
+  info:    <Info       className="w-5 h-5 text-primary-dark" />,
 };
 
 const STYLES: Record<ToastType, string> = {
-  success: "border-l-4 border-emerald-500 bg-white",
-  error:   "border-l-4 border-red-500 bg-white",
-  warning: "border-l-4 border-amber-500 bg-white",
-  info:    "border-l-4 border-blue-500 bg-white",
+  success: "border-l-4 border-primary bg-paper",
+  error:   "border-l-4 border-accent bg-paper",
+  warning: "border-l-4 border-accent bg-paper",
+  info:    "border-l-4 border-primary-dark bg-paper",
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -73,12 +73,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           >
             <div className="flex-shrink-0 mt-0.5">{ICONS[t.type]}</div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 leading-tight">{t.title}</p>
-              {t.message && <p className="text-xs text-gray-500 mt-0.5 leading-snug">{t.message}</p>}
+              <p className="text-sm font-semibold text-ink leading-tight">{t.title}</p>
+              {t.message && <p className="text-xs text-muted mt-0.5 leading-snug">{t.message}</p>}
             </div>
             <button
               onClick={() => dismiss(t.id)}
-              className="flex-shrink-0 text-gray-300 hover:text-gray-500 transition-colors ml-1 -mr-1 -mt-0.5"
+              className="flex-shrink-0 text-muted hover:text-ink transition-colors ml-1 -mr-1 -mt-0.5"
             >
               <X className="w-4 h-4" />
             </button>
