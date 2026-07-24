@@ -17,7 +17,7 @@ export function Skeleton({ className = "", style }: SkeletonProps) {
 /** A standard card skeleton (icon + two text lines) */
 export function SkeletonCard() {
   return (
-    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 p-5 shadow-soft glass">
+    <div className="bg-paper rounded-2xl border border-border p-5 shadow-sm">
       <div className="flex items-start gap-4">
         <Skeleton className="w-12 h-12 rounded-xl flex-shrink-0" />
         <div className="flex-1 space-y-2 pt-1">
@@ -32,7 +32,7 @@ export function SkeletonCard() {
 /** A stat card skeleton */
 export function SkeletonStat() {
   return (
-    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 p-6 shadow-soft glass">
+    <div className="bg-paper rounded-2xl border border-border p-6 shadow-sm">
       <Skeleton className="h-3 w-24 mb-3" />
       <Skeleton className="h-8 w-16 mb-2" />
       <Skeleton className="h-3 w-20" />
@@ -70,13 +70,14 @@ export function PageLoader({ message = "Loading..." }: { message?: string }) {
     <div className="w-full py-24 flex items-center justify-center">
       <div className="flex flex-col items-center gap-6 p-8 rounded-3xl animate-fade-in-up">
         <div className="relative w-16 h-16 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-4 border-indigo-100 dark:border-slate-700" />
-          <div className="absolute inset-0 rounded-full border-4 border-t-cyan-400 border-r-indigo-500 border-b-transparent border-l-transparent animate-spin blur-[1px]" />
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-lg shadow-lg flex items-center justify-center rotate-45 animate-pulse">
-            <div className="w-3 h-3 bg-white rounded-sm -rotate-45" />
-          </div>
+          {/* Track ring */}
+          <div className="absolute inset-0 rounded-full border-4 border-border" />
+          {/* Spinning accent arc */}
+          <div className="absolute inset-0 rounded-full border-4 border-t-primary border-r-accent border-b-transparent border-l-transparent animate-spin" />
+          {/* Center pip */}
+          <div className="w-6 h-6 bg-primary rounded-md shadow-sm" />
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 font-semibold tracking-wide uppercase heading-font">{message}</p>
+        <p className="text-sm text-muted font-semibold tracking-wide uppercase heading-font">{message}</p>
       </div>
     </div>
   );
