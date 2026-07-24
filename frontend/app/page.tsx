@@ -1,14 +1,8 @@
 import React from 'react';
-import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/landing/Navbar';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { LandingPageSections } from '@/components/landing/LandingPageSections';
 import { HeartPulse, Stethoscope, ShieldCheck, Bone, Brain, type LucideIcon } from 'lucide-react';
-
-const PulseDivider = dynamic(
-  () => import('@/components/ui/PulseOrb3D').then((m) => ({ default: m.PulseDivider })),
-  { ssr: false, loading: () => <div className="h-10" /> }
-);
 
 async function getSpecialties(): Promise<string[]> {
   try {
@@ -49,7 +43,6 @@ export default async function LandingPage() {
     <div className="min-h-screen bg-paper font-sans text-ink selection:bg-primary/10 selection:text-primary">
       <Navbar />
       <HeroSection />
-      <PulseDivider />
       <LandingPageSections
         specialties={specialties}
         getIcon={getSpecialtyIcon}

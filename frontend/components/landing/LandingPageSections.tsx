@@ -2,6 +2,7 @@
 
 import React, { useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   motion,
   useInView,
@@ -14,6 +15,11 @@ import {
   Calendar, Phone, Activity, Stethoscope, CheckCircle2, HeartPulse,
   type LucideIcon,
 } from "lucide-react";
+
+const PulseDivider = dynamic(
+  () => import('@/components/ui/PulseOrb3D').then((m) => ({ default: m.PulseDivider })),
+  { ssr: false, loading: () => <div className="h-10" /> }
+);
 
 // ── Shared motion variants ────────────────────────────────────────────────────
 
@@ -454,6 +460,7 @@ export function LandingPageSections({
 }) {
   return (
     <>
+      <PulseDivider />
       <QuickServicesSection />
       <SpecialtiesSection specialties={specialties} getIcon={getIcon} getDescription={getDescription} />
       <HowItWorksSection />
