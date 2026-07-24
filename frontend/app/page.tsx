@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
+import { HeroSection } from '@/components/landing/HeroSection';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
@@ -41,69 +42,10 @@ export default async function LandingPage() {
   const specialties: string[] = await getSpecialties();
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-paper font-sans text-ink selection:bg-primary/10 selection:text-primary">
       <Navbar />
       
-      {/* Hero Section */}
-      <section className="relative pt-16 pb-32 overflow-hidden bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-[1.2fr_0.8fr] lg:grid-cols-2 gap-12 items-center">
-          {/* Left Side: Content & Search */}
-          <div className="max-w-2xl z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-medium text-sm mb-6 border border-blue-100 shadow-sm">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              Modern Healthcare Platform
-            </div>
-            
-            <h1 className="text-5xl lg:text-6xl font-semibold text-gray-900 leading-[1.15] tracking-tight mb-6">
-              Smarter Healthcare Starts Here
-            </h1>
-            
-            <p className="text-lg text-gray-600 mb-10 leading-relaxed max-w-xl">
-              Book appointments with top doctors, manage your health records, and experience premium clinical care effortlessly.
-            </p>
-
-            {/* Smart Search */}
-            <div className="bg-white p-3 rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 flex flex-col sm:flex-row gap-3 mb-10 w-full max-w-xl relative group">
-               <div className="absolute inset-0 rounded-2xl bg-blue-50/50 opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none"></div>
-               <div className="flex-1 relative z-10">
-                 <Input 
-                   icon={<Search className="w-5 h-5 text-gray-400" />} 
-                   placeholder="Search doctors, clinics, or symptoms"
-                   className="border-none bg-gray-50 focus:bg-white h-14 text-base shadow-inner w-full"
-                 />
-               </div>
-               <Link href="/login" className="z-10 sm:w-auto w-full">
-                 <Button size="lg" className="w-full h-14 px-8 text-base shadow-md">
-                   Search
-                 </Button>
-               </Link>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-4">
-              <Link href="/login">
-                <Button size="lg" variant="primary" className="h-14 px-8 text-base">Book Appointment</Button>
-              </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline" className="h-14 px-8 text-base bg-white">Find Doctors</Button>
-              </Link>
-            </div>
-          </div>
-          
-          {/* Right Side: Image */}
-          <div className="relative hidden md:block h-[500px] lg:h-[600px] w-full bg-gray-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white mb-8 md:mb-0">
-             <div className="absolute inset-0 bg-blue-600/5 mix-blend-multiply z-10 pointer-events-none"></div>
-             <img 
-               src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=2070&auto=format&fit=crop" 
-               alt="Doctor measuring patient blood pressure" 
-               className="w-full h-full object-cover object-center"
-             />
-           
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* Quick Services */}
       <section className="py-24 bg-gray-50">
