@@ -1,9 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
-import { Button } from '@/components/landing/Button';
-import { Input } from '@/components/landing/Input';
-import { Card } from '@/components/landing/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Card } from '@/components/ui/Card';
 import { Search, Calendar, Phone, Activity, ShieldCheck, HeartPulse, Stethoscope, Eye, Bone, Brain } from 'lucide-react';
 
 async function getSpecialties() {

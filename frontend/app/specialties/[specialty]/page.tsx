@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
-import { Button } from '@/components/landing/Button';
+import { Button } from '@/components/ui/Button';
 import { Star, Clock, MapPin, ChevronLeft } from 'lucide-react';
 
 async function getDoctors(specialty: string) {

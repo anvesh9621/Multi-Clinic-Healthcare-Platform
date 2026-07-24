@@ -10,7 +10,7 @@ export function Card({ className, children, hoverable = false, ...props }: CardP
   return (
     <div 
       className={cn(
-        "bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300",
+        "bg-paper rounded-xl border border-border shadow-sm overflow-hidden transition-all duration-300",
         hoverable && "hover:-translate-y-1 hover:shadow-md",
         className
       )}
