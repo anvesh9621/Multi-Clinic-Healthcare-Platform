@@ -12,7 +12,7 @@ import {
 } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
-import { Building2, Star, Clock, CheckCircle2 } from "lucide-react";
+import { Building2, Activity, Star, Clock, CheckCircle2 } from "lucide-react";
 
 // Lazy-loaded 3D orb — NOT in the critical render path
 const PulseOrb3D = dynamic(
