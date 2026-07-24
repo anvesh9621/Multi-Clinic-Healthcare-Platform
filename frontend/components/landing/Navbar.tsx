@@ -2,7 +2,7 @@
 
 import React, { useContext } from 'react';
 import Link from 'next/link';
-import { Button } from './Button';
+import { Button } from '@/components/ui/Button';
 import { HeartPulse } from 'lucide-react';
 import { AuthContext } from '@/context/AuthContext';
 
