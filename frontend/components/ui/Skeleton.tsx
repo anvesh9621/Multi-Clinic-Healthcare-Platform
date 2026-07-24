@@ -45,7 +45,7 @@ export function SkeletonRow({ cols = 4 }: { cols?: number }) {
   return (
     <tr>
       {Array.from({ length: cols }).map((_, i) => (
-        <td key={i} className="px-4 py-4 border-b border-slate-100 dark:border-slate-700/50">
+        <td key={i} className="px-4 py-4 border-b border-border">
           <Skeleton className="h-4" style={{ width: `${60 + Math.random() * 30}%` }} />
         </td>
       ))}
