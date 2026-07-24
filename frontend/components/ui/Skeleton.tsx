@@ -9,7 +9,7 @@ interface SkeletonProps {
 
 /** A single shimmer block. Pass className for sizing. */
 export function Skeleton({ className = "", style }: SkeletonProps) {
-  return <div className={`skeleton ${className}`} style={style} />;
+  return <div className={`animate-shimmer bg-[length:200%_100%] bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded-md ${className}`} style={style} />;
 }
 
 // ── Composed Skeleton patterns ───────────────────────────────────────────
