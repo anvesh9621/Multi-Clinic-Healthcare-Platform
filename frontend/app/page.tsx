@@ -1,11 +1,17 @@
 import React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/landing/Navbar';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Search, Calendar, Phone, Activity, ShieldCheck, HeartPulse, Stethoscope, Eye, Bone, Brain } from 'lucide-react';
+
+const PulseDivider = dynamic(
+  () => import('@/components/ui/PulseOrb3D').then((m) => ({ default: m.PulseDivider })),
+  { ssr: false, loading: () => <div className="h-10" /> }
+);
 
 async function getSpecialties() {
   try {
@@ -46,6 +52,7 @@ export default async function LandingPage() {
       <Navbar />
       
       <HeroSection />
+      <PulseDivider />
 
       {/* Quick Services */}
       <section className="py-24 bg-gray-50">

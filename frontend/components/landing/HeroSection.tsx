@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -11,7 +12,13 @@ import {
 } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
-import { Building2, Activity, Star, Clock, CheckCircle2 } from "lucide-react";
+import { Building2, Star, Clock, CheckCircle2 } from "lucide-react";
+
+// Lazy-loaded 3D orb — NOT in the critical render path
+const PulseOrb3D = dynamic(
+  () => import("@/components/ui/PulseOrb3D").then((m) => ({ default: m.PulseOrb3D })),
+  { ssr: false, loading: () => null }
+);
 
 // ── Floating glass card components ───────────────────────────────────────────
 
@@ -192,6 +199,16 @@ export function HeroSection() {
             className="absolute -top-4 -right-8 z-20"
           >
             <StatCard />
+          </motion.div>
+
+          {/* 3D Pulse Orb — corner accent, secondary to photo */}
+          <motion.div
+            initial={prefersReduced ? {} : { opacity: 0, scale: 0.8 }}
+            animate={prefersReduced ? {} : { opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.9, ease: "easeOut" }}
+            className="absolute bottom-10 right-6 z-20"
+          >
+            <PulseOrb3D className="w-20 h-20" />
           </motion.div>
         </div>
       </div>
