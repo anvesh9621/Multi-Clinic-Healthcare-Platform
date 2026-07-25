@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import api from '@/services/api';
 import {
   Receipt, CreditCard, CheckCircle2, Clock, ChevronRight,
   X, FileText, Calendar, Stethoscope, ArrowLeft, Shield,
   TrendingUp, DollarSign, ExternalLink, AlertTriangle,
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type InvoiceItem = { id: number; description: string; amount: string };
 type Invoice = {
@@ -31,24 +32,19 @@ const statusConfig = {
 };
 
 export default function BillingPage() {
-  const [invoices, setInvoices]        = useState<Invoice[]>([]);
-  const [loading, setLoading]          = useState(true);
+  const queryClient = useQueryClient();
   const [selectedInvoice, setSelected] = useState<Invoice | null>(null);
   const [payError, setPayError]        = useState('');
-  const [paying, setPaying]            = useState<number | null>(null); // invoice id being processed
+  const [paying, setPaying]            = useState<number | null>(null);
 
-  useEffect(() => { fetchInvoices(); }, []);
-
-  const fetchInvoices = async () => {
-    try {
+  const { data: invoices = [], isLoading: loading } = useQuery<Invoice[]>({
+    queryKey: ['billing', 'invoices'],
+    queryFn: async () => {
       const res = await api.get('/billing/invoices/');
-      setInvoices(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setInvoices([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    staleTime: 60_000, // treat data as fresh for 60s
+  });
 
   /**
    * POST /billing/invoices/{id}/pay/  →  { payment_link_url }
@@ -63,6 +59,8 @@ export default function BillingPage() {
       const url: string = res.data.payment_link_url || res.data.short_url;
       if (url) {
         window.open(url, '_blank', 'noopener,noreferrer');
+        // Invalidate so re-visiting the page picks up the updated status
+        queryClient.invalidateQueries({ queryKey: ['billing', 'invoices'] });
       } else {
         setPayError('No payment link returned. Please try again.');
       }

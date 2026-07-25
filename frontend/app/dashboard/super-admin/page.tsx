@@ -30,6 +30,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MotionDivItem } from "@/components/ui/MotionListItem";
 import { AnimatePresence } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface ClinicRow {
   id: number;
@@ -80,14 +81,31 @@ function StatCard({ label, value, icon: Icon, color, sub, format }: any) {
 export default function SuperAdminDashboard() {
   const { user } = useContext(AuthContext);
   const router = useRouter();
-  const [data, setData] = useState<SuperAdminData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
+
+  const { data, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ["super-admin", "overview"],
+    queryFn: async () => {
+      const res = await apiClient.get("/analytics/super-admin/");
+      return res.data.data as SuperAdminData;
+    },
+    enabled: !!user && user.role === "SUPER_ADMIN",
+  });
+  
+  const error = queryError ? "Failed to load platform stats." : "";
 
   // Modal State for Clinic Admin
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [clinics, setClinics] = useState<{ id: number; name: string }[]>([]);
+  
+  const { data: clinics = [] } = useQuery({
+    queryKey: ["super-admin", "clinics"],
+    queryFn: async () => {
+      const res = await apiClient.get("/doctors/clinics/");
+      return res.data as { id: number; name: string }[];
+    },
+    enabled: isAdminModalOpen && !!user && user.role === "SUPER_ADMIN",
+  });
   const [adminFormData, setAdminFormData] = useState({
     first_name: "", last_name: "", email: "", password: "", clinic_id: "",
   });
@@ -125,28 +143,13 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     if (user && user.role !== "SUPER_ADMIN") {
       router.push("/dashboard");
-      return;
     }
-    if (user) fetchStats();
-  }, [user]);
-
-  const fetchStats = async () => {
-    try {
-      const res = await apiClient.get("/analytics/super-admin/");
-      setData(res.data.data);
-    } catch {
-      setError("Failed to load platform stats.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, router]);
 
   const openAdminModal = async () => {
-    setIsAdminModalOpen(true); setAdminFormError(""); setAdminFormSuccess("");
-    try {
-      const res = await apiClient.get("/doctors/clinics/");
-      setClinics(res.data);
-    } catch (err) { console.error("Failed to fetch clinics", err); }
+    setIsAdminModalOpen(true); 
+    setAdminFormError(""); 
+    setAdminFormSuccess("");
   };
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
@@ -156,7 +159,7 @@ export default function SuperAdminDashboard() {
       setAdminFormSuccess("Clinic Admin created successfully!");
       setAdminFormData({ first_name: "", last_name: "", email: "", password: "", clinic_id: "" });
       setTimeout(() => setIsAdminModalOpen(false), 2000);
-      fetchStats();
+      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
     } catch (err: any) {
       const apiErrors = err.response?.data?.errors;
       if (apiErrors?.non_field_errors) setAdminFormError(apiErrors.non_field_errors[0]);
@@ -172,7 +175,7 @@ export default function SuperAdminDashboard() {
       setClinicFormSuccess("Clinic created successfully!");
       setClinicFormData({ name: "", address: "", subscription_plan: "BASIC" });
       setTimeout(() => setIsClinicModalOpen(false), 2000);
-      fetchStats();
+      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
     } catch (err: any) {
       setClinicFormError(err.response?.data?.errors?.non_field_errors?.[0] || "Failed to create Clinic.");
     } finally { setClinicFormLoading(false); }
@@ -194,7 +197,7 @@ export default function SuperAdminDashboard() {
     if (!confirm(`Are you sure you want to ${currentStatus ? 'suspend' : 'activate'} this clinic?`)) return;
     try {
       await apiClient.patch(`/clinics/${clinicId}/toggle-status/`);
-      fetchStats();
+      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
     } catch (err) {
       alert("Failed to toggle clinic status.");
     }
@@ -228,7 +231,7 @@ export default function SuperAdminDashboard() {
       await apiClient.post(`/clinics/super-admin/${billingClinic.id}/change-plan/`, { plan: billingPlan });
       setBillingAction("change-plan");
       setBillingResult(`Plan updated to "${billingPlan}" successfully.`);
-      fetchStats();
+      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
     } catch (err: any) {
       setBillingError(err.response?.data?.error || "Failed to change plan.");
     } finally {
