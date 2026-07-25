@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Plus, Receipt, FileText, Trash2, X, Banknote, QrCode, CheckCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
 import api from "@/services/api";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 type InvoiceItem = { description: string; amount: string };
 
@@ -130,20 +133,12 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Invoice INV-{invoice.id.toString().padStart(4, "0")}</h2>
-            <p className="text-sm text-gray-500">{invoice.patient_name} · ₹{parseFloat(invoice.total_amount).toFixed(2)}</p>
-          </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`Invoice INV-${invoice.id.toString().padStart(4, "0")}`}
+      className="max-w-md"
+    >
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex gap-2 items-start text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -227,9 +222,9 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
               {qrExpired ? (
                 <div>
                   <p className="text-red-600 font-semibold mb-3">QR code expired</p>
-                  <button onClick={handleGenerateQR} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700">
+                  <Button size="sm" onClick={handleGenerateQR}>
                     Generate new QR
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
@@ -257,9 +252,7 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
               )}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -341,70 +334,59 @@ export default function ReceptionistBilling() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">Manage patient invoices and collect payments</p>
         </div>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Create Invoice
-        </button>
+        <Button onClick={() => setIsCreateModalOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" /> Create Invoice
+        </Button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {invoices.length === 0 ? (
-          <div className="p-16 text-center">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="w-6 h-6 text-gray-400" />
-            </div>
-            <p className="text-gray-900 font-semibold">No invoices generated yet</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Invoice</th>
-                <th className="px-6 py-4">Patient</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {invoices.map(inv => (
-                <tr key={inv.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-gray-900">INV-{inv.id.toString().padStart(4, "0")}</td>
-                  <td className="px-6 py-4">
-                    <p className="font-semibold text-gray-900">{inv.patient_name || `Patient #${inv.patient}`}</p>
-                    {inv.patient_email && <p className="text-xs text-gray-400 mt-0.5">{inv.patient_email}</p>}
-                  </td>
-                  <td className="px-6 py-4 text-gray-600">{new Date(inv.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</td>
-                  <td className="px-6 py-4 font-bold text-gray-900 font-mono">₹{parseFloat(inv.total_amount).toFixed(2)}</td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={inv.status} method={inv.payment_method} />
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {inv.status !== "paid" && inv.status !== "cancelled" && inv.status !== "refunded" ? (
-                      <button
-                        onClick={() => setSelectedInvoice(inv)}
-                        className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
-                      >
-                        Collect Payment →
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setSelectedInvoice(inv)}
-                        className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        View
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Invoice</TableHead>
+            <TableHead>Patient</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Amount</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {invoices.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="py-16 text-center">
+                <div className="w-16 h-16 bg-warm-surface rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-6 h-6 text-muted" />
+                </div>
+                <p className="text-ink font-semibold">No invoices generated yet</p>
+              </TableCell>
+            </TableRow>
+          ) : (
+            invoices.map(inv => (
+              <TableRow key={inv.id}>
+                <TableCell className="font-bold">INV-{inv.id.toString().padStart(4, "0")}</TableCell>
+                <TableCell>
+                  <p className="font-semibold text-ink">{inv.patient_name || `Patient #${inv.patient}`}</p>
+                  {inv.patient_email && <p className="text-xs text-muted mt-0.5">{inv.patient_email}</p>}
+                </TableCell>
+                <TableCell className="text-muted">{new Date(inv.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</TableCell>
+                <TableCell className="font-bold font-mono">₹{parseFloat(inv.total_amount).toFixed(2)}</TableCell>
+                <TableCell><StatusBadge status={inv.status} method={inv.payment_method} /></TableCell>
+                <TableCell className="text-right">
+                  {inv.status !== "paid" && inv.status !== "cancelled" && inv.status !== "refunded" ? (
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedInvoice(inv)} className="text-primary">
+                      Collect Payment →
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedInvoice(inv)} className="text-muted">
+                      View
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
 
       {/* Payment Modal */}
       {selectedInvoice && (
@@ -415,63 +397,52 @@ export default function ReceptionistBilling() {
         />
       )}
 
-      {/* Create Invoice Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Create New Invoice</h2>
-              <button onClick={() => setIsCreateModalOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Create New Invoice">
+        <form id="invoice-form" onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-ink mb-2">Select Patient</label>
+            <select
+              required
+              value={selectedPatient}
+              onChange={(e) => setSelectedPatient(e.target.value)}
+              className="w-full rounded-xl border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white font-medium text-ink"
+            >
+              <option value="" disabled>Search or select a patient...</option>
+              {patients.map(p => (
+                <option key={p.id} value={p.id}>Patient #{p.id} {p.user?.email ? `(${p.user.email})` : ""}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+              <label className="block text-sm font-bold text-ink">Line Items</label>
+              <button type="button" onClick={handleAddItem} className="text-xs text-primary font-bold hover:text-primary-dark tracking-wide uppercase">+ Add Item</button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              <form id="invoice-form" onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Patient</label>
-                  <select
-                    required
-                    value={selectedPatient}
-                    onChange={(e) => setSelectedPatient(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-colors bg-white font-medium"
-                  >
-                    <option value="" disabled>Search or select a patient...</option>
-                    {patients.map(p => (
-                      <option key={p.id} value={p.id}>Patient #{p.id} {p.user?.email ? `(${p.user.email})` : ""}</option>
-                    ))}
-                  </select>
+            <div className="space-y-3">
+              {items.map((item, idx) => (
+                <div key={idx} className="flex gap-3 items-center group">
+                  <input required type="text" placeholder="Service description" value={item.description} onChange={(e) => handleItemChange(idx, "description", e.target.value)} className="flex-1 flex-grow-[2] rounded-xl border border-border px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm font-bold">₹</span>
+                    <input required type="number" min="0" step="0.01" placeholder="0.00" value={item.amount} onChange={(e) => handleItemChange(idx, "amount", e.target.value)} className="w-full rounded-xl border border-border pl-7 pr-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                  </div>
+                  <button type="button" onClick={() => handleRemoveItem(idx)} className="text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-                    <label className="block text-sm font-bold text-gray-900">Line Items</label>
-                    <button type="button" onClick={handleAddItem} className="text-xs text-blue-600 font-bold hover:text-blue-800 tracking-wide uppercase">+ Add Item</button>
-                  </div>
-                  <div className="space-y-3">
-                    {items.map((item, idx) => (
-                      <div key={idx} className="flex gap-3 items-center group">
-                        <input required type="text" placeholder="Service description" value={item.description} onChange={(e) => handleItemChange(idx, "description", e.target.value)} className="flex-1 flex-grow-[2] rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600" />
-                        <div className="relative flex-1">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">₹</span>
-                          <input required type="number" min="0" step="0.01" placeholder="0.00" value={item.amount} onChange={(e) => handleItemChange(idx, "amount", e.target.value)} className="w-full rounded-xl border border-gray-200 pl-7 pr-3 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600" />
-                        </div>
-                        <button type="button" onClick={() => handleRemoveItem(idx)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-dashed border-gray-200 flex justify-between items-center text-sm font-bold">
-                    <span className="text-gray-500">Draft Total:</span>
-                    <span className="text-gray-900">₹{totalDraft.toFixed(2)}</span>
-                  </div>
-                </div>
-              </form>
+              ))}
             </div>
-            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
-              <button form="invoice-form" type="submit" disabled={isSubmitting || !selectedPatient || items.length === 0} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm disabled:opacity-50">
-                {isSubmitting ? "Generating..." : "Generate Invoice"}
-              </button>
+            <div className="mt-4 pt-4 border-t border-dashed border-border flex justify-between items-center text-sm font-bold">
+              <span className="text-muted">Draft Total:</span>
+              <span className="text-ink">₹{totalDraft.toFixed(2)}</span>
             </div>
           </div>
-        </div>
-      )}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting || !selectedPatient || items.length === 0}>
+              {isSubmitting ? "Generating..." : "Generate Invoice"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
