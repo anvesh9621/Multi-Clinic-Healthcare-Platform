@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { LayoutDashboard, CheckSquare, Clock, UserCheck } from "lucide-react";
 import api from "@/services/api";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { MotionTrItem } from "@/components/ui/MotionListItem";
+import { AnimatePresence } from "framer-motion";
 
 type Appointment = {
   id: number;
@@ -81,9 +84,10 @@ export default function ReceptionistQueue() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {appointments.sort((a,b) => a.start_time.localeCompare(b.start_time)).map(apt => (
-                <tr key={apt.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-xl text-indigo-600 font-mono tracking-widest">{apt.queue_token}</td>
+              <AnimatePresence mode="popLayout">
+                {appointments.sort((a,b) => a.start_time.localeCompare(b.start_time)).map(apt => (
+                  <MotionTrItem key={apt.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-xl text-indigo-600 font-mono tracking-widest">{apt.queue_token}</td>
                   <td className="px-6 py-4 font-bold text-gray-900">{apt.start_time.slice(0, 5)}</td>
                   <td className="px-6 py-4 font-medium text-gray-700">{apt.patient_name}</td>
                   <td className="px-6 py-4 text-gray-600 font-medium">{apt.doctor_name}</td>
@@ -114,8 +118,9 @@ export default function ReceptionistQueue() {
                       </button>
                     )}
                   </td>
-                </tr>
-              ))}
+                  </MotionTrItem>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         )}

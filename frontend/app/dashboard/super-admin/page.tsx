@@ -27,6 +27,9 @@ import {
   Check
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { MotionDivItem } from "@/components/ui/MotionListItem";
+import { AnimatePresence } from "framer-motion";
 
 interface ClinicRow {
   id: number;
@@ -57,7 +60,7 @@ const PLAN_BADGE: Record<string, string> = {
   ENTERPRISE: "bg-violet-100 text-violet-700",
 };
 
-function StatCard({ label, value, icon: Icon, color, sub }: any) {
+function StatCard({ label, value, icon: Icon, color, sub, format }: any) {
   return (
     <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-100 shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
@@ -65,7 +68,9 @@ function StatCard({ label, value, icon: Icon, color, sub }: any) {
       </div>
       <div>
         <p className="text-sm text-gray-500 font-medium">{label}</p>
-        <p className="text-3xl font-bold text-gray-900 mt-0.5">{value}</p>
+        <div className="text-3xl font-bold text-gray-900 mt-0.5">
+          <AnimatedNumber value={value} format={format} />
+        </div>
         {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
       </div>
     </div>
@@ -284,7 +289,7 @@ export default function SuperAdminDashboard() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <StatCard label="MRR (Revenue)" value={`₹${data.total_revenue_paid.toLocaleString()}`} icon={DollarSign} color="bg-emerald-50 text-emerald-600" sub="All-time paid invoices" />
+            <StatCard label="MRR (Revenue)" value={data.total_revenue_paid} format={(v: number) => `₹${Math.round(v).toLocaleString()}`} icon={DollarSign} color="bg-emerald-50 text-emerald-600" sub="All-time paid invoices" />
             <StatCard label="Active Clinics" value={data.active_clinics} icon={Building2} color="bg-violet-50 text-violet-600" sub={`Out of ${data.total_clinics} total`} />
             <StatCard label="Total Users" value={data.total_users} icon={Users} color="bg-blue-50 text-blue-600" sub="Doctors, patients, staff" />
             <StatCard label="Total Appointments" value={data.total_appointments} icon={CalendarCheck} color="bg-amber-50 text-amber-600" sub={`${data.appointments_today} today`} />
@@ -317,13 +322,15 @@ export default function SuperAdminDashboard() {
                 </span>
               </div>
               <div className="space-y-4">
-                {data.recent_logs.map((log: any) => (
-                  <div key={log.id} className="text-sm border-l-2 border-gray-200 pl-3 py-1">
-                    <p className="text-gray-900 font-medium">{log.user} <span className="text-gray-400 font-normal">in</span> {log.clinic}</p>
-                    <p className="text-gray-500">{log.description}</p>
-                    <p className="text-xs text-gray-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
-                  </div>
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {data.recent_logs.map((log: any) => (
+                    <MotionDivItem key={log.id} className="text-sm border-l-2 border-gray-200 pl-3 py-1">
+                      <p className="text-gray-900 font-medium">{log.user} <span className="text-gray-400 font-normal">in</span> {log.clinic}</p>
+                      <p className="text-gray-500">{log.description}</p>
+                      <p className="text-xs text-gray-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
+                    </MotionDivItem>
+                  ))}
+                </AnimatePresence>
                 {data.recent_logs.length === 0 && <p className="text-gray-400 text-sm">No recent activity.</p>}
               </div>
             </div>

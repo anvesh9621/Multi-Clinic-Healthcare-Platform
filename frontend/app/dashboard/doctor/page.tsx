@@ -18,9 +18,13 @@ import {
   Stethoscope,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   X
 } from "lucide-react";
 import { useToast } from "@/context/ToastContext";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { MotionDivItem } from "@/components/ui/MotionListItem";
+import { AnimatePresence } from "framer-motion";
 
 interface Appointment {
   id: number;
@@ -274,45 +278,47 @@ export default function DoctorDashboard() {
           <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
             <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <h2 className="font-bold text-gray-900 text-lg">Up Next</h2>
-              <span className="bg-blue-100 text-blue-700 py-1 px-3 rounded-full text-xs font-bold">
-                {upcoming.length} Waiting
+              <span className="bg-blue-100 text-blue-700 py-1 px-3 rounded-full text-xs font-bold flex gap-1 items-center">
+                <AnimatedNumber value={upcoming.length} /> Waiting
               </span>
             </div>
             
             <div className="divide-y divide-gray-100">
-              {upcoming.slice(inProgress ? 0 : 1).map((app) => (
-                <div key={app.id} className="p-6 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 text-blue-600 font-bold">
-                      {app.start_time.slice(0,5)}
+              <AnimatePresence mode="popLayout">
+                {upcoming.slice(inProgress ? 0 : 1).map((app) => (
+                  <MotionDivItem key={app.id} className="p-6 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 text-blue-600 font-bold">
+                        {app.start_time.slice(0,5)}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-lg">{app.patient_name}</h3>
+                        <p className="text-sm text-gray-500 mt-0.5">{app.reason}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg">{app.patient_name}</h3>
-                      <p className="text-sm text-gray-500 mt-0.5">{app.reason}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => openReschedule(app)}
-                      className="px-4 py-2 bg-white text-gray-700 border border-gray-200 text-sm font-semibold rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 sm:translate-x-4 sm:group-hover:translate-x-0 transform duration-200"
-                    >
-                      Reschedule
-                    </button>
-                    <button 
-                      onClick={() => handleCancel(app.id)}
-                      className="px-4 py-2 bg-white text-red-600 border border-red-100 text-sm font-semibold rounded-lg hover:bg-red-50 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 sm:translate-x-4 sm:group-hover:translate-x-0 transform duration-200"
-                    >
-                      Cancel
-                    </button>
-                    <Link href={`/dashboard/doctor/consult/${app.id}`}>
-                      <button className="px-5 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 sm:translate-x-4 sm:group-hover:translate-x-0 transform duration-200 shadow-sm whitespace-nowrap">
-                        Start Consult
+                    
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => openReschedule(app)}
+                        className="px-4 py-2 bg-white text-gray-700 border border-gray-200 text-sm font-semibold rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 sm:translate-x-4 sm:group-hover:translate-x-0 transform duration-200"
+                      >
+                        Reschedule
                       </button>
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                      <button 
+                        onClick={() => handleCancel(app.id)}
+                        className="px-4 py-2 bg-white text-red-600 border border-red-100 text-sm font-semibold rounded-lg hover:bg-red-50 hover:border-red-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 sm:translate-x-4 sm:group-hover:translate-x-0 transform duration-200"
+                      >
+                        Cancel
+                      </button>
+                      <Link href={`/dashboard/doctor/consult/${app.id}`}>
+                        <button className="px-5 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 sm:translate-x-4 sm:group-hover:translate-x-0 transform duration-200 shadow-sm whitespace-nowrap">
+                          Start Consult
+                        </button>
+                      </Link>
+                    </div>
+                  </MotionDivItem>
+                ))}
+              </AnimatePresence>
               
               {upcoming.length === 0 || (upcoming.length === 1 && !inProgress) ? (
                 <div className="p-8 text-center text-gray-500">
@@ -347,7 +353,9 @@ export default function DoctorDashboard() {
           {/* Completed Today */}
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">Completed Today ({completed.length})</h3>
+              <h3 className="font-bold text-gray-900 flex gap-1 items-center">
+                Completed Today (<AnimatedNumber value={completed.length} />)
+              </h3>
             </div>
             <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
               {completed.map(app => (

@@ -38,3 +38,21 @@ export function MotionDivItem({ children, className, ...props }: MotionDivItemPr
     </motion.div>
   );
 }
+
+export type MotionTrItemProps = HTMLMotionProps<"tr">;
+
+export function MotionTrItem({ children, className, ...props }: MotionTrItemProps) {
+  return (
+    <motion.tr
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className={className}
+      {...props}
+    >
+      {children}
+    </motion.tr>
+  );
+}

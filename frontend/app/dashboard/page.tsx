@@ -11,6 +11,7 @@ import {
   XCircle, Users, Stethoscope, Activity, TrendingUp 
 } from "lucide-react";
 import { SkeletonStat, SkeletonRow, Skeleton } from "@/components/ui/Skeleton";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { motion } from "framer-motion";
 
 export default function DashboardPage() {
@@ -124,7 +125,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <h3 className="text-gray-500 font-medium tracking-wide text-sm uppercase">{stat.label}</h3>
-                  <p className="text-3xl font-bold text-gray-900 mt-1 heading-font">{stat.value}</p>
+                  <div className="text-3xl font-bold text-gray-900 mt-1 heading-font">
+                    <AnimatedNumber value={stat.value as number} />
+                  </div>
                 </motion.div>
               ))}
             </motion.div>
