@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useContext } from "react";
 import { AuthContext } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { getDashboardStats, getDoctorWorkload, getAppointmentTrend } from "@/services/analytics";
 import AppointmentTrendChart from "@/components/analytics/AppointmentTrendChart";
 import { 
@@ -11,49 +12,37 @@ import {
 } from "lucide-react";
 import { SkeletonStat, SkeletonRow, Skeleton } from "@/components/ui/Skeleton";
 import { motion } from "framer-motion";
+
 export default function DashboardPage() {
   const { user } = useContext(AuthContext);
   const router = useRouter();
 
-  const [stats, setStats] = useState<any>(null);
-  const [workload, setWorkload] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [trend, setTrend] = useState([]);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-
   useEffect(() => {
-
-    const loadDashboard = async () => {
-      try {
-        const [statsData, workloadData, trendData] = await Promise.all([
-          getDashboardStats(),
-          getDoctorWorkload(),
-          getAppointmentTrend(),
-        ]);
-
-        setStats(statsData);
-        setWorkload(workloadData);
-        setTrend(trendData);
-      } catch (err) {
-        console.error("Failed to load dashboard data", err);
-        setError("Couldn't load your dashboard right now.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (user && user.role === "PATIENT") {
         router.push("/dashboard/patient");
     } else if (user && user.role === "DOCTOR") {
         router.push("/dashboard/appointments");
     } else if (user && user.role === "SUPER_ADMIN") {
         router.push("/dashboard/super-admin");
-    } else {
-        loadDashboard();
     }
+  }, [user, router]);
 
-  }, [user, router, retryCount]);
+  const isAuthorized = user && !["PATIENT", "DOCTOR", "SUPER_ADMIN"].includes(user.role);
+
+  const { data, isLoading: loading, isError: error, refetch } = useQuery({
+    queryKey: ["dashboard", "overview"],
+    queryFn: async () => {
+      const [statsData, workloadData, trendData] = await Promise.all([
+        getDashboardStats(),
+        getDoctorWorkload(),
+        getAppointmentTrend(),
+      ]);
+      return { stats: statsData, workload: workloadData, trend: trendData };
+    },
+    enabled: !!isAuthorized,
+  });
+
+  const { stats, workload = [], trend = [] } = data || {};
 
   return (
     <div className="space-y-8 pb-10">
@@ -95,9 +84,9 @@ export default function DashboardPage() {
             <XCircle className="w-8 h-8 text-red-500" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-500 mb-6">{error}</p>
+          <p className="text-gray-500 mb-6">Couldn't load your dashboard right now.</p>
           <button 
-            onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}
+            onClick={() => refetch()}
             className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
           >
             Try Again
