@@ -9,6 +9,11 @@ import {
 import api from "@/services/api";
 
 import { useQuery } from "@tanstack/react-query";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DoctorEntry {
@@ -183,13 +188,10 @@ export default function AdminDoctorsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Staff Management</h1>
           <p className="text-gray-500 mt-1">Manage your doctors and pending invitations</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-sm whitespace-nowrap"
-        >
-          <UserPlus className="w-5 h-5" />
+        <Button onClick={() => setShowModal(true)}>
+          <UserPlus className="w-5 h-5 mr-2" />
           Invite Doctors
-        </button>
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -211,16 +213,14 @@ export default function AdminDoctorsPage() {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search by name, email, or specialization…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-sm"
-        />
-      </div>
+      <Input
+        icon={<Search className="w-5 h-5" />}
+        type="text"
+        placeholder="Search by name, email, or specialization…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="py-3.5"
+      />
 
       {/* Content Grid */}
       {loading ? (
@@ -229,10 +229,10 @@ export default function AdminDoctorsPage() {
         </div>
       ) : activeTab === "doctors" ? (
         filteredDoctors.length === 0 ? (
-          <div className="text-center py-20 bg-white border border-gray-100 rounded-2xl shadow-sm text-gray-500">
-            <Stethoscope className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="font-semibold text-lg text-gray-900">{search ? "No doctors match your search." : "No active doctors yet."}</p>
-          </div>
+          <Card className="text-center py-20 text-muted">
+            <Stethoscope className="w-12 h-12 mx-auto mb-3 text-muted" />
+            <p className="font-semibold text-lg text-ink">{search ? "No doctors match your search." : "No active doctors yet."}</p>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredDoctors.map((doc) => (
@@ -242,173 +242,132 @@ export default function AdminDoctorsPage() {
         )
       ) : (
         /* Invitations List */
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50/80 text-xs uppercase font-bold text-gray-500 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Email</th>
-                <th className="px-6 py-4">Specialization</th>
-                <th className="px-6 py-4">Sent On</th>
-                <th className="px-6 py-4 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredInvites.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-gray-500 font-medium">
-                    {search ? "No invitations match your search." : "No pending invitations."}
-                  </td>
-                </tr>
-              ) : (
-                filteredInvites.map((invite) => (
-                  <tr key={invite.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 flex items-center gap-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Specialization</TableHead>
+              <TableHead>Sent On</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredInvites.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-12 text-center text-muted">
+                  {search ? "No invitations match your search." : "No pending invitations."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredInvites.map((invite) => (
+                <TableRow key={invite.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                        <Mail className="w-5 h-5 text-blue-600" />
+                        <Mail className="w-5 h-5 text-primary" />
                       </div>
-                      <span className="font-bold text-gray-900 text-base">{invite.email}</span>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-700">{invite.specialization}</td>
-                    <td className="px-6 py-4 text-gray-500">
-                      {new Date(invite.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
-                        invite.status === "PENDING" ? "bg-amber-50 border-amber-200 text-amber-700" :
-                        invite.status === "ACCEPTED" ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
-                        "bg-red-50 border-red-200 text-red-700"
-                      }`}>
-                        {invite.status === "PENDING" && <Clock className="w-3.5 h-3.5" />}
-                        {invite.status === "ACCEPTED" && <CheckCircle className="w-3.5 h-3.5" />}
-                        {invite.status === "EXPIRED" && <X className="w-3.5 h-3.5" />}
-                        {invite.status.charAt(0) + invite.status.slice(1).toLowerCase()}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      <span className="font-bold text-ink text-base">{invite.email}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">{invite.specialization}</TableCell>
+                  <TableCell>{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-center">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                      invite.status === "PENDING" ? "bg-amber-50 border-amber-200 text-amber-700" :
+                      invite.status === "ACCEPTED" ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
+                      "bg-red-50 border-red-200 text-red-700"
+                    }`}>
+                      {invite.status === "PENDING" && <Clock className="w-3.5 h-3.5" />}
+                      {invite.status === "ACCEPTED" && <CheckCircle className="w-3.5 h-3.5" />}
+                      {invite.status === "EXPIRED" && <X className="w-3.5 h-3.5" />}
+                      {invite.status.charAt(0) + invite.status.slice(1).toLowerCase()}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       )}
 
-      {/* Create Doctor Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-100 px-8 py-5 flex items-center justify-between rounded-t-3xl z-10">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Invite Doctors</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Send bulk email invitations</p>
+      <Modal isOpen={showModal} onClose={resetModal} title="Invite Doctors">
+        {inviteSuccess.length > 0 ? (
+          <div className="text-center space-y-4 py-4">
+            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Send className="w-8 h-8 text-emerald-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-ink heading-font">Invitations Sent!</h3>
+            <p className="text-muted max-w-sm mx-auto">
+              Sent {inviteSuccess.length} invitation(s) successfully. They will receive a secure link to create their profile.
+              <br /><br />
+              <span className="text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 inline-block">📋 Check runserver terminal for links</span>
+            </p>
+            <div className="flex gap-4 justify-center pt-8">
+              <Button variant="secondary" onClick={resetModal}>Close</Button>
+              <Button onClick={() => { setInviteSuccess([]); setForm(initialForm); setError(null); }}>+ Invite More</Button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleCreate} className="space-y-6">
+            {error && (
+              <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm font-semibold shadow-sm">
+                <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                {error}
               </div>
-              <button onClick={resetModal} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-                <X className="w-6 h-6" />
-              </button>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-ink mb-2">Doctor Email Addresses <span className="text-red-500">*</span></label>
+              <textarea
+                required
+                rows={4}
+                value={form.emails}
+                onChange={(e) => setForm((f) => ({ ...f, emails: e.target.value }))}
+                placeholder={"dr.sharma@gmail.com, dr.kapoor@gmail.com\n(Separate with commas or newlines)"}
+                className="w-full px-4 py-3 bg-white border border-border rounded-xl text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-sm resize-none"
+              />
+              <p className="text-muted text-sm mt-2">You can enter multiple emails at once.</p>
             </div>
 
-            {inviteSuccess.length > 0 ? (
-              /* ✅ Success state */
-              <div className="p-10 text-center space-y-4">
-                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Send className="w-8 h-8 text-emerald-500" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">Invitations Sent!</h3>
-                <p className="text-gray-600 max-w-sm mx-auto">
-                  Sent {inviteSuccess.length} invitation(s) successfully. They will receive a secure link to create their profile.
-                  <br /><br />
-                  <span className="text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200inline-block">📋 Check runserver terminal for links</span>
-                </p>
-                <div className="flex gap-4 justify-center pt-8">
-                  <button onClick={resetModal} className="px-6 py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors font-bold shadow-sm">
-                    Close
-                  </button>
-                  <button
-                    onClick={() => { setInviteSuccess([]); setForm(initialForm); setError(null); }}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-bold shadow-sm"
-                  >
-                    + Invite More
-                  </button>
-                </div>
+            <div>
+              <label className="block text-sm font-bold text-ink mb-2">Assigned Specialization <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <select
+                  required
+                  value={form.specialization}
+                  onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}
+                  className="w-full px-4 py-3 bg-white border border-border rounded-xl text-ink appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-sm"
+                >
+                  <option value="">Select specialization…</option>
+                  {SPECIALIZATIONS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted pointer-events-none" />
               </div>
-            ) : (
-              /* ─ Form ─ */
-              <form onSubmit={handleCreate} className="p-8 space-y-6">
-                {error && (
-                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm font-semibold shadow-sm">
-                    <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
-                    {error}
-                  </div>
+            </div>
+
+            <div className="flex items-start gap-3 px-5 py-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 shadow-sm">
+              <UserPlus className="w-5 h-5 shrink-0 text-blue-600 mt-0.5" />
+              <div>
+                <strong className="block mb-1 text-blue-900">Streamlined Onboarding</strong>
+                Doctors will fill out their own profile details when they accept the invite.
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-6 border-t border-border mt-4">
+              <Button type="button" variant="secondary" className="flex-1" onClick={resetModal}>Cancel</Button>
+              <Button type="submit" disabled={submitting} className="flex-1">
+                {submitting ? (
+                  <><Loader2 className="w-5 h-5 animate-spin mr-2" />Sending…</>
+                ) : (
+                  <><Send className="w-5 h-5 mr-2" />Send Invitations</>
                 )}
-
-                {/* Emails */}
-                <div>
-                  <label className="block text-sm font-bold text-gray-900 mb-2">Doctor Email Addresses <span className="text-red-500">*</span></label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={form.emails}
-                    onChange={(e) => setForm((f) => ({ ...f, emails: e.target.value }))}
-                    placeholder="dr.sharma@gmail.com, dr.kapoor@gmail.com&#10;(Separate with commas or newlines)"
-                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-sm resize-none"
-                  />
-                  <p className="text-gray-500 text-sm mt-2">You can enter multiple emails at once.</p>
-                </div>
-
-                {/* Specialization */}
-                <div>
-                  <label className="block text-sm font-bold text-gray-900 mb-2">Assigned Specialization <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <select
-                      required
-                      value={form.specialization}
-                      onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}
-                      className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-sm"
-                    >
-                      <option value="">Select specialization…</option>
-                      {SPECIALIZATIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Info banner */}
-                <div className="flex items-start gap-3 px-5 py-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 shadow-sm">
-                  <UserPlus className="w-5 h-5 shrink-0 text-blue-600 mt-0.5" />
-                  <div>
-                    <strong className="block mb-1 text-blue-900">Streamlined Onboarding</strong>
-                    Doctors will fill out their own profile details (Name, Experience, Fees) when they accept the invite.
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex gap-4 pt-6 border-t border-gray-100 mt-8">
-                  <button
-                    type="button"
-                    onClick={resetModal}
-                    className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors font-bold shadow-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    {submitting ? (
-                      <><Loader2 className="w-5 h-5 animate-spin" /> Sending Invites…</>
-                    ) : (
-                      <><Send className="w-5 h-5" /> Send Invitations</>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -426,7 +385,7 @@ function DoctorCard({ doctor }: { doctor: DoctorEntry }) {
   const colorClass = AVATAR_COLORS[doctor.id % AVATAR_COLORS.length];
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-lg hover:border-blue-100 transition-all group flex flex-col h-full">
+    <Card hoverable className="p-6 flex flex-col h-full">
       <div className="flex items-start gap-4 mb-5">
         {doctor.profile_photo ? (
           <img
@@ -482,6 +441,6 @@ function DoctorCard({ doctor }: { doctor: DoctorEntry }) {
           Active
         </span>
       </div>
-    </div>
+    </Card>
   );
 }

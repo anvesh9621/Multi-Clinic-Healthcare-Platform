@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Clock, Plus, Trash2, CalendarOff } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/context/ToastContext";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -145,7 +147,7 @@ export default function DoctorSchedulePage() {
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
-      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
     </div>
   );
 
@@ -160,7 +162,7 @@ export default function DoctorSchedulePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* Weekly Schedule */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+        <Card className="flex flex-col">
           <div className="p-5 border-b border-gray-100 bg-gray-50/50">
             <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2">
               <Clock className="w-5 h-5 text-indigo-600" /> Weekly Hours
@@ -202,9 +204,9 @@ export default function DoctorSchedulePage() {
                   className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-20 p-2"
                 />
               </div>
-              <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-1 transition-colors">
-                <Plus className="w-4 h-4" /> Add
-              </button>
+              <Button type="submit" size="sm" className="self-end">
+                <Plus className="w-4 h-4 mr-1" /> Add
+              </Button>
             </form>
           </div>
           
@@ -240,10 +242,10 @@ export default function DoctorSchedulePage() {
                 </div>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Time Off / Leaves */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+        <Card className="flex flex-col">
           <div className="p-5 border-b border-gray-100 bg-rose-50/30">
             <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2">
               <CalendarOff className="w-5 h-5 text-rose-600" /> Time Off / Leaves
@@ -277,9 +279,9 @@ export default function DoctorSchedulePage() {
                       className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block w-full p-2"
                     />
                   </div>
-                  <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg text-sm px-4 py-2 flex items-center gap-1 transition-colors h-[38px]">
-                    <Plus className="w-4 h-4" /> Add
-                  </button>
+                  <Button type="submit" size="sm" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50">
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
                 </div>
              </form>
           </div>
@@ -299,15 +301,15 @@ export default function DoctorSchedulePage() {
                                </div>
                                {leave.reason && <p className="text-xs text-gray-500 mt-0.5">{leave.reason}</p>}
                            </div>
-                           <button onClick={() => handleDeleteLeave(leave.id)} className="text-red-500 hover:text-red-700 bg-white p-2 border border-red-100 rounded-lg shadow-sm transition-colors" title="Cancel Time Off">
+                           <Button variant="ghost" size="icon" onClick={() => handleDeleteLeave(leave.id)} className="text-red-500 hover:text-red-700 border border-red-100" title="Cancel Time Off">
                               <Trash2 className="w-4 h-4" />
-                           </button>
+                           </Button>
                        </div>
                    ))}
                 </div>
              )}
           </div>
-        </div>
+        </Card>
 
       </div>
     </div>

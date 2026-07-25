@@ -5,6 +5,11 @@ import { AuthContext } from "@/context/AuthContext";
 import apiClient from "@/services/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Search, UserPlus, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { Card } from "@/components/ui/Card";
 
 interface Patient {
   id: number;
@@ -21,16 +26,12 @@ export default function ReceptionistPatientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (user && (user.role === "RECEPTIONIST" || user.role === "CLINIC_ADMIN")) {
-      const delayDebounceFn = setTimeout(() => {
-        fetchPatients(searchQuery);
-      }, 300); // Wait for the user to stop typing
-      
-      return () => clearTimeout(delayDebounceFn);
+      const timer = setTimeout(() => fetchPatients(searchQuery), 300);
+      return () => clearTimeout(timer);
     } else if (user) {
       router.push("/dashboard");
     }
@@ -49,104 +50,102 @@ export default function ReceptionistPatientsPage() {
     }
   };
 
-  if (loading && patients.length === 0) return <div>Loading patients...</div>;
+  if (loading && patients.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto space-y-8 p-6 flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-red-100 shadow-sm text-center">
-        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
-          <span className="text-3xl">⚠️</span>
-        </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-        <p className="text-gray-500 mb-6">{error}</p>
-        <button 
-          onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}
-          className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
-        >
-          Try Again
-        </button>
+      <div className="max-w-7xl mx-auto p-6">
+        <Card className="flex flex-col items-center justify-center py-20 text-center px-4">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-ink mb-2">Something went wrong</h2>
+          <p className="text-muted mb-6">{error}</p>
+          <Button onClick={() => { setLoading(true); setError(null); setRetryCount(r => r + 1); }}>
+            Try Again
+          </Button>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 p-6">
+    <div className="max-w-7xl mx-auto space-y-6 p-6">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Manage Patients</h1>
-          <p className="text-gray-500 mt-1">View, search, and manage registered clinic patients.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-ink heading-font">Manage Patients</h1>
+          <p className="text-muted mt-1">View, search, and manage registered clinic patients.</p>
         </div>
         <Link href="/dashboard/receptionist/patients/new">
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-colors w-full md:w-auto">
-            + Register New Patient
-          </button>
+          <Button className="w-full md:w-auto">
+            <UserPlus className="w-4 h-4 mr-2" /> Register New Patient
+          </Button>
         </Link>
       </div>
 
       {/* SEARCH */}
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search patients by email or phone number..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full md:w-96 px-5 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition shadow-sm"
-        />
-      </div>
+      <Input
+        icon={<Search className="w-4 h-4" />}
+        type="text"
+        placeholder="Search patients by email or phone number..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="max-w-md py-3"
+      />
 
       {/* TABLE */}
-      <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden min-h-[400px]">
-        <table className="min-w-full divide-y divide-gray-100">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Contact Details
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date of Birth
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-50">
-            {patients.map((patient) => (
-              <tr key={patient.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                  PT-{patient.id}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <div className="font-bold text-gray-900">{patient.email}</div>
-                  <div className="text-gray-500 mt-0.5">{patient.phone}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                  {patient.date_of_birth || "Not provided"}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-4">
-                  <Link href={`/dashboard/receptionist/book?patientId=${patient.id}`} className="text-blue-600 hover:text-blue-700 hover:underline">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>Contact Details</TableHead>
+            <TableHead>Date of Birth</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {patients.map((patient) => (
+            <TableRow key={patient.id}>
+              <TableCell className="font-bold">PT-{patient.id}</TableCell>
+              <TableCell>
+                <div className="font-semibold text-ink">{patient.email}</div>
+                <div className="text-muted text-xs mt-0.5">{patient.phone}</div>
+              </TableCell>
+              <TableCell>{patient.date_of_birth || "Not provided"}</TableCell>
+              <TableCell>
+                <div className="flex gap-4">
+                  <Link
+                    href={`/dashboard/receptionist/book?patientId=${patient.id}`}
+                    className="text-primary hover:text-primary-dark text-sm font-semibold transition-colors"
+                  >
                     Book Appointment
                   </Link>
-                  <Link href={`/dashboard/receptionist/patients/${patient.id}`} className="text-gray-600 hover:text-gray-900 hover:underline">
+                  <Link
+                    href={`/dashboard/receptionist/patients/${patient.id}`}
+                    className="text-muted hover:text-ink text-sm font-semibold transition-colors"
+                  >
                     View History
                   </Link>
-                </td>
-              </tr>
-            ))}
-            {patients.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-gray-500 font-medium bg-gray-50/50">
-                  No patients found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+          {patients.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="py-12 text-center text-muted">
+                No patients found.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }
