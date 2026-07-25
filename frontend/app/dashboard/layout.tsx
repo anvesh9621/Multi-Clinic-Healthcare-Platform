@@ -5,6 +5,7 @@ import { AuthContext } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { logout } from "@/services/auth";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -127,6 +128,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -285,8 +287,18 @@ export default function DashboardLayout({
         
         <SubscriptionBanner userRole={user.role} />
         
-        <div className="p-6 max-w-7xl mx-auto animate-fade-in relative z-10 w-full flex-1 min-h-0">
-          {children}
+        <div className="p-6 max-w-7xl mx-auto relative z-10 w-full flex-1 min-h-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
+              animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
       </div>
