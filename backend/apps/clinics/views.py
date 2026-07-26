@@ -100,6 +100,14 @@ class ReceptionistListView(ClinicQuerysetMixin, ListAPIView):
     serializer_class = ReceptionistSerializer
     queryset = User.objects.filter(role=User.RoleChoices.RECEPTIONIST)
 
+
+class AdminReceptionistInvitationListView(ClinicQuerysetMixin, ListAPIView):
+    """Clinic Admin views all sent receptionist invitations, scoped to their clinic."""
+    permission_classes = [IsClinicAdmin]
+    serializer_class = ReceptionistInvitationSerializer
+    queryset = ReceptionistInvitation.objects.order_by("-created_at")
+    clinic_field = 'clinic'
+
 from rest_framework.permissions import AllowAny
 from .serializers import ClinicRegistrationSerializer
 

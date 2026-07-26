@@ -43,6 +43,15 @@ export interface ReceptionistUser {
   created_at: string;
 }
 
+export interface ReceptionistInvitation {
+  id: number;
+  clinic_name: string;
+  email: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";
+  created_at: string;
+  expires_at: string;
+}
+
 // ── Appointments ──────────────────────────────────────────────────────────────
 
 export type AppointmentStatus =
