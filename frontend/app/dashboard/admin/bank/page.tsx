@@ -5,6 +5,9 @@ import { AuthContext } from "@/context/AuthContext";
 import apiClient from "@/services/api";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, AlertTriangle, Building, CreditCard, Landmark, FileText, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 export default function BankAccountPage() {
   const { user } = useContext(AuthContext);
@@ -71,7 +74,7 @@ export default function BankAccountPage() {
   if (loading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -79,35 +82,35 @@ export default function BankAccountPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Bank Account & Payouts</h1>
-        <p className="text-gray-500 mt-1">Configure your bank details to receive direct payouts for patient bookings.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink heading-font">Bank Account & Payouts</h1>
+        <p className="text-muted mt-1">Configure your bank details to receive direct payouts for patient bookings.</p>
       </div>
 
       {isOnboarded ? (
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-8 flex items-start gap-4">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-6 h-6 text-green-600" />
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 flex items-start gap-4">
+          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-6 h-6 text-emerald-700" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-green-900">Bank Account Connected</h2>
-            <p className="text-green-700 mt-1 mb-4">
+            <h2 className="text-xl font-bold text-emerald-950 heading-font">Bank Account Connected</h2>
+            <p className="text-emerald-800 mt-1 mb-4 text-sm font-medium">
               Your clinic is verified and connected to receive direct patient payouts via Razorpay Route.
             </p>
-            <div className="bg-white/60 border border-green-200 rounded-xl px-4 py-3 inline-block">
-              <span className="text-sm font-semibold text-green-800 uppercase tracking-wide">Linked Account ID</span>
-              <p className="font-mono text-green-900 mt-1">{accountId}</p>
+            <div className="bg-paper/80 border border-emerald-200 rounded-xl px-4 py-3 inline-block shadow-sm">
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">Linked Account ID</span>
+              <p className="font-mono font-bold text-emerald-950 mt-1">{accountId}</p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-6 sm:p-8 bg-blue-50 border-b border-blue-100 flex items-start gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Landmark className="w-6 h-6 text-blue-600" />
+        <Card className="overflow-hidden p-0">
+          <div className="p-6 sm:p-8 bg-primary/10 border-b border-primary/20 flex items-start gap-4">
+            <div className="w-12 h-12 bg-paper rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Landmark className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-blue-900">Connect your Bank Account</h2>
-              <p className="text-blue-700 mt-1">
+              <h2 className="text-xl font-bold text-ink heading-font">Connect your Bank Account</h2>
+              <p className="text-muted mt-1 text-sm leading-relaxed">
                 We use Razorpay Route to directly transfer consultation fees from patients to your clinic account.
                 Please provide your business bank details below to enable online payments.
               </p>
@@ -116,15 +119,15 @@ export default function BankAccountPage() {
 
           <div className="p-6 sm:p-8">
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3">
-                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-semibold">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-600" />
                 {error}
               </div>
             )}
             
             {success && (
-              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+              <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-semibold">
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600" />
                 {success}
               </div>
             )}
@@ -132,87 +135,77 @@ export default function BankAccountPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Account Holder Name *</label>
-                  <div className="relative">
-                    <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      name="bank_account_name"
-                      value={formData.bank_account_name}
-                      onChange={handleChange}
-                      required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                      placeholder="e.g. City Clinic Private Limited"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1.5">Must match the exact name registered with your bank.</p>
+                  <label className="block text-sm font-bold text-ink mb-2">Account Holder Name *</label>
+                  <Input
+                    type="text"
+                    name="bank_account_name"
+                    icon={<Building className="w-4 h-4 text-muted" />}
+                    value={formData.bank_account_name}
+                    onChange={handleChange}
+                    required
+                    placeholder="e.g. City Clinic Private Limited"
+                  />
+                  <p className="text-xs text-muted mt-1.5">Must match the exact name registered with your bank.</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Account Number *</label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      name="bank_account_number"
-                      value={formData.bank_account_number}
-                      onChange={handleChange}
-                      required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                      placeholder="e.g. 50200012345678"
-                    />
-                  </div>
+                  <label className="block text-sm font-bold text-ink mb-2">Account Number *</label>
+                  <Input
+                    type="text"
+                    name="bank_account_number"
+                    icon={<CreditCard className="w-4 h-4 text-muted" />}
+                    value={formData.bank_account_number}
+                    onChange={handleChange}
+                    required
+                    placeholder="e.g. 50200012345678"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">IFSC Code *</label>
-                  <div className="relative">
-                    <Landmark className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      name="bank_ifsc"
-                      value={formData.bank_ifsc}
-                      onChange={handleChange}
-                      required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all uppercase"
-                      placeholder="e.g. HDFC0001234"
-                    />
-                  </div>
+                  <label className="block text-sm font-bold text-ink mb-2">IFSC Code *</label>
+                  <Input
+                    type="text"
+                    name="bank_ifsc"
+                    icon={<Landmark className="w-4 h-4 text-muted" />}
+                    value={formData.bank_ifsc}
+                    onChange={handleChange}
+                    required
+                    className="uppercase font-mono"
+                    placeholder="e.g. HDFC0001234"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Business PAN *</label>
-                  <div className="relative">
-                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      name="business_pan"
-                      value={formData.business_pan}
-                      onChange={handleChange}
-                      required
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all uppercase"
-                      placeholder="e.g. ABCDE1234F"
-                    />
-                  </div>
+                  <label className="block text-sm font-bold text-ink mb-2">Business PAN *</label>
+                  <Input
+                    type="text"
+                    name="business_pan"
+                    icon={<FileText className="w-4 h-4 text-muted" />}
+                    value={formData.business_pan}
+                    onChange={handleChange}
+                    required
+                    className="uppercase font-mono"
+                    placeholder="e.g. ABCDE1234F"
+                  />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-gray-100">
-                <button
+              <div className="pt-4 border-t border-border">
+                <Button
                   type="submit"
                   disabled={submitting}
-                  className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto py-3"
                 >
                   {submitting ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Verifying details...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying details...</>
                   ) : (
-                    "Connect Bank Account"
+                    <>Connect Bank Account</>
                   )}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );
