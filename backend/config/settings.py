@@ -217,7 +217,7 @@ SIMPLE_JWT = {
 # ── Email (Brevo SMTP Relay) ──────────────────────────────────────────────────
 if DEBUG and not os.environ.get("BREVO_SMTP_LOGIN"):
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    DEFAULT_FROM_EMAIL = "MediClinic <noreply@mediclinic.com>"
+    DEFAULT_FROM_EMAIL = "MediClinic <anveshpandey488@gmail.com>"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = "smtp-relay.brevo.com"
@@ -272,4 +272,4 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_EAGER_PROPAGATES = True
