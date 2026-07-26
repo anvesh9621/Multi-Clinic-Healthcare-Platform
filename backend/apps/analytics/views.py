@@ -102,7 +102,7 @@ class SuperAdminStatsView(APIView):
             clinic_breakdown.append({
                 "id": clinic.id,
                 "name": clinic.name,
-                "plan": clinic.subscription_plan,
+                "plan": (clinic.subscription.plan if hasattr(clinic, "subscription") and clinic.subscription else clinic.subscription_plan).upper(),
                 "is_active": clinic.is_active,
                 "total_appointments": Appointment.objects.filter(clinic=clinic).count(),
                 "appointments_today": Appointment.objects.filter(clinic=clinic, appointment_date=today).count(),
