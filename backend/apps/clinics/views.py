@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 
 from apps.accounts.models import User
 from apps.accounts.permissions import IsClinicAdmin
@@ -10,7 +11,14 @@ from apps.core.tenancy import ClinicQuerysetMixin
 from apps.audit.services import log_action
 from apps.audit.models import AuditLog
 
-from .serializers import ReceptionistCreateSerializer, ReceptionistSerializer
+from .serializers import (
+    ReceptionistCreateSerializer,
+    ReceptionistSerializer,
+    ReceptionistInvitationSerializer,
+    ReceptionistAcceptInviteSerializer,
+)
+from .models import ReceptionistInvitation
+
 
 class CreateReceptionistView(APIView):
     permission_classes = [IsClinicAdmin]
@@ -27,26 +35,65 @@ class CreateReceptionistView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        receptionist = serializer.save()
+        invite = serializer.save()
 
         log_action(
             user=request.user,
             clinic=request.user.clinic,
             action_type=AuditLog.ActionChoices.CREATE,
-            object_type="User",
-            object_id=receptionist.id,
-            description="Clinic admin created a receptionist",
+            object_type="ReceptionistInvitation",
+            object_id=invite.id,
+            description=f"Clinic admin invited receptionist {invite.email}",
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
         return Response(
             {
                 "success": True,
-                "receptionist_id": receptionist.id,
-                "message": "Receptionist created successfully"
+                "invite_id": invite.id,
+                "message": "Receptionist invitation sent successfully."
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class ReceptionistInvitationStatusView(APIView):
+    """Public — checks if a receptionist invite token is valid."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        try:
+            invite = ReceptionistInvitation.objects.get(token=token)
+            if not invite.is_valid:
+                return Response(
+                    {"isValid": False, "error": "This invitation has expired or has already been used."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer = ReceptionistInvitationSerializer(invite)
+            return Response({"isValid": True, "invitation": serializer.data})
+
+        except ReceptionistInvitation.DoesNotExist:
+            return Response({"isValid": False, "error": "Invalid invitation token."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ReceptionistInviteAcceptView(APIView):
+    """Public — receptionist sets password to complete account creation."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ReceptionistAcceptInviteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+
+        return Response({
+            "success": True,
+            "message": "Receptionist account created successfully. You can now log in.",
+            "email": user.email,
+        })
+
 
 class ReceptionistListView(ClinicQuerysetMixin, ListAPIView):
     permission_classes = [IsClinicAdmin]

@@ -1,4 +1,8 @@
+import uuid
+from datetime import timedelta
+from django.utils import timezone
 from django.db import models
+
 
 class Clinic(models.Model):
 
@@ -42,4 +46,40 @@ class Clinic(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return self.name
+
+
+class ReceptionistInvitation(models.Model):
+    STATUS_CHOICES = (
+        ("PENDING", "Pending"),
+        ("ACCEPTED", "Accepted"),
+        ("EXPIRED", "Expired"),
+        ("CANCELLED", "Cancelled"),
+    )
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name="receptionist_invitations"
+    )
+    email = models.EmailField()
+    token = models.CharField(max_length=64, default=uuid.uuid4, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = ("clinic", "email", "status")
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=48)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        return self.status == "PENDING" and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"Receptionist Invite: {self.email} to {self.clinic.name} ({self.status})"
