@@ -14,6 +14,7 @@ import {
   UserCheck,
   MailCheck,
   XCircle,
+  RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -75,23 +76,39 @@ export default function ReceptionistsListPage() {
   const pendingInvite = invitations.find(
     (i) => i.status === "PENDING" && new Date(i.expires_at) > new Date()
   );
+  const expiredOrCancelledInvite = !activeReceptionist && !pendingInvite && invitations.length > 0 ? invitations[0] : null;
 
   const canInvite = !activeReceptionist && !pendingInvite;
+
+  const getRemainingHours = (expiresAtStr: string) => {
+    const expiresAt = new Date(expiresAtStr).getTime();
+    const now = new Date().getTime();
+    const diffMs = expiresAt - now;
+    if (diffMs <= 0) return "Expired";
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours > 0) return `${hours}h ${minutes}m remaining`;
+    return `${minutes}m remaining`;
+  };
 
   const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
 
+    await sendInviteRequest(email.trim().toLowerCase());
+    setEmail("");
+  };
+
+  const sendInviteRequest = async (targetEmail: string) => {
     setSubmitting(true);
     setError("");
     setSuccessMessage("");
 
     try {
       await apiClient.post("/clinics/receptionists/create/", {
-        email: email.trim().toLowerCase(),
+        email: targetEmail.toLowerCase(),
       });
-      setSuccessMessage(`Invitation sent to ${email.trim()}. They will receive an email to accept and set their password.`);
-      setEmail("");
+      setSuccessMessage(`Invitation link sent to ${targetEmail}. They will receive an email to set their password.`);
       await fetchData();
     } catch (err: any) {
       console.error(err);
@@ -126,9 +143,9 @@ export default function ReceptionistsListPage() {
         </p>
       </div>
 
-      {/* Primary Action / Status Banner Card */}
+      {/* Main Status & Action Card */}
       <Card className="p-6 sm:p-8 space-y-6">
-        {/* Status: Active Receptionist */}
+        {/* State 1: Active Receptionist */}
         {activeReceptionist && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200">
@@ -155,13 +172,13 @@ export default function ReceptionistsListPage() {
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-muted flex items-start gap-2.5">
               <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <span>
-                Each clinic is limited to <strong>1 assigned Receptionist</strong>. Your clinic currently has an active receptionist registered.
+                Your clinic receptionist slot is <strong>filled and active</strong>. Each clinic is limited to 1 assigned Receptionist.
               </span>
             </div>
           </div>
         )}
 
-        {/* Status: Pending Invite */}
+        {/* State 2: Pending Invitation */}
         {!activeReceptionist && pendingInvite && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-amber-50/80 border border-amber-200">
@@ -175,11 +192,11 @@ export default function ReceptionistsListPage() {
                       {pendingInvite.email}
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Invitation Pending
+                      <Clock className="w-3 h-3" /> Invitation Pending ({getRemainingHours(pendingInvite.expires_at)})
                     </span>
                   </div>
                   <p className="text-xs text-muted mt-0.5">
-                    Invite sent on {new Date(pendingInvite.created_at).toLocaleDateString()} • Expires on {new Date(pendingInvite.expires_at).toLocaleString()}
+                    Sent on {new Date(pendingInvite.created_at).toLocaleDateString()} • Expires on {new Date(pendingInvite.expires_at).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -188,13 +205,44 @@ export default function ReceptionistsListPage() {
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-muted flex items-start gap-2.5">
               <MailCheck className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
               <span>
-                An invitation email was sent to <strong>{pendingInvite.email}</strong>. They will set their password upon accepting. Only 1 receptionist assignment is permitted at a time.
+                An invitation email is currently active for <strong>{pendingInvite.email}</strong>. They will set their password upon accepting.
               </span>
             </div>
           </div>
         )}
 
-        {/* Status: Available to Invite */}
+        {/* State 3: Expired / Cancelled Invitation (Shows Resend Banner + Form) */}
+        {!activeReceptionist && !pendingInvite && expiredOrCancelledInvite && (
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center flex-shrink-0">
+                <XCircle className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-ink">
+                  Previous Invite to {expiredOrCancelledInvite.email} ({expiredOrCancelledInvite.status.toLowerCase()})
+                </p>
+                <p className="text-xs text-muted">
+                  {expiredOrCancelledInvite.status === "EXPIRED" ? "Invitation expired. You can resend a new invitation link below." : "Invitation was cancelled."}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={submitting}
+              onClick={() => sendInviteRequest(expiredOrCancelledInvite.email)}
+              className="whitespace-nowrap"
+            >
+
+              <RotateCw className="w-3.5 h-3.5 mr-1.5" />
+              Resend Invite
+            </Button>
+          </div>
+        )}
+
+        {/* State 4: Available to Invite Form */}
         {canInvite && (
           <div className="space-y-6">
             <div className="border-b border-border/60 pb-4">
@@ -263,8 +311,9 @@ export default function ReceptionistsListPage() {
             <TableRow>
               <TableHead>Recipient Email</TableHead>
               <TableHead>Type / Role</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Date Sent / Joined</TableHead>
+              <TableHead>Status & Expiration</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -281,6 +330,9 @@ export default function ReceptionistsListPage() {
                     <CheckCircle2 className="w-3 h-3" /> Active
                   </span>
                 </TableCell>
+                <TableCell className="text-right text-xs text-muted italic">
+                  Active Member
+                </TableCell>
               </TableRow>
             ))}
 
@@ -294,9 +346,11 @@ export default function ReceptionistsListPage() {
                 </TableCell>
                 <TableCell>
                   {inv.status === "PENDING" && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                      <Clock className="w-3 h-3" /> Pending
-                    </span>
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <Clock className="w-3 h-3" /> Pending ({getRemainingHours(inv.expires_at)})
+                      </span>
+                    </div>
                   )}
                   {inv.status === "ACCEPTED" && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -314,12 +368,25 @@ export default function ReceptionistsListPage() {
                     </span>
                   )}
                 </TableCell>
+                <TableCell className="text-right">
+                  {!activeReceptionist && (inv.status === "EXPIRED" || inv.status === "CANCELLED") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={submitting}
+                      onClick={() => sendInviteRequest(inv.email)}
+                      className="text-xs font-semibold"
+                    >
+                      <RotateCw className="w-3 h-3 mr-1" /> Resend
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
 
             {receptionists.length === 0 && invitations.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="py-12 text-center text-muted">
+                <TableCell colSpan={5} className="py-12 text-center text-muted">
                   No receptionist staff or invitations found for this clinic.
                 </TableCell>
               </TableRow>
