@@ -214,20 +214,20 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# ── Email (SMTP) ─────────────────────────────
-# Set these in your .env file or environment variables in production
-if DEBUG:
+# ── Email (Brevo SMTP Relay) ──────────────────────────────────────────────────
+if DEBUG and not os.environ.get("BREVO_SMTP_LOGIN"):
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    DEFAULT_FROM_EMAIL = "MediClinic <noreply@mediclinic.com>"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-
-EMAIL_HOST = 'smtp.gmail.com'  # Or your chosen provider
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-# Fallback to empty string here to prevent crash if not set, but emails will fail
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER or "noreply@mediclinic.com"
+    EMAIL_HOST = "smtp-relay.brevo.com"
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.environ["BREVO_SMTP_LOGIN"]
+    EMAIL_HOST_PASSWORD = os.environ["BREVO_SMTP_KEY"]
+    DEFAULT_FROM_EMAIL = os.environ.get(
+        "DEFAULT_FROM_EMAIL", f"MediClinic <{os.environ['BREVO_SMTP_LOGIN']}>"
+    )
 
 # ── Frontend URL (used for invite links) ─────────────────────────────────────
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
