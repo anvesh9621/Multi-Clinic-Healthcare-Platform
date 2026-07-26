@@ -5,6 +5,9 @@ import { AuthContext } from "@/context/AuthContext";
 import apiClient from "@/services/api";
 import { useRouter } from "next/navigation";
 import { Shield, AlertTriangle, CheckCircle2, Loader2, Key, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 
 export default function PlatformSettingsPage() {
   const { user } = useContext(AuthContext);
@@ -58,7 +61,6 @@ export default function PlatformSettingsPage() {
       await apiClient.post("/billing/platform-settings/", formData);
       setSuccess("Platform settings updated successfully.");
 
-      // Re-fetch to show masked secret
       const { data } = await apiClient.get("/billing/platform-settings/");
       setFormData({
         razorpay_key_id: data.razorpay_key_id || "",
@@ -74,7 +76,7 @@ export default function PlatformSettingsPage() {
   if (loading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -82,19 +84,19 @@ export default function PlatformSettingsPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Platform Settings</h1>
-        <p className="text-gray-500 mt-1">Configure the global Razorpay payment gateway for subscription billing.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-ink heading-font">Platform Settings</h1>
+        <p className="text-muted mt-1">Configure the global Razorpay payment gateway for subscription billing.</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Header */}
-        <div className="p-6 sm:p-8 bg-slate-900 border-b border-slate-800 flex items-start gap-4">
-          <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0">
-            <Shield className="w-6 h-6 text-white" />
+      <Card className="overflow-hidden p-0">
+        {/* Header Banner */}
+        <div className="p-6 sm:p-8 bg-ink border-b border-border text-paper flex items-start gap-4">
+          <div className="w-12 h-12 bg-paper/10 rounded-full flex items-center justify-center flex-shrink-0">
+            <Shield className="w-6 h-6 text-paper" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Razorpay Payment Gateway</h2>
-            <p className="text-slate-300 mt-1 text-sm">
+            <h2 className="text-xl font-bold text-paper heading-font">Razorpay Payment Gateway</h2>
+            <p className="text-paper/80 mt-1 text-sm leading-relaxed">
               These keys authenticate all platform-level transactions — clinic subscription charges and 
               Razorpay Route patient payments. Keep your secret key secure.
             </p>
@@ -103,15 +105,15 @@ export default function PlatformSettingsPage() {
 
         <div className="p-6 sm:p-8">
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-semibold">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-600" />
               {error}
             </div>
           )}
 
           {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+            <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-semibold">
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600" />
               {success}
             </div>
           )}
@@ -120,71 +122,69 @@ export default function PlatformSettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Key ID */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Razorpay Key ID</label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    name="razorpay_key_id"
-                    value={formData.razorpay_key_id}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono text-sm"
-                    placeholder="rzp_live_xxxxxxxxxxxxx"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1.5">
+                <label className="block text-sm font-bold text-ink mb-2">Razorpay Key ID</label>
+                <Input
+                  type="text"
+                  name="razorpay_key_id"
+                  icon={<Key className="w-4 h-4 text-muted" />}
+                  value={formData.razorpay_key_id}
+                  onChange={handleChange}
+                  className="font-mono text-sm"
+                  placeholder="rzp_live_xxxxxxxxxxxxx"
+                />
+                <p className="text-xs text-muted mt-1.5 font-medium">
                   This is your <strong>publishable</strong> key, safe to expose to the frontend.
                 </p>
               </div>
 
               {/* Key Secret */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Razorpay Key Secret</label>
+                <label className="block text-sm font-bold text-ink mb-2">Razorpay Key Secret</label>
                 <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
+                  <Input
                     type={showSecret ? "text" : "password"}
                     name="razorpay_key_secret"
+                    icon={<Key className="w-4 h-4 text-muted" />}
                     value={formData.razorpay_key_secret}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-slate-900 outline-none transition-all font-mono text-sm"
+                    className="font-mono text-sm pr-10"
                     placeholder="Enter new secret to update"
                   />
                   <button
                     type="button"
                     onClick={() => setShowSecret(!showSecret)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
                   >
                     {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1.5">Leave blank to keep the current secret. Stored encrypted.</p>
+                <p className="text-xs text-muted mt-1.5 font-medium">Leave blank to keep the current secret. Stored encrypted.</p>
               </div>
             </div>
 
             {/* Info callout */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-800">
-              <strong>How it works:</strong> The Key ID is sent to the frontend to initialize Razorpay Checkout.
+            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-sm text-ink leading-relaxed font-medium">
+              <strong className="text-primary">How it works:</strong> The Key ID is sent to the frontend to initialize Razorpay Checkout.
               The Key Secret is used server-side to create subscriptions and verify webhook signatures.
               Razorpay collects clinic subscription payments directly into your Razorpay account linked to these credentials.
             </div>
 
-            <div className="pt-4 border-t border-gray-100 flex justify-end">
-              <button
+            <div className="pt-4 border-t border-border flex justify-end">
+              <Button
                 type="submit"
                 disabled={submitting}
-                className="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2"
+                className="px-8 py-3"
               >
                 {submitting ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
                 ) : (
-                  <>Save Configuration</>
+                  <><Shield className="w-4 h-4 mr-2" /> Save Configuration</>
                 )}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
