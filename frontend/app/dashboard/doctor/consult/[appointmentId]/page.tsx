@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
+import { Appointment, MedicalRecord, PrescriptionItem, PrescriptionTemplate } from "@/types/api";
+
 export default function ConsultPage(props: { params: Promise<{ appointmentId: string }> }) {
   const params = use(props.params);
   const { appointmentId } = params;
@@ -34,8 +36,8 @@ export default function ConsultPage(props: { params: Promise<{ appointmentId: st
   const [saving, setSaving] = useState(false);
   
   // Appointment/Patient context
-  const [appointment, setAppointment] = useState<any>(null);
-  const [patientHistory, setPatientHistory] = useState<any[]>([]);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [patientHistory, setPatientHistory] = useState<MedicalRecord[]>([]);
 
   // Form State
   const [symptoms, setSymptoms] = useState("");
@@ -51,12 +53,12 @@ export default function ConsultPage(props: { params: Promise<{ appointmentId: st
   const [followUpDate, setFollowUpDate] = useState("");
 
   // Prescription Items
-  const [prescriptionItems, setPrescriptionItems] = useState<any[]>([
-    { medicine_name: "", dosage: "", frequency: "", duration_days: "", instructions: "" }
+  const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionItem[]>([
+    { medicine_name: "", dosage: "", frequency: "", duration_days: 1, instructions: "" }
   ]);
   
   // Templates
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<PrescriptionTemplate[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");

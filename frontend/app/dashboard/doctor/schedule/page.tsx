@@ -12,6 +12,8 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
+import { DoctorSchedule, DoctorLeave } from "@/types/api";
+
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function DoctorSchedulePage() {
@@ -23,7 +25,7 @@ export default function DoctorSchedulePage() {
   const [doctorClinicId, setDoctorClinicId] = useState<number | null>(null);
 
   // Schedules state
-  const [schedules, setSchedules] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<DoctorSchedule[]>([]);
   // Form state for new schedule
   const [dayOfWeek, setDayOfWeek] = useState("0");
   const [startTime, setStartTime] = useState("09:00");
@@ -31,7 +33,7 @@ export default function DoctorSchedulePage() {
   const [slotDuration, setSlotDuration] = useState("30");
 
   // Leaves state
-  const [leaves, setLeaves] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<DoctorLeave[]>([]);
   // Form state for new leave
   const [leaveStartDate, setLeaveStartDate] = useState("");
   const [leaveEndDate, setLeaveEndDate] = useState("");

@@ -9,10 +9,12 @@ import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
+import { ReceptionistUser } from "@/types/api";
+
 export default function ReceptionistsListPage() {
   const { user } = useContext(AuthContext);
   const router = useRouter();
-  const [receptionists, setReceptionists] = useState<any[]>([]);
+  const [receptionists, setReceptionists] = useState<ReceptionistUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

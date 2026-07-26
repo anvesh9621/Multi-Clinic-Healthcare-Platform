@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
+import { DoctorEntry } from "@/types/api";
+
 export default function SchedulePage() {
-  const [doctors, setDoctors] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<DoctorEntry[]>([]);
   const [doctorClinicId, setDoctorClinicId] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState(0);
   const [slotDuration, setSlotDuration] = useState(30);

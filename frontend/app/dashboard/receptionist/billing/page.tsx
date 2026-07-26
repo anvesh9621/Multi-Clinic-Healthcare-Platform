@@ -256,9 +256,11 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
   );
 }
 
+import { Patient } from "@/types/api";
+
 export default function ReceptionistBilling() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);

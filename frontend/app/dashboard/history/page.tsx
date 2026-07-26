@@ -5,11 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { getMedicalHistory } from "@/services/history";
 import { ReviewModal } from "@/components/patient/ReviewModal";
 
+import { MedicalRecord } from "@/types/api";
+
 function HistoryPageContent() {
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId");
 
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);

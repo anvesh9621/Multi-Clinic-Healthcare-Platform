@@ -35,6 +35,14 @@ export interface AuthContextValue {
   loading: boolean;
 }
 
+// ── Receptionists ─────────────────────────────────────────────────────────────
+
+export interface ReceptionistUser {
+  id: number;
+  email: string;
+  created_at: string;
+}
+
 // ── Appointments ──────────────────────────────────────────────────────────────
 
 export type AppointmentStatus =
@@ -201,6 +209,51 @@ export interface Patient {
   phone: string;
   date_of_birth: string | null;   // "YYYY-MM-DD"
   created_at: string;             // ISO datetime
+}
+
+// ── Medical Records & Prescriptions ──────────────────────────────────────────
+
+export interface PrescriptionItem {
+  id?: number;
+  medicine_name: string;
+  dosage: string;
+  frequency: string;
+  duration_days: number;
+  instructions: string;
+}
+
+export interface Prescription {
+  id: number;
+  medical_record: number;
+  items: PrescriptionItem[];
+  created_at: string;
+}
+
+export interface MedicalRecord {
+  id: number;
+  appointment: number | null;
+  patient: number;
+  doctor_clinic: number;
+  patient_name?: string;
+  doctor_name?: string;
+  doctor_id?: number;
+  symptoms: string;
+  diagnosis: string;
+  doctor_notes: string;
+  private_notes?: string;
+  vitals_temperature?: string;
+  vitals_blood_pressure?: string;
+  prescriptions?: Prescription[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PrescriptionTemplate {
+  id: number;
+  doctor_clinic: number;
+  name: string;
+  items: PrescriptionItem[];
+  created_at: string;
 }
 
 // ── Schedules & Leaves ────────────────────────────────────────────────────────

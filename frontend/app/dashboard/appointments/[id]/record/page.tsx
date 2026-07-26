@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/services/api";
 
+import { MedicalRecord } from "@/types/api";
+
 export default function RecordPage() {
 
   const { id } = useParams();
 
-  const [record, setRecord] = useState<any>(null);
+  const [record, setRecord] = useState<MedicalRecord | null>(null);
 
   useEffect(() => {
 

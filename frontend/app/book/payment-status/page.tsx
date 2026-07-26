@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import api from "@/services/api";
 
-export default function PaymentStatusPage() {
+function PaymentStatusContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"polling" | "confirmed" | "timeout">("polling");
   const [message, setMessage] = useState("Verifying your payment...");
 
   useEffect(() => {
-    // Read appointment_id from URL param (set by Razorpay callback) or sessionStorage
     const appointmentIdParam = searchParams.get("appointment_id");
     const appointmentId = appointmentIdParam || sessionStorage.getItem("pending_appointment_id");
 
@@ -24,7 +23,7 @@ export default function PaymentStatusPage() {
     sessionStorage.removeItem("pending_appointment_id");
 
     let pollCount = 0;
-    const MAX_POLLS = 40; // 40 × 3s = 2 minutes
+    const MAX_POLLS = 40;
 
     const interval = setInterval(async () => {
       pollCount++;
@@ -52,32 +51,32 @@ export default function PaymentStatusPage() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl p-10 max-w-sm w-full text-center">
+    <div className="min-h-screen flex items-center justify-center bg-warm-surface/30 px-4">
+      <div className="bg-paper rounded-2xl shadow-xl p-10 max-w-sm w-full text-center border border-border">
         {status === "polling" && (
           <>
-            <Loader2 className="w-14 h-14 text-blue-600 animate-spin mx-auto mb-5" />
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Confirming your appointment</h1>
-            <p className="text-gray-500 text-sm">{message}</p>
+            <Loader2 className="w-14 h-14 text-primary animate-spin mx-auto mb-5" />
+            <h1 className="text-xl font-bold text-ink mb-2 heading-font">Confirming your appointment</h1>
+            <p className="text-muted text-sm">{message}</p>
           </>
         )}
 
         {status === "confirmed" && (
           <>
-            <CheckCircle className="w-14 h-14 text-emerald-500 mx-auto mb-5" />
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Appointment Confirmed!</h1>
-            <p className="text-gray-500 text-sm">Redirecting to your appointments...</p>
+            <CheckCircle className="w-14 h-14 text-emerald-600 mx-auto mb-5" />
+            <h1 className="text-xl font-bold text-ink mb-2 heading-font">Appointment Confirmed!</h1>
+            <p className="text-muted text-sm">Redirecting to your appointments...</p>
           </>
         )}
 
         {status === "timeout" && (
           <>
             <AlertCircle className="w-14 h-14 text-amber-500 mx-auto mb-5" />
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Payment Received</h1>
-            <p className="text-gray-500 text-sm mb-6">{message}</p>
+            <h1 className="text-xl font-bold text-ink mb-2 heading-font">Payment Received</h1>
+            <p className="text-muted text-sm mb-6">{message}</p>
             <button
               onClick={() => router.push("/dashboard/patient/appointments")}
-              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+              className="w-full py-3 bg-primary text-paper font-bold rounded-xl hover:bg-primary-dark transition-colors"
             >
               Go to Appointments
             </button>
@@ -85,5 +84,17 @@ export default function PaymentStatusPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PaymentStatusPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-warm-surface/30">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <PaymentStatusContent />
+    </Suspense>
   );
 }

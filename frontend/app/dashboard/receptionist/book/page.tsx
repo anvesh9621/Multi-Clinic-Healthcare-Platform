@@ -10,6 +10,8 @@ import { CalendarCheck, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
+import { DoctorEntry, Patient } from "@/types/api";
+
 function BookingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -17,8 +19,8 @@ function BookingForm() {
 
   const initialPatientId = searchParams.get("patientId") || "";
 
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<DoctorEntry[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [patientId, setPatientId] = useState(initialPatientId);
   const [doctorClinicId, setDoctorClinicId] = useState<number | null>(null);
   const [date, setDate] = useState("");
