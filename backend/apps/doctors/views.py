@@ -46,20 +46,36 @@ class DoctorClinicListView(TenantScopedAPIView):
 
 class DoctorScheduleListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = DoctorSchedule.objects.all()
     serializer_class = DoctorScheduleSerializer
 
     def get_queryset(self):
-        # Optional: Filter by clinic if needed
-        return super().get_queryset()
+        user = self.request.user
+        if getattr(user, "role", None) == "DOCTOR":
+            return DoctorSchedule.objects.filter(doctor_clinic__doctor__user=user)
+        if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
+            clinic = get_user_clinic(user)
+            return DoctorSchedule.objects.filter(doctor_clinic__clinic=clinic)
+        if getattr(user, "role", None) == "SUPER_ADMIN":
+            return DoctorSchedule.objects.all()
+        return DoctorSchedule.objects.none()
 
 
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
 
 class DoctorScheduleDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = DoctorSchedule.objects.all()
     serializer_class = DoctorScheduleSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if getattr(user, "role", None) == "DOCTOR":
+            return DoctorSchedule.objects.filter(doctor_clinic__doctor__user=user)
+        if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
+            clinic = get_user_clinic(user)
+            return DoctorSchedule.objects.filter(doctor_clinic__clinic=clinic)
+        if getattr(user, "role", None) == "SUPER_ADMIN":
+            return DoctorSchedule.objects.all()
+        return DoctorSchedule.objects.none()
 
 
 class DoctorLeaveListCreateView(ListCreateAPIView):
