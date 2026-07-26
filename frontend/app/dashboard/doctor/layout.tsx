@@ -3,7 +3,6 @@
 import { useContext, useEffect } from "react";
 import { AuthContext } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 
 export default function DoctorLayout({
   children,
@@ -25,8 +24,8 @@ export default function DoctorLayout({
 
   if (loading || !user || user.role !== "DOCTOR") {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="flex h-screen items-center justify-center bg-warm-surface/30">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
