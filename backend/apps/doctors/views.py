@@ -40,10 +40,22 @@ class DoctorClinicListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user = request.user
         queryset = DoctorClinic.objects.select_related("doctor__user", "clinic")
-        clinic_id = request.query_params.get("clinic_id")
-        if clinic_id:
-            queryset = queryset.filter(clinic_id=clinic_id)
+
+        if user.role == "SUPER_ADMIN":
+            clinic_id = request.query_params.get("clinic_id")
+            if clinic_id:
+                queryset = queryset.filter(clinic_id=clinic_id)
+            # else: SUPER_ADMIN sees all, which is correct for this role
+        elif user.role in ("CLINIC_ADMIN", "RECEPTIONIST", "DOCTOR"):
+            clinic = get_user_clinic(user)
+            if not clinic:
+                return Response({"success": False, "error": "No clinic associated with this account."}, status=403)
+            queryset = queryset.filter(clinic=clinic)
+        else:
+            return Response({"success": False, "error": "Not authorized."}, status=403)
+
         serializer = DoctorClinicSerializer(queryset, many=True)
         return Response(serializer.data)
 
