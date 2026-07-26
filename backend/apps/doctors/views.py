@@ -4,8 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListCreateAPIView, ListAPIView
 from rest_framework import status
-from apps.core.tenancy import ClinicQuerysetMixin
-from apps.core.tenancy import get_user_clinic
+from apps.core.tenancy import ClinicQuerysetMixin, get_user_clinic, TenantScopedAPIView
 
 from .models import DoctorClinic, DoctorSchedule, Doctor, DoctorLeave
 from .serializers import (
@@ -36,26 +35,11 @@ class ClinicListView(APIView):
         return Response(serializer.data)
 
 
-class DoctorClinicListView(APIView):
-    permission_classes = [IsAuthenticated]
-
+class DoctorClinicListView(TenantScopedAPIView):
     def get(self, request):
-        user = request.user
         queryset = DoctorClinic.objects.select_related("doctor__user", "clinic")
-
-        if user.role == "SUPER_ADMIN":
-            clinic_id = request.query_params.get("clinic_id")
-            if clinic_id:
-                queryset = queryset.filter(clinic_id=clinic_id)
-            # else: SUPER_ADMIN sees all, which is correct for this role
-        elif user.role in ("CLINIC_ADMIN", "RECEPTIONIST", "DOCTOR"):
-            clinic = get_user_clinic(user)
-            if not clinic:
-                return Response({"success": False, "error": "No clinic associated with this account."}, status=403)
-            queryset = queryset.filter(clinic=clinic)
-        else:
-            return Response({"success": False, "error": "Not authorized."}, status=403)
-
+        if not self.is_platform_wide:
+            queryset = queryset.filter(clinic=self.clinic)
         serializer = DoctorClinicSerializer(queryset, many=True)
         return Response(serializer.data)
 

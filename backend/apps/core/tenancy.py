@@ -1,4 +1,8 @@
 from django.core.exceptions import PermissionDenied
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+from apps.clinics.models import Clinic
 
 
 def get_user_clinic(user):
@@ -14,6 +18,32 @@ def get_user_clinic(user):
         return None
 
     return user.clinic
+
+
+class TenantScopedAPIView(APIView):
+    """
+    Base class for any APIView that returns clinic-scoped data.
+    Resolves self.clinic from the authenticated user automatically.
+    NEVER trust a client-supplied clinic_id for non-SUPER_ADMIN roles —
+    self.clinic is the only clinic identifier views built on this class
+    should use.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        user = request.user
+        if user.role == "SUPER_ADMIN":
+            # SUPER_ADMIN may optionally scope via query param; None means "all"
+            requested_id = request.query_params.get("clinic_id")
+            self.clinic = Clinic.objects.filter(id=requested_id).first() if requested_id else None
+            self.is_platform_wide = self.clinic is None
+        else:
+            self.clinic = get_user_clinic(user)
+            self.is_platform_wide = False
+            if not self.clinic:
+                raise DRFPermissionDenied("No clinic associated with this account.")
+
 
 class ClinicQuerysetMixin:
     """
