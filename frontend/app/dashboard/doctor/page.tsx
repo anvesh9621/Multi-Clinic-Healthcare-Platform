@@ -26,16 +26,7 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MotionDivItem } from "@/components/ui/MotionListItem";
 import { AnimatePresence } from "framer-motion";
 
-interface Appointment {
-  id: number;
-  patient_name: string;
-  patient_id: number;
-  appointment_date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  reason: string;
-}
+import type { Appointment } from "@/types/api";
 
 export default function DoctorDashboard() {
   const { user } = useContext(AuthContext);

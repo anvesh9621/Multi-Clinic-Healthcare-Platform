@@ -5,6 +5,7 @@ import { AuthContext } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardStats, getDoctorWorkload, getAppointmentTrend } from "@/services/analytics";
+import type { ClinicDashboardStats, DoctorWorkloadEntry, AppointmentTrendEntry } from "@/types/api";
 import AppointmentTrendChart from "@/components/analytics/AppointmentTrendChart";
 import { 
   CalendarCheck, CalendarDays, CheckCircle2, 
@@ -30,7 +31,11 @@ export default function DashboardPage() {
 
   const isAuthorized = user && !["PATIENT", "DOCTOR", "SUPER_ADMIN"].includes(user.role);
 
-  const { data, isLoading: loading, isError: error, refetch } = useQuery({
+  const { data, isLoading: loading, isError: error, refetch } = useQuery<{
+    stats: ClinicDashboardStats;
+    workload: DoctorWorkloadEntry[];
+    trend: AppointmentTrendEntry[];
+  }>({
     queryKey: ["dashboard", "overview"],
     queryFn: async () => {
       const [statsData, workloadData, trendData] = await Promise.all([
@@ -43,7 +48,7 @@ export default function DashboardPage() {
     enabled: !!isAuthorized,
   });
 
-  const { stats, workload = [], trend = [] } = data || {};
+  const { stats, workload = [], trend = [] } = data ?? {};
 
   return (
     <div className="space-y-8 pb-10">
@@ -126,7 +131,7 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="text-gray-500 font-medium tracking-wide text-sm uppercase">{stat.label}</h3>
                   <div className="text-3xl font-bold text-gray-900 mt-1 heading-font">
-                    <AnimatedNumber value={stat.value as number} />
+                    <AnimatedNumber value={stat.value} />
                   </div>
                 </motion.div>
               ))}

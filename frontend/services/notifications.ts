@@ -1,17 +1,8 @@
 import api from './api';
-
-export interface Notification {
-  id: number;
-  notification_type: string;
-  title: string;
-  message: string;
-  is_read: boolean;
-  related_link: string | null;
-  created_at: string;
-}
+import type { Notification } from '@/types/api';
 
 export const fetchNotifications = async (): Promise<Notification[]> => {
-  const response = await api.get('/notifications/');
+  const response = await api.get<Notification[]>('/notifications/');
   return response.data;
 };
 
