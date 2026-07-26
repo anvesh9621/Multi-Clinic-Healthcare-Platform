@@ -149,7 +149,7 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
           {isPaid && (
             <div className="text-center py-6">
               <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-              <p className="font-bold text-gray-900 text-lg">
+              <p className="font-bold text-ink text-lg">
                 ₹{parseFloat(invoice.total_amount).toFixed(2)} Paid
               </p>
               <p className="text-sm text-gray-500 mt-1 capitalize">
@@ -172,7 +172,7 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
                   <Banknote className="w-6 h-6 text-white" />
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-gray-900 text-sm">Mark paid — cash</p>
+                  <p className="font-bold text-ink text-sm">Mark paid — cash</p>
                   <p className="text-xs text-gray-500 mt-0.5">Record physical cash received</p>
                 </div>
               </button>
@@ -182,12 +182,12 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
                 disabled={loading}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-transparent bg-blue-50 hover:border-blue-300 hover:bg-blue-100 transition-all"
               >
-                <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
                   {loading ? <Loader2 className="w-6 h-6 text-white animate-spin" /> : <QrCode className="w-6 h-6 text-white" />}
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-gray-900 text-sm">Generate QR code</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Patient pays via UPI — auto-detected</p>
+                  <p className="font-bold text-ink text-sm">Generate QR code</p>
+                  <p className="text-xs text-muted mt-0.5">Patient pays via UPI — auto-detected</p>
                 </div>
               </button>
             </div>
@@ -232,7 +232,7 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
                   <div className="bg-gray-50 rounded-2xl p-6 border-2 border-dashed border-gray-200">
                     <QrCode className="w-16 h-16 text-gray-400 mx-auto mb-3" />
                     <p className="text-xs text-gray-500 mb-2">Ask patient to scan this link or open:</p>
-                    <a href={qrData.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-sm break-all hover:underline">
+                    <a href={qrData.url} target="_blank" rel="noopener noreferrer" className="text-primary font-bold text-sm break-all hover:underline">
                       {qrData.url}
                     </a>
                   </div>
@@ -329,10 +329,10 @@ export default function ReceptionistBilling() {
     <div className="max-w-6xl mx-auto py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <Receipt className="w-6 h-6 text-blue-600" /> Clinic Billing
+          <h1 className="text-3xl font-bold text-ink heading-font flex items-center gap-3">
+            <Receipt className="w-6 h-6 text-primary" /> Clinic Billing
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Manage patient invoices and collect payments</p>
+          <p className="text-sm text-muted mt-1">Manage patient invoices and collect payments</p>
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" /> Create Invoice
