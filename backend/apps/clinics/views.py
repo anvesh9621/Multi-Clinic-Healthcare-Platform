@@ -98,10 +98,7 @@ class ReceptionistInviteAcceptView(APIView):
 class ReceptionistListView(ClinicQuerysetMixin, ListAPIView):
     permission_classes = [IsClinicAdmin]
     serializer_class = ReceptionistSerializer
-    
-    def get_queryset(self):
-        # Base query filtered further by ClinicQuerysetMixin
-        return User.objects.filter(role=User.RoleChoices.RECEPTIONIST)
+    queryset = User.objects.filter(role=User.RoleChoices.RECEPTIONIST)
 
 from rest_framework.permissions import AllowAny
 from .serializers import ClinicRegistrationSerializer
