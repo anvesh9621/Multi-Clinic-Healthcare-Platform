@@ -10,6 +10,10 @@ import {
   AlertTriangle, X, Zap, Building2, Crown, ChevronRight,
   RefreshCw, CheckCircle2
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { Modal } from "@/components/ui/Modal";
 
 interface Invoice {
   id: number;
@@ -137,11 +141,10 @@ export default function SubscriptionPage() {
       const planDetails = PLANS.find((p) => p.id === plan);
       const options = {
         key: data.razorpay_key,
-        subscription_id: data.subscription_id, // NOT order_id — this is e-mandate mode
+        subscription_id: data.subscription_id,
         name: "MediClinic",
         description: `${planDetails?.name} Plan — ₹${planDetails?.price}/month`,
         handler: function (response: any) {
-          // E-mandate set up — verify on backend
           verifySubscription({
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_subscription_id: response.razorpay_subscription_id,
@@ -153,7 +156,7 @@ export default function SubscriptionPage() {
           email: user?.email || "",
           contact: user?.phone_number || "",
         },
-        theme: { color: "#6366f1" },
+        theme: { color: "#0F7B6C" },
         modal: {
           ondismiss: function () {
             setLoadingAction(null);
@@ -208,8 +211,8 @@ export default function SubscriptionPage() {
         <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
           <AlertTriangle className="w-7 h-7 text-red-500" />
         </div>
-        <p className="font-bold text-gray-800">Access Restricted</p>
-        <p className="text-sm text-gray-500">Redirecting...</p>
+        <p className="font-bold text-ink heading-font">Access Restricted</p>
+        <p className="text-sm text-muted">Redirecting...</p>
       </div>
     );
   }
@@ -217,7 +220,7 @@ export default function SubscriptionPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -226,42 +229,42 @@ export default function SubscriptionPage() {
   const currentStatus = subscription?.status || "inactive";
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Subscription & Billing</h1>
-        <p className="text-gray-500 mt-1 text-sm">Manage your clinic's SaaS plan and GST invoices.</p>
+        <h1 className="text-3xl font-bold text-ink tracking-tight heading-font">Subscription & Billing</h1>
+        <p className="text-muted mt-1 text-sm">Manage your clinic's SaaS plan and GST invoices.</p>
       </div>
 
       {errorMsg && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm font-medium">{errorMsg}</span>
+          <span className="text-sm font-semibold">{errorMsg}</span>
           <button onClick={() => setErrorMsg(null)} className="ml-auto"><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {/* Current Plan Banner */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 lg:p-8">
+      <Card className="p-6 lg:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-indigo-600" />
+            <h2 className="text-lg font-bold text-ink flex items-center gap-2 heading-font">
+              <CreditCard className="w-5 h-5 text-primary" />
               Current Plan
             </h2>
             <div className="mt-4 flex items-end gap-3">
-              <span className="text-4xl font-black text-gray-900 capitalize tracking-tight">{currentPlan}</span>
-              <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                currentStatus === "active" ? "bg-emerald-100 text-emerald-700" :
-                currentStatus === "trialing" ? "bg-blue-100 text-blue-700" :
-                currentStatus === "past_due" ? "bg-amber-100 text-amber-700" :
-                "bg-gray-100 text-gray-700"
+              <span className="text-4xl font-black text-ink capitalize tracking-tight heading-font">{currentPlan}</span>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                currentStatus === "active" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
+                currentStatus === "trialing" ? "bg-blue-100 text-blue-800 border border-blue-200" :
+                currentStatus === "past_due" ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                "bg-gray-100 text-gray-800 border border-gray-200"
               }`}>
                 {currentStatus.replace("_", " ")}
               </span>
             </div>
             {subscription?.current_period_end && (
-              <p className="mt-2 text-sm text-gray-500 font-medium">
+              <p className="mt-2 text-sm text-muted font-medium">
                 Auto-renews on: {new Date(subscription.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
               </p>
             )}
@@ -269,21 +272,22 @@ export default function SubscriptionPage() {
 
           <div className="flex flex-col sm:flex-row gap-3">
             {(currentPlan === "professional" || currentPlan === "enterprise") && currentStatus !== "cancelled" && (
-              <button
+              <Button
+                variant="outline"
                 onClick={handleCancel}
                 disabled={loadingAction !== null}
-                className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:text-red-600 hover:border-red-200 hover:bg-red-50 font-medium text-sm rounded-xl transition-all disabled:opacity-50"
+                className="text-rose-600 border-rose-200 hover:bg-rose-50"
               >
                 {loadingAction === "cancel" ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Cancel Plan"}
-              </button>
+              </Button>
             )}
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Plan Cards */}
       <div>
-        <h2 className="text-base font-bold text-gray-900 mb-4">Choose a Plan</h2>
+        <h2 className="text-xl font-bold text-ink mb-4 heading-font">Choose a Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {PLANS.map((plan) => {
             const isCurrentPlan = currentPlan.toLowerCase() === plan.id;
@@ -293,10 +297,10 @@ export default function SubscriptionPage() {
                 key={plan.id}
                 className={`relative rounded-2xl border p-6 flex flex-col transition-all ${
                   plan.id === "enterprise"
-                    ? "bg-gray-900 border-gray-800 shadow-lg"
+                    ? "bg-ink text-paper border-ink shadow-lg"
                     : isCurrentPlan
-                    ? "bg-indigo-50 border-indigo-200"
-                    : "bg-white border-gray-100 shadow-sm hover:border-indigo-100 hover:shadow-md"
+                    ? "bg-primary/5 border-primary/30"
+                    : "bg-paper border-border shadow-sm hover:border-primary/30 hover:shadow-md"
                 }`}
               >
                 {plan.popular && (
@@ -305,30 +309,30 @@ export default function SubscriptionPage() {
                   </div>
                 )}
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
-                  plan.id === "enterprise" ? "bg-white/10" : "bg-indigo-50"
+                  plan.id === "enterprise" ? "bg-paper/10" : "bg-primary/10"
                 }`}>
-                  <Icon className={`w-5 h-5 ${plan.id === "enterprise" ? "text-white" : "text-indigo-600"}`} />
+                  <Icon className={`w-5 h-5 ${plan.id === "enterprise" ? "text-paper" : "text-primary"}`} />
                 </div>
-                <h3 className={`text-xl font-bold ${plan.id === "enterprise" ? "text-white" : "text-gray-900"}`}>
+                <h3 className={`text-xl font-bold heading-font ${plan.id === "enterprise" ? "text-paper" : "text-ink"}`}>
                   {plan.name}
                 </h3>
                 <div className="flex items-baseline gap-1 mt-2 mb-5">
-                  <span className={`text-3xl font-black ${plan.id === "enterprise" ? "text-white" : "text-gray-900"}`}>
+                  <span className={`text-3xl font-black font-mono ${plan.id === "enterprise" ? "text-paper" : "text-ink"}`}>
                     {plan.price === 0 ? "Free" : `₹${plan.price.toLocaleString("en-IN")}`}
                   </span>
                   {plan.price > 0 && (
-                    <span className={`font-medium text-sm ${plan.id === "enterprise" ? "text-gray-400" : "text-gray-500"}`}>/month</span>
+                    <span className={`font-medium text-sm ${plan.id === "enterprise" ? "text-paper/70" : "text-muted"}`}>/month</span>
                   )}
                 </div>
                 <ul className="space-y-2.5 mb-6 flex-1">
                   {plan.features.map((ft) => (
                     <li key={ft} className={`flex items-center gap-2.5 text-sm font-medium ${
-                      plan.id === "enterprise" ? "text-gray-300" : "text-gray-600"
+                      plan.id === "enterprise" ? "text-paper/80" : "text-ink/80"
                     }`}>
                       <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        plan.id === "enterprise" ? "bg-white/10" : "bg-indigo-50"
+                        plan.id === "enterprise" ? "bg-paper/10 text-paper" : "bg-primary/10 text-primary"
                       }`}>
-                        <Check className={`w-2.5 h-2.5 ${plan.id === "enterprise" ? "text-white" : "text-indigo-600"}`} />
+                        <Check className="w-2.5 h-2.5" />
                       </div>
                       {ft}
                     </li>
@@ -337,31 +341,28 @@ export default function SubscriptionPage() {
 
                 {isCurrentPlan ? (
                   <div className={`w-full py-2.5 rounded-xl text-center text-sm font-bold flex items-center justify-center gap-2 ${
-                    plan.id === "enterprise" ? "bg-white/10 text-white" : "bg-indigo-100 text-indigo-700"
+                    plan.id === "enterprise" ? "bg-paper/10 text-paper" : "bg-primary/10 text-primary"
                   }`}>
                     <CheckCircle2 className="w-4 h-4" /> Current Plan
                   </div>
                 ) : plan.id === "starter" ? (
-                  <div className="w-full py-2.5 rounded-xl text-center text-sm font-medium text-gray-400 border border-dashed border-gray-200">
+                  <div className="w-full py-2.5 rounded-xl text-center text-sm font-medium text-muted border border-dashed border-border">
                     Free plan
                   </div>
                 ) : (
-                  <button
+                  <Button
                     id={`subscribe-${plan.id}`}
                     onClick={() => handleSubscribe(plan.id as "professional" | "enterprise")}
                     disabled={loadingAction !== null}
-                    className={`w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${
-                      plan.id === "enterprise"
-                        ? "bg-white text-gray-900 hover:bg-gray-100"
-                        : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-600/25"
-                    }`}
+                    variant={plan.id === "enterprise" ? "secondary" : "default"}
+                    className="w-full py-3"
                   >
                     {loadingAction === plan.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <>Upgrade <ChevronRight className="w-4 h-4" /></>
+                      <>Upgrade <ChevronRight className="w-4 h-4 ml-1" /></>
                     )}
-                  </button>
+                  </Button>
                 )}
               </div>
             );
@@ -370,117 +371,101 @@ export default function SubscriptionPage() {
       </div>
 
       {/* Invoices */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-500" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-ink heading-font flex items-center gap-2">
+            <FileText className="w-5 h-5 text-muted" />
             Billing History & GST Invoices
           </h2>
-          <button onClick={fetchInvoices} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg">
+          <Button variant="ghost" size="icon" onClick={fetchInvoices} className="text-muted">
             <RefreshCw className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="text-xs uppercase bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4">Invoice #</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Billing Period</th>
-                <th className="px-6 py-4 font-mono">Amount (INR)</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {invoices.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-gray-400 font-medium">
-                    No invoices yet. They'll appear here after your first charge.
-                  </td>
-                </tr>
-              ) : (
-                invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">{inv.invoice_number}</td>
-                    <td className="px-6 py-4">{new Date(inv.issued_at).toLocaleDateString()}</td>
-                    <td className="px-6 py-4 text-xs">
-                      {new Date(inv.period_start).toLocaleDateString()} – {new Date(inv.period_end).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 font-mono font-medium text-gray-900">
-                      ₹{parseFloat(inv.total_amount).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {inv.has_pdf ? (
-                        <button
-                          onClick={() => handleDownloadInvoice(inv.id, inv.invoice_number)}
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                          Download PDF
-                        </button>
-                      ) : (
-                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-md font-medium border border-amber-100">
-                          Generating...
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Invoice #</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Billing Period</TableHead>
+              <TableHead>Amount (INR)</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {invoices.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="px-6 py-10 text-center text-muted font-medium">
+                  No invoices yet. They'll appear here after your first charge.
+                </TableCell>
+              </TableRow>
+            ) : (
+              invoices.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell className="font-bold text-ink font-mono">{inv.invoice_number}</TableCell>
+                  <TableCell className="text-ink">{new Date(inv.issued_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-xs text-muted">
+                    {new Date(inv.period_start).toLocaleDateString()} – {new Date(inv.period_end).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="font-mono font-bold text-ink">
+                    ₹{parseFloat(inv.total_amount).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {inv.has_pdf ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadInvoice(inv.id, inv.invoice_number)}
+                        className="text-primary hover:text-primary-dark"
+                      >
+                        <Download className="w-4 h-4 mr-1.5" />
+                        Download PDF
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-amber-800 bg-amber-100 border border-amber-200 px-2 py-1 rounded-full font-semibold">
+                        Generating...
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       {/* Subscription Checkout Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">
-                {paymentSuccess ? "Subscription Activated!" : verifying ? "Verifying Payment..." : "Subscribe"}
-              </h3>
-              {!verifying && !paymentSuccess && (
-                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-            <div className="p-6 text-center">
-              {paymentSuccess ? (
-                <>
-                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-                  </div>
-                  <p className="font-bold text-gray-900 text-lg mb-1">You're all set!</p>
-                  <p className="text-gray-500 text-sm mb-6">
-                    Your <strong className="capitalize">{selectedPlan}</strong> plan is now active.
-                    Auto-renewal is set up via UPI Autopay / Card e-mandate.
-                  </p>
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all"
-                  >
-                    Done
-                  </button>
-                </>
-              ) : verifying ? (
-                <>
-                  <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-                  <p className="font-semibold text-gray-800">Verifying your payment...</p>
-                  <p className="text-sm text-gray-500 mt-1">Please wait, do not close this window.</p>
-                </>
-              ) : loadingAction ? (
-                <>
-                  <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-                  <p className="font-semibold text-gray-800">Preparing secure checkout...</p>
-                  <p className="text-sm text-gray-500 mt-1">Razorpay checkout will open shortly.</p>
-                </>
-              ) : null}
-            </div>
-          </div>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={paymentSuccess ? "Subscription Activated!" : verifying ? "Verifying Payment..." : "Subscribe"} className="max-w-sm">
+        <div className="text-center py-4">
+          {paymentSuccess ? (
+            <>
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              </div>
+              <p className="font-bold text-ink text-lg mb-1 heading-font">You're all set!</p>
+              <p className="text-muted text-sm mb-6">
+                Your <strong className="capitalize text-ink">{selectedPlan}</strong> plan is now active.
+                Auto-renewal is set up via UPI Autopay / Card e-mandate.
+              </p>
+              <Button onClick={() => setShowModal(false)} className="w-full">
+                Done
+              </Button>
+            </>
+          ) : verifying ? (
+            <>
+              <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+              <p className="font-bold text-ink">Verifying your payment...</p>
+              <p className="text-sm text-muted mt-1">Please wait, do not close this window.</p>
+            </>
+          ) : loadingAction ? (
+            <>
+              <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+              <p className="font-bold text-ink">Preparing secure checkout...</p>
+              <p className="text-sm text-muted mt-1">Razorpay checkout will open shortly.</p>
+            </>
+          ) : null}
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
