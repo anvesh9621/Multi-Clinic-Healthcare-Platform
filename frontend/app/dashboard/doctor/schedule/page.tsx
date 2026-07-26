@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { useToast } from "@/context/ToastContext";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -46,18 +47,15 @@ export default function DoctorSchedulePage() {
 
   const fetchData = async () => {
     try {
-      // 1. Get doctor profile to find doctor_clinic_id
       const profileResp = await apiClient.get("/doctors/profile/");
       const dcId = profileResp.data.data.doctor_clinic_id;
       setDoctorClinicId(dcId);
 
-      // 2. Fetch schedules and leaves
       const [schedResp, leavesResp] = await Promise.all([
         getSchedules(),
         getLeaves()
       ]);
 
-      // Filter to only show for this doctor (if API returns more, though get_queryset should limit it)
       if (schedResp.results || Array.isArray(schedResp)) {
         const scheds = (schedResp.results || schedResp).filter((s: any) => s.doctor_clinic_id === dcId);
         setSchedules(scheds);
@@ -146,37 +144,38 @@ export default function DoctorSchedulePage() {
   };
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+    <div className="flex h-screen items-center justify-center bg-warm-surface/30">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
+  const selectClass = "bg-warm-surface border border-border text-ink text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary block p-2 font-medium";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <CalendarDays className="w-6 h-6 text-blue-600" /> My Schedule & Availability
+        <h1 className="text-3xl font-bold text-ink heading-font flex items-center gap-2">
+          <CalendarDays className="w-6 h-6 text-primary" /> My Schedule & Availability
         </h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
         {/* Weekly Schedule */}
-        <Card className="flex flex-col">
-          <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2">
-              <Clock className="w-5 h-5 text-indigo-600" /> Weekly Hours
+        <Card className="flex flex-col p-0 overflow-hidden">
+          <div className="p-5 border-b border-border bg-warm-surface/50">
+            <h2 className="font-bold text-ink text-lg heading-font flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" /> Weekly Hours
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Define your recurring weekly working hours.</p>
+            <p className="text-sm text-muted mt-1">Define your recurring weekly working hours.</p>
           </div>
           
-          <div className="p-5 border-b border-gray-100">
+          <div className="p-5 border-b border-border">
             <form onSubmit={handleAddSchedule} className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Day</label>
+                <label className="block text-xs font-bold text-ink mb-1">Day</label>
                 <select 
                   value={dayOfWeek} onChange={e => setDayOfWeek(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-32 p-2"
+                  className={`${selectClass} w-32`}
                 >
                   {DAYS_OF_WEEK.map((day, idx) => (
                       <option key={idx} value={idx}>{day}</option>
@@ -184,24 +183,24 @@ export default function DoctorSchedulePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Start</label>
-                <input 
+                <label className="block text-xs font-bold text-ink mb-1">Start</label>
+                <Input 
                   type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required
-                  className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
+                  className="py-1.5"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">End</label>
-                <input 
+                <label className="block text-xs font-bold text-ink mb-1">End</label>
+                <Input 
                   type="time" value={endTime} onChange={e => setEndTime(e.target.value)} required
-                  className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
+                  className="py-1.5"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Slot (min)</label>
-                <input 
+                <label className="block text-xs font-bold text-ink mb-1">Slot (min)</label>
+                <Input 
                   type="number" value={slotDuration} onChange={e => setSlotDuration(e.target.value)} required min="5" step="5"
-                  className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-20 p-2"
+                  className="w-20 py-1.5"
                 />
               </div>
               <Button type="submit" size="sm" className="self-end">
@@ -212,74 +211,73 @@ export default function DoctorSchedulePage() {
           
           <div className="flex-1 p-5 overflow-y-auto">
             {schedules.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No working hours defined. You will not be bookable.</p>
+              <p className="text-muted text-sm text-center py-4">No working hours defined. You will not be bookable.</p>
             ) : (
-                <div className="space-y-3">
-                    {/* Group by day to make it look nicer */}
-                    {DAYS_OF_WEEK.map((dayName, dayIndex) => {
-                        const daySchedules = schedules.filter(s => s.day_of_week === dayIndex);
-                        if (daySchedules.length === 0) return null;
-                        
-                        return (
-                            <div key={dayIndex} className="bg-gray-50 rounded-xl p-4 border border-gray-100 flex items-start justify-between group">
-                                <div>
-                                    <h3 className="font-bold text-gray-800">{dayName}</h3>
-                                    <div className="mt-1 space-y-1">
-                                        {daySchedules.map(s => (
-                                            <div key={s.id} className="text-sm text-gray-600 flex items-center gap-2">
-                                                <span className="font-medium">{s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}</span>
-                                                <span className="text-xs bg-gray-200 px-2 rounded-full">{s.slot_duration}m slots</span>
-                                                <button onClick={() => handleDeleteSchedule(s.id)} className="text-red-500 hover:text-red-700 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+              <div className="space-y-3">
+                {DAYS_OF_WEEK.map((dayName, dayIndex) => {
+                  const daySchedules = schedules.filter(s => s.day_of_week === dayIndex);
+                  if (daySchedules.length === 0) return null;
+                  
+                  return (
+                    <div key={dayIndex} className="bg-warm-surface/50 rounded-xl p-4 border border-border flex items-start justify-between group">
+                      <div>
+                        <h3 className="font-bold text-ink">{dayName}</h3>
+                        <div className="mt-1 space-y-1">
+                          {daySchedules.map(s => (
+                            <div key={s.id} className="text-sm text-muted flex items-center gap-2">
+                              <span className="font-semibold text-ink font-mono">{s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}</span>
+                              <span className="text-xs bg-warm-surface border border-border px-2 rounded-full font-medium text-muted">{s.slot_duration}m slots</span>
+                              <button onClick={() => handleDeleteSchedule(s.id)} className="text-rose-600 hover:text-rose-800 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                        );
-                    })}
-                </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </Card>
 
         {/* Time Off / Leaves */}
-        <Card className="flex flex-col">
-          <div className="p-5 border-b border-gray-100 bg-rose-50/30">
-            <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+        <Card className="flex flex-col p-0 overflow-hidden">
+          <div className="p-5 border-b border-border bg-rose-50/50">
+            <h2 className="font-bold text-ink text-lg heading-font flex items-center gap-2">
               <CalendarOff className="w-5 h-5 text-rose-600" /> Time Off / Leaves
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Block out dates when you are unavailable.</p>
+            <p className="text-sm text-muted mt-1">Block out dates when you are unavailable.</p>
           </div>
           
-          <div className="p-5 border-b border-gray-100">
+          <div className="p-5 border-b border-border">
              <form onSubmit={handleAddLeave} className="space-y-4">
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Start Date</label>
-                    <input 
+                    <label className="block text-xs font-bold text-ink mb-1">Start Date</label>
+                    <Input 
                       type="date" value={leaveStartDate} onChange={e => setLeaveStartDate(e.target.value)} required min={new Date().toISOString().split("T")[0]}
-                      className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block w-full p-2"
+                      className="py-1.5"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">End Date</label>
-                    <input 
+                    <label className="block text-xs font-bold text-ink mb-1">End Date</label>
+                    <Input 
                       type="date" value={leaveEndDate} onChange={e => setLeaveEndDate(e.target.value)} required min={leaveStartDate || new Date().toISOString().split("T")[0]}
-                      className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block w-full p-2"
+                      className="py-1.5"
                     />
                   </div>
                 </div>
                 <div className="flex gap-4 items-end">
                   <div className="flex-1">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Reason (Optional)</label>
-                    <input 
+                    <label className="block text-xs font-bold text-ink mb-1">Reason (Optional)</label>
+                    <Input 
                       type="text" value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="e.g. Vacation, Conference"
-                      className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-rose-500 focus:border-rose-500 block w-full p-2"
+                      className="py-1.5"
                     />
                   </div>
-                  <Button type="submit" size="sm" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50">
+                  <Button type="submit" size="sm" variant="secondary" className="border-rose-200 text-rose-800 hover:bg-rose-100">
                     <Plus className="w-4 h-4 mr-1" /> Add
                   </Button>
                 </div>
@@ -288,20 +286,20 @@ export default function DoctorSchedulePage() {
 
           <div className="flex-1 p-5 overflow-y-auto">
              {leaves.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No upcoming time off requested.</p>
+                <p className="text-muted text-sm text-center py-4">No upcoming time off requested.</p>
              ) : (
                 <div className="space-y-3">
                    {leaves.map(leave => (
-                       <div key={leave.id} className="bg-rose-50/50 rounded-xl p-4 border border-rose-100 flex items-center justify-between">
+                       <div key={leave.id} className="bg-rose-50/40 rounded-xl p-4 border border-rose-200 flex items-center justify-between">
                            <div>
-                               <div className="font-bold text-gray-800 text-sm">
+                               <div className="font-bold text-ink text-sm font-mono">
                                    {format(new Date(leave.start_date), "MMM d, yyyy")} 
                                    {" "}-{" "} 
                                    {format(new Date(leave.end_date), "MMM d, yyyy")}
                                </div>
-                               {leave.reason && <p className="text-xs text-gray-500 mt-0.5">{leave.reason}</p>}
+                               {leave.reason && <p className="text-xs text-muted mt-0.5">{leave.reason}</p>}
                            </div>
-                           <Button variant="ghost" size="icon" onClick={() => handleDeleteLeave(leave.id)} className="text-red-500 hover:text-red-700 border border-red-100" title="Cancel Time Off">
+                           <Button variant="ghost" size="icon" onClick={() => handleDeleteLeave(leave.id)} className="text-rose-600 hover:text-rose-800 border border-rose-200 bg-paper" title="Cancel Time Off">
                               <Trash2 className="w-4 h-4" />
                            </Button>
                        </div>
@@ -310,7 +308,6 @@ export default function DoctorSchedulePage() {
              )}
           </div>
         </Card>
-
       </div>
     </div>
   );
