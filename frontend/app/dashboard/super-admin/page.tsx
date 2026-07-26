@@ -8,13 +8,11 @@ import {
   Building2,
   Users,
   CalendarCheck,
-  TrendingUp,
   DollarSign,
   Activity,
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
-  BarChart3,
   UserPlus,
   X,
   PlusCircle,
@@ -31,6 +29,11 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MotionDivItem } from "@/components/ui/MotionListItem";
 import { AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
 
 interface ClinicRow {
   id: number;
@@ -56,25 +59,25 @@ interface SuperAdminData {
 }
 
 const PLAN_BADGE: Record<string, string> = {
-  BASIC: "bg-slate-100 text-slate-600",
-  PRO: "bg-blue-100 text-blue-700",
-  ENTERPRISE: "bg-violet-100 text-violet-700",
+  BASIC: "bg-warm-surface border border-border text-muted font-bold",
+  PRO: "bg-blue-100 border border-blue-200 text-blue-800 font-bold",
+  ENTERPRISE: "bg-purple-100 border border-purple-200 text-purple-800 font-bold",
 };
 
 function StatCard({ label, value, icon: Icon, color, sub, format }: any) {
   return (
-    <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-100 shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition">
+    <Card className="p-6 flex items-start gap-4">
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
         <Icon className="w-6 h-6" />
       </div>
       <div>
-        <p className="text-sm text-gray-500 font-medium">{label}</p>
-        <div className="text-3xl font-bold text-gray-900 mt-0.5">
+        <p className="text-sm text-muted font-bold">{label}</p>
+        <div className="text-3xl font-bold text-ink mt-0.5 heading-font">
           <AnimatedNumber value={value} format={format} />
         </div>
-        {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+        {sub && <p className="text-xs text-muted mt-1 font-medium">{sub}</p>}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -246,44 +249,67 @@ export default function SuperAdminDashboard() {
     });
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]"><div className="animate-spin w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full" /></div>
-  );
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  if (error || !data) return (
-    <div className="p-8 text-center"><AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" /><p className="text-gray-700 font-medium">{error || "No data available."}</p></div>
-  );
+  if (error || !data) {
+    return (
+      <div className="p-8 text-center max-w-xl mx-auto">
+        <Card className="p-8 text-center">
+          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+          <p className="text-ink font-bold text-lg">{error || "No data available."}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const selectClass = "w-full border border-border rounded-xl px-4 py-2.5 bg-warm-surface text-ink font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition shadow-sm";
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8 bg-slate-50 min-h-screen">
+    <div className="p-6 max-w-7xl mx-auto space-y-8 min-h-screen">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck className="w-5 h-5 text-violet-600" />
-            <span className="text-xs font-bold uppercase tracking-widest text-violet-600">SaaS Command Center</span>
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">SaaS Command Center</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Platform Overview</h1>
+          <h1 className="text-3xl font-bold text-ink heading-font">Platform Overview</h1>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => setIsClinicModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 shadow-sm transition">
-            <PlusCircle className="w-4 h-4" /> Create Clinic
-          </button>
-          <button onClick={openAdminModal} className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 shadow-sm transition">
-            <UserPlus className="w-4 h-4" /> Create Admin
-          </button>
-          <button onClick={fetchStats} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 shadow-sm transition">
-            <Activity className="w-4 h-4" />
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" onClick={() => setIsClinicModalOpen(true)}>
+            <PlusCircle className="w-4 h-4 mr-1.5" /> Create Clinic
+          </Button>
+          <Button onClick={openAdminModal}>
+            <UserPlus className="w-4 h-4 mr-1.5" /> Create Admin
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] })}>
+            <Activity className="w-4 h-4 text-muted" />
+          </Button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200">
-        <button onClick={() => setActiveTab("overview")} className={`px-6 py-3 text-sm font-bold border-b-2 transition ${activeTab === "overview" ? "border-violet-600 text-violet-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition ${
+            activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
           Overview
         </button>
-        <button onClick={() => setActiveTab("clinics")} className={`px-6 py-3 text-sm font-bold border-b-2 transition ${activeTab === "clinics" ? "border-violet-600 text-violet-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+        <button
+          onClick={() => setActiveTab("clinics")}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition ${
+            activeTab === "clinics" ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
           Tenants ({data.total_clinics})
         </button>
       </div>
@@ -292,249 +318,288 @@ export default function SuperAdminDashboard() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <StatCard label="MRR (Revenue)" value={data.total_revenue_paid} format={(v: number) => `₹${Math.round(v).toLocaleString()}`} icon={DollarSign} color="bg-emerald-50 text-emerald-600" sub="All-time paid invoices" />
-            <StatCard label="Active Clinics" value={data.active_clinics} icon={Building2} color="bg-violet-50 text-violet-600" sub={`Out of ${data.total_clinics} total`} />
-            <StatCard label="Total Users" value={data.total_users} icon={Users} color="bg-blue-50 text-blue-600" sub="Doctors, patients, staff" />
-            <StatCard label="Total Appointments" value={data.total_appointments} icon={CalendarCheck} color="bg-amber-50 text-amber-600" sub={`${data.appointments_today} today`} />
+            <StatCard label="MRR (Revenue)" value={data.total_revenue_paid} format={(v: number) => `₹${Math.round(v).toLocaleString()}`} icon={DollarSign} color="bg-emerald-100 text-emerald-800" sub="All-time paid invoices" />
+            <StatCard label="Active Clinics" value={data.active_clinics} icon={Building2} color="bg-primary/10 text-primary" sub={`Out of ${data.total_clinics} total`} />
+            <StatCard label="Total Users" value={data.total_users} icon={Users} color="bg-blue-100 text-blue-800" sub="Doctors, patients, staff" />
+            <StatCard label="Total Appointments" value={data.total_appointments} icon={CalendarCheck} color="bg-amber-100 text-amber-800" sub={`${data.appointments_today} today`} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-6">7-Day Platform Growth</h3>
+            <Card className="lg:col-span-2 p-6">
+              <h3 className="text-lg font-bold text-ink mb-6 heading-font">7-Day Platform Growth</h3>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.trend_data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} dy={10} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} />
-                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE8" vertical={false} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: '1px solid #EDEDE8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                     <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Revenue (₹)" />
-                    <Line yAxisId="right" type="monotone" dataKey="appointments" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Appointments" />
+                    <Line yAxisId="right" type="monotone" dataKey="appointments" stroke="#0F7B6C" strokeWidth={3} dot={{ r: 4, fill: '#0F7B6C', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Appointments" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </Card>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-900">Security Feed</h3>
+                <h3 className="text-lg font-bold text-ink heading-font">Security Feed</h3>
                 <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                 </span>
               </div>
               <div className="space-y-4">
                 <AnimatePresence mode="popLayout">
                   {data.recent_logs.map((log: any) => (
-                    <MotionDivItem key={log.id} className="text-sm border-l-2 border-gray-200 pl-3 py-1">
-                      <p className="text-gray-900 font-medium">{log.user} <span className="text-gray-400 font-normal">in</span> {log.clinic}</p>
-                      <p className="text-gray-500">{log.description}</p>
-                      <p className="text-xs text-gray-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
+                    <MotionDivItem key={log.id} className="text-sm border-l-2 border-border pl-3 py-1">
+                      <p className="text-ink font-semibold">{log.user} <span className="text-muted font-normal">in</span> {log.clinic}</p>
+                      <p className="text-muted">{log.description}</p>
+                      <p className="text-xs text-muted mt-1 font-mono">{new Date(log.timestamp).toLocaleString()}</p>
                     </MotionDivItem>
                   ))}
                 </AnimatePresence>
-                {data.recent_logs.length === 0 && <p className="text-gray-400 text-sm">No recent activity.</p>}
+                {data.recent_logs.length === 0 && <p className="text-muted text-sm font-medium">No recent activity.</p>}
               </div>
-            </div>
+            </Card>
           </div>
         </div>
       )}
 
       {/* CLINICS TAB */}
       {activeTab === "clinics" && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4 text-left font-semibold">Tenant</th>
-                  <th className="px-6 py-4 text-left font-semibold">Plan</th>
-                  <th className="px-6 py-4 text-center font-semibold">Doctors / Patients</th>
-                  <th className="px-6 py-4 text-right font-semibold">Appts (Today)</th>
-                  <th className="px-6 py-4 text-center font-semibold">Status</th>
-                  <th className="px-6 py-4 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {data.clinic_breakdown.map((clinic) => (
-                  <tr key={clinic.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-gray-900">{clinic.name}</td>
-                    <td className="px-6 py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${PLAN_BADGE[clinic.plan] || "bg-gray-100 text-gray-600"}`}>{clinic.plan}</span></td>
-                    <td className="px-6 py-4 text-center text-gray-500 font-medium">{clinic.total_doctors} / {clinic.total_patients}</td>
-                    <td className="px-6 py-4 text-right text-gray-500 font-medium">{clinic.total_appointments} <span className="text-emerald-600 font-bold">({clinic.appointments_today})</span></td>
-                    <td className="px-6 py-4 text-center">
-                      {clinic.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 className="w-3.5 h-3.5" /> Active</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-red-500 text-xs font-bold bg-red-50 px-2 py-1 rounded-full"><AlertTriangle className="w-3.5 h-3.5" /> Suspended</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button onClick={() => handleImpersonate(clinic.id)} className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition" title="Login as Admin">
-                        <LogIn className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleToggleStatus(clinic.id, clinic.is_active)} className={`p-2 rounded-lg transition ${clinic.is_active ? 'text-red-500 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'}`} title={clinic.is_active ? "Suspend Clinic" : "Activate Clinic"}>
-                        {clinic.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => openBillingModal(clinic)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Billing Actions">
-                        <Link2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tenant</TableHead>
+              <TableHead>Plan</TableHead>
+              <TableHead className="text-center">Doctors / Patients</TableHead>
+              <TableHead className="text-right">Appts (Today)</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.clinic_breakdown.map((clinic) => (
+              <TableRow key={clinic.id}>
+                <TableCell className="font-bold text-ink">{clinic.name}</TableCell>
+                <TableCell>
+                  <span className={`px-2.5 py-1 rounded-full text-xs uppercase tracking-wider ${PLAN_BADGE[clinic.plan] || "bg-warm-surface border border-border text-muted font-bold"}`}>
+                    {clinic.plan}
+                  </span>
+                </TableCell>
+                <TableCell className="text-center text-muted font-semibold">{clinic.total_doctors} / {clinic.total_patients}</TableCell>
+                <TableCell className="text-right text-muted font-medium font-mono">
+                  {clinic.total_appointments} <span className="text-emerald-700 font-bold">({clinic.appointments_today})</span>
+                </TableCell>
+                <TableCell className="text-center">
+                  {clinic.is_active ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-bold bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-rose-800 text-xs font-bold bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-full">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Suspended
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right space-x-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleImpersonate(clinic.id)}
+                    className="text-primary hover:text-primary-dark"
+                    title="Login as Admin"
+                  >
+                    <LogIn className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleToggleStatus(clinic.id, clinic.is_active)}
+                    className={clinic.is_active ? 'text-rose-600 hover:text-rose-800' : 'text-emerald-600 hover:text-emerald-800'}
+                    title={clinic.is_active ? "Suspend Clinic" : "Activate Clinic"}
+                  >
+                    {clinic.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openBillingModal(clinic)}
+                    className="text-accent hover:text-accent/80"
+                    title="Billing Actions"
+                  >
+                    <Link2 className="w-4 h-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {/* Create Clinic Modal */}
-      {isClinicModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h3 className="text-xl font-bold text-gray-900">Create Tenant</h3>
-              <button onClick={() => setIsClinicModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleCreateClinic} className="p-6 space-y-4">
-              {clinicFormError && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl">{clinicFormError}</div>}
-              {clinicFormSuccess && <div className="p-3 bg-emerald-50 text-emerald-600 text-sm rounded-xl">{clinicFormSuccess}</div>}
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Clinic Name</label><input type="text" required value={clinicFormData.name} onChange={(e) => setClinicFormData({ ...clinicFormData, name: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><textarea required rows={2} value={clinicFormData.address} onChange={(e) => setClinicFormData({ ...clinicFormData, address: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none resize-none" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Subscription Plan</label><select required value={clinicFormData.subscription_plan} onChange={(e) => setClinicFormData({ ...clinicFormData, subscription_plan: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 focus:border-transparent outline-none bg-white"><option value="BASIC">Basic</option><option value="PRO">Pro</option><option value="ENTERPRISE">Enterprise</option></select></div>
-              <div className="pt-4 flex gap-3"><button type="button" onClick={() => setIsClinicModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-gray-600 font-medium hover:bg-gray-50 transition">Cancel</button><button type="submit" disabled={clinicFormLoading} className="flex-1 px-4 py-2 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition disabled:opacity-50">{clinicFormLoading ? "Creating..." : "Create Clinic"}</button></div>
-            </form>
+      <Modal isOpen={isClinicModalOpen} onClose={() => setIsClinicModalOpen(false)} title="Create Tenant" className="max-w-md">
+        <form onSubmit={handleCreateClinic} className="space-y-4">
+          {clinicFormError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-xl">{clinicFormError}</div>}
+          {clinicFormSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl">{clinicFormSuccess}</div>}
+          
+          <div>
+            <label className="block text-sm font-bold text-ink mb-1">Clinic Name *</label>
+            <Input type="text" required value={clinicFormData.name} onChange={(e) => setClinicFormData({ ...clinicFormData, name: e.target.value })} placeholder="City Health Care" />
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-bold text-ink mb-1">Address *</label>
+            <textarea required rows={2} value={clinicFormData.address} onChange={(e) => setClinicFormData({ ...clinicFormData, address: e.target.value })} className="w-full border border-border rounded-xl px-4 py-2.5 bg-warm-surface text-ink font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none shadow-sm text-sm" placeholder="Street address..." />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-ink mb-1">Subscription Plan *</label>
+            <select required value={clinicFormData.subscription_plan} onChange={(e) => setClinicFormData({ ...clinicFormData, subscription_plan: e.target.value })} className={selectClass}>
+              <option value="BASIC">Basic</option>
+              <option value="PRO">Pro</option>
+              <option value="ENTERPRISE">Enterprise</option>
+            </select>
+          </div>
+
+          <div className="pt-4 flex gap-3 justify-end">
+            <Button type="button" variant="secondary" onClick={() => setIsClinicModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={clinicFormLoading}>{clinicFormLoading ? "Creating..." : "Create Clinic"}</Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Create Clinic Admin Modal */}
-      {isAdminModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h3 className="text-xl font-bold text-gray-900">Assign Tenant Admin</h3>
-              <button onClick={() => setIsAdminModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+      <Modal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} title="Assign Tenant Admin" className="max-w-md">
+        <form onSubmit={handleCreateAdmin} className="space-y-4">
+          {adminFormError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-xl">{adminFormError}</div>}
+          {adminFormSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl">{adminFormSuccess}</div>}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-ink mb-1">First Name *</label>
+              <Input type="text" required value={adminFormData.first_name} onChange={(e) => setAdminFormData({ ...adminFormData, first_name: e.target.value })} />
             </div>
-            <form onSubmit={handleCreateAdmin} className="p-6 space-y-4">
-              {adminFormError && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl">{adminFormError}</div>}
-              {adminFormSuccess && <div className="p-3 bg-emerald-50 text-emerald-600 text-sm rounded-xl">{adminFormSuccess}</div>}
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">First Name</label><input type="text" required value={adminFormData.first_name} onChange={(e) => setAdminFormData({ ...adminFormData, first_name: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 outline-none" /></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label><input type="text" required value={adminFormData.last_name} onChange={(e) => setAdminFormData({ ...adminFormData, last_name: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 outline-none" /></div>
-              </div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" required value={adminFormData.email} onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 outline-none" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" required minLength={8} value={adminFormData.password} onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 outline-none" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Assign to Tenant</label><select required value={adminFormData.clinic_id} onChange={(e) => setAdminFormData({ ...adminFormData, clinic_id: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 focus:ring-2 focus:ring-violet-600 outline-none bg-white"><option value="" disabled>Select a clinic</option>{clinics.map((clinic) => (<option key={clinic.id} value={clinic.id}>{clinic.name}</option>))}</select></div>
-              <div className="pt-4 flex gap-3"><button type="button" onClick={() => setIsAdminModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-gray-600 font-medium hover:bg-gray-50 transition">Cancel</button><button type="submit" disabled={adminFormLoading} className="flex-1 px-4 py-2 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition disabled:opacity-50">{adminFormLoading ? "Creating..." : "Assign Admin"}</button></div>
-            </form>
+            <div>
+              <label className="block text-sm font-bold text-ink mb-1">Last Name *</label>
+              <Input type="text" required value={adminFormData.last_name} onChange={(e) => setAdminFormData({ ...adminFormData, last_name: e.target.value })} />
+            </div>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-bold text-ink mb-1">Email *</label>
+            <Input type="email" required value={adminFormData.email} onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-ink mb-1">Password *</label>
+            <Input type="password" required minLength={8} value={adminFormData.password} onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-ink mb-1">Assign to Tenant *</label>
+            <select required value={adminFormData.clinic_id} onChange={(e) => setAdminFormData({ ...adminFormData, clinic_id: e.target.value })} className={selectClass}>
+              <option value="" disabled>Select a clinic</option>
+              {clinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="pt-4 flex gap-3 justify-end">
+            <Button type="button" variant="secondary" onClick={() => setIsAdminModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={adminFormLoading}>{adminFormLoading ? "Creating..." : "Assign Admin"}</Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Billing Actions Modal */}
       {billingClinic && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Billing Actions</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Fallback tools for: <strong>{billingClinic.name}</strong></p>
+        <Modal isOpen={!!billingClinic} onClose={() => setBillingClinic(null)} title="Billing Actions" className="max-w-md">
+          <p className="text-xs text-muted mb-4 font-semibold">Fallback tools for: <strong className="text-ink">{billingClinic.name}</strong></p>
+
+          <div className="space-y-5">
+            {billingError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {billingError}
               </div>
-              <button onClick={() => setBillingClinic(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            )}
+
+            {/* Plan selector */}
+            <div>
+              <label className="block text-sm font-bold text-ink mb-2">Target Plan</label>
+              <div className="grid grid-cols-2 gap-2">
+                {["professional", "enterprise"].map((p) => (
+                  <Button
+                    key={p}
+                    type="button"
+                    variant={billingPlan === p ? "default" : "outline"}
+                    onClick={() => setBillingPlan(p)}
+                    className="capitalize py-2.5 text-xs font-bold"
+                  >
+                    {p} {p === "professional" ? "(₹999/mo)" : "(₹2999/mo)"}
+                  </Button>
+                ))}
+              </div>
             </div>
-            <div className="p-6 space-y-5">
-              {billingError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {billingError}
-                </div>
-              )}
 
-              {/* Plan selector */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Target Plan</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {["professional", "enterprise"].map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setBillingPlan(p)}
-                      className={`py-2.5 px-4 rounded-xl border text-sm font-semibold capitalize transition-all ${
-                        billingPlan === p
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white text-gray-700 border-gray-200 hover:border-indigo-200"
-                      }`}
+            {/* Generate Payment Link */}
+            <div className="border border-border rounded-xl p-4 bg-warm-surface/30">
+              <div className="flex items-start gap-3 mb-3">
+                <Link2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-ink text-sm">Generate Payment Link</p>
+                  <p className="text-xs text-muted mt-0.5">Create a one-time Razorpay link to share via WhatsApp/email when e-mandate fails.</p>
+                </div>
+              </div>
+              {billingAction === "generate" && billingResult ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 bg-paper border border-border rounded-lg px-3 py-2">
+                    <span className="text-xs text-ink flex-1 truncate font-mono">{billingResult}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(billingResult)}
+                      className="text-xs font-bold text-primary"
                     >
-                      {p} {p === "professional" ? "(₹999/mo)" : "(₹2999/mo)"}
-                    </button>
-                  ))}
+                      {copied ? <><Check className="w-3 h-3 mr-1" /> Copied!</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-amber-800 bg-amber-100 border border-amber-200 px-3 py-2 rounded-lg font-medium">After payment is confirmed, use "Change Plan" below to activate the clinic.</p>
                 </div>
-              </div>
+              ) : (
+                <Button
+                  onClick={handleGeneratePaymentLink}
+                  disabled={billingLoading}
+                  className="w-full"
+                >
+                  <Link2 className="w-4 h-4 mr-2" /> Generate Link
+                </Button>
+              )}
+            </div>
 
-              {/* Generate Payment Link */}
-              <div className="border border-gray-100 rounded-xl p-4">
-                <div className="flex items-start gap-3 mb-3">
-                  <Link2 className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">Generate Payment Link</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Create a one-time Razorpay link to share via WhatsApp/email when e-mandate fails.</p>
-                  </div>
+            {/* Change Plan Manually */}
+            <div className="border border-border rounded-xl p-4 bg-warm-surface/30">
+              <div className="flex items-start gap-3 mb-3">
+                <ChevronsUp className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-ink text-sm">Manually Change Plan</p>
+                  <p className="text-xs text-muted mt-0.5">Use after confirming payment receipt. Activates the plan immediately.</p>
                 </div>
-                {billingAction === "generate" && billingResult ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                      <span className="text-xs text-gray-600 flex-1 truncate font-mono">{billingResult}</span>
-                      <button
-                        onClick={() => copyToClipboard(billingResult)}
-                        className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-all ${
-                          copied ? "bg-emerald-50 text-emerald-600" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                        }`}
-                      >
-                        {copied ? <><Check className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy</>}
-                      </button>
-                    </div>
-                    <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">After payment is confirmed, use "Change Plan" below to activate the clinic.</p>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleGeneratePaymentLink}
-                    disabled={billingLoading}
-                    className="w-full py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {billingLoading && billingAction !== "change-plan" ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Link2 className="w-4 h-4" />}
-                    Generate Link
-                  </button>
-                )}
               </div>
-
-              {/* Change Plan Manually */}
-              <div className="border border-gray-100 rounded-xl p-4">
-                <div className="flex items-start gap-3 mb-3">
-                  <ChevronsUp className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">Manually Change Plan</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Use after confirming payment receipt. Activates the plan immediately.</p>
-                  </div>
+              {billingAction === "change-plan" && billingResult ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-semibold px-3 py-2 rounded-lg flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> {billingResult}
                 </div>
-                {billingAction === "change-plan" && billingResult ? (
-                  <div className="bg-emerald-50 text-emerald-700 text-sm font-medium px-3 py-2 rounded-lg flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" /> {billingResult}
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleChangePlan}
-                    disabled={billingLoading}
-                    className="w-full py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {billingLoading && billingAction !== "generate" ? <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <ChevronsUp className="w-4 h-4" />}
-                    Activate {billingPlan.charAt(0).toUpperCase() + billingPlan.slice(1)} Plan
-                  </button>
-                )}
-              </div>
+              ) : (
+                <Button
+                  onClick={handleChangePlan}
+                  disabled={billingLoading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                >
+                  <ChevronsUp className="w-4 h-4 mr-2" /> Activate {billingPlan.charAt(0).toUpperCase() + billingPlan.slice(1)} Plan
+                </Button>
+              )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
