@@ -90,7 +90,9 @@ class DoctorLeaveListCreateView(ListCreateAPIView):
         if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
             clinic = get_user_clinic(user)
             return DoctorLeave.objects.filter(doctor_clinic__clinic=clinic)
-        return DoctorLeave.objects.all()
+        if getattr(user, "role", None) == "SUPER_ADMIN":
+            return DoctorLeave.objects.all()
+        return DoctorLeave.objects.none()
 
     def perform_create(self, serializer):
         serializer.save()
@@ -107,7 +109,9 @@ class DoctorLeaveDetailView(RetrieveUpdateDestroyAPIView):
         if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
             clinic = get_user_clinic(user)
             return DoctorLeave.objects.filter(doctor_clinic__clinic=clinic)
-        return DoctorLeave.objects.all()
+        if getattr(user, "role", None) == "SUPER_ADMIN":
+            return DoctorLeave.objects.all()
+        return DoctorLeave.objects.none()
 
 
 class CreateDoctorInvitationView(APIView):
