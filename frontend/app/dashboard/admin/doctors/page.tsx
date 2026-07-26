@@ -195,20 +195,20 @@ export default function AdminDoctorsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-8 border-b border-gray-200">
+      <div className="flex items-center gap-8 border-b border-border">
         <button
           onClick={() => setActiveTab("doctors")}
-          className={`pb-4 text-sm font-bold transition-colors relative ${activeTab === "doctors" ? "text-blue-600" : "text-gray-500 hover:text-gray-900"}`}
+          className={`pb-4 text-sm font-bold transition-colors relative ${activeTab === "doctors" ? "text-primary" : "text-muted hover:text-ink"}`}
         >
           Active Doctors ({doctors.length})
-          {activeTab === "doctors" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full" />}
+          {activeTab === "doctors" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" />}
         </button>
         <button
           onClick={() => setActiveTab("invites")}
-          className={`pb-4 text-sm font-bold transition-colors relative ${activeTab === "invites" ? "text-blue-600" : "text-gray-500 hover:text-gray-900"}`}
+          className={`pb-4 text-sm font-bold transition-colors relative ${activeTab === "invites" ? "text-primary" : "text-muted hover:text-ink"}`}
         >
           Sent Invitations ({invites.length})
-          {activeTab === "invites" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full" />}
+          {activeTab === "invites" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" />}
         </button>
       </div>
 
@@ -431,12 +431,12 @@ function DoctorCard({ doctor }: { doctor: DoctorEntry }) {
         )}
       </div>
 
-      <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+      <div className="mt-6 pt-5 border-t border-border flex items-center justify-between">
         <div className="text-sm">
-          <span className="text-gray-500 font-medium">Consultation Fee: </span>
-          <span className="text-gray-900 font-bold text-lg">₹{doctor.consultation_fee || "0"}</span>
+          <span className="text-muted font-medium">Consultation Fee: </span>
+          <span className="text-ink font-bold text-lg font-mono">₹{doctor.consultation_fee || "0"}</span>
         </div>
-        <span className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full font-bold">
+        <span className="flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-full font-bold">
           <CheckCircle className="w-3.5 h-3.5" />
           Active
         </span>
