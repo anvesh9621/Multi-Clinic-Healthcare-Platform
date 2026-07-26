@@ -64,17 +64,25 @@ class ReceptionistInvitationStatusView(APIView):
     def get(self, request, token):
         try:
             invite = ReceptionistInvitation.objects.get(token=token)
+            serializer = ReceptionistInvitationSerializer(invite)
             if not invite.is_valid:
+                error_msg = "This invitation has expired or has already been used."
+                if invite.status == "ACCEPTED":
+                    error_msg = "This invitation has already been accepted. You can log in with your credentials."
+                elif invite.status == "EXPIRED":
+                    error_msg = "This invitation link has expired. Please request a new invite from your clinic admin."
+                elif invite.status == "CANCELLED":
+                    error_msg = "This invitation has been cancelled by the clinic admin."
+
                 return Response(
-                    {"isValid": False, "error": "This invitation has expired or has already been used."},
+                    {"isValid": False, "error": error_msg, "status": invite.status, "invitation": serializer.data},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            serializer = ReceptionistInvitationSerializer(invite)
-            return Response({"isValid": True, "invitation": serializer.data})
+            return Response({"isValid": True, "invitation": serializer.data, "status": invite.status})
 
         except ReceptionistInvitation.DoesNotExist:
-            return Response({"isValid": False, "error": "Invalid invitation token."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"isValid": False, "error": "Invalid invitation token.", "status": "NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
 
 
 class ReceptionistInviteAcceptView(APIView):
