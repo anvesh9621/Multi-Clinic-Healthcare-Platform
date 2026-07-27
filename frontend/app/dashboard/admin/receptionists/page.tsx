@@ -91,12 +91,44 @@ export default function ReceptionistsListPage() {
     return `${minutes}m remaining`;
   };
 
+  const extractErrorMessage = (err: any): string => {
+    if (!err?.response?.data) {
+      return err?.message || "Failed to send invitation. Please try again.";
+    }
+    const data = err.response.data;
+
+    if (data.errors) {
+      if (typeof data.errors === "string") return data.errors;
+      if (Array.isArray(data.errors) && data.errors.length > 0) {
+        return typeof data.errors[0] === "string" ? data.errors[0] : JSON.stringify(data.errors[0]);
+      }
+      if (typeof data.errors === "object") {
+        if (data.errors.email) {
+          return Array.isArray(data.errors.email) ? data.errors.email[0] : data.errors.email;
+        }
+        if (data.errors.non_field_errors) {
+          return Array.isArray(data.errors.non_field_errors) ? data.errors.non_field_errors[0] : data.errors.non_field_errors;
+        }
+        const firstKey = Object.keys(data.errors)[0];
+        if (firstKey && data.errors[firstKey]) {
+          const val = data.errors[firstKey];
+          return Array.isArray(val) ? val[0] : val;
+        }
+      }
+    }
+
+    if (data.detail) return data.detail;
+    if (data.error) return data.error;
+    if (data.message) return data.message;
+
+    return "Failed to send invitation. Please try again.";
+  };
+
   const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
 
     await sendInviteRequest(email.trim().toLowerCase());
-    setEmail("");
   };
 
   const sendInviteRequest = async (targetEmail: string) => {
@@ -109,14 +141,10 @@ export default function ReceptionistsListPage() {
         email: targetEmail.toLowerCase(),
       });
       setSuccessMessage(`Invitation link sent to ${targetEmail}. They will receive an email to set their password.`);
+      setEmail("");
       await fetchData();
     } catch (err: any) {
-      console.error(err);
-      const backendErr =
-        err.response?.data?.errors?.non_field_errors?.[0] ||
-        err.response?.data?.errors?.email?.[0] ||
-        err.response?.data?.error ||
-        "Failed to send invitation. Please try again.";
+      const backendErr = extractErrorMessage(err);
       setError(backendErr);
     } finally {
       setSubmitting(false);

@@ -34,11 +34,13 @@ export default function CreateReceptionistPage() {
       });
       router.push("/dashboard/admin/receptionists");
     } catch (err: any) {
-      console.error(err);
+      const data = err.response?.data;
       const backendErr =
-        err.response?.data?.errors?.non_field_errors?.[0] ||
-        err.response?.data?.errors?.email?.[0] ||
-        err.response?.data?.error ||
+        data?.errors?.email?.[0] ||
+        data?.errors?.non_field_errors?.[0] ||
+        (typeof data?.errors === "string" ? data.errors : null) ||
+        data?.detail ||
+        data?.error ||
         "Failed to send receptionist invitation";
       setError(backendErr);
     } finally {
