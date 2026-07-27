@@ -96,9 +96,17 @@ class ReceptionistAcceptInviteSerializer(serializers.Serializer):
         from django.db import transaction
 
         token = self.validated_data["token"]
-        invite = ReceptionistInvitation.objects.get(token=token)
 
         with transaction.atomic():
+            invite = ReceptionistInvitation.objects.get(token=token)
+
+            user = User.objects.filter(email=invite.email).first()
+            if user:
+                raise serializers.ValidationError(
+                    "This email is already registered to an existing account. "
+                    "Please contact support if you believe this is an error."
+                )
+
             user = User.objects.create_user(
                 email=invite.email,
                 password=self.validated_data["password"],
@@ -107,6 +115,7 @@ class ReceptionistAcceptInviteSerializer(serializers.Serializer):
                 first_name=self.validated_data.get("first_name", ""),
                 last_name=self.validated_data.get("last_name", ""),
             )
+
             invite.status = "ACCEPTED"
             invite.save()
 
