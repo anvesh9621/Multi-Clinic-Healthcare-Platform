@@ -1,4 +1,4 @@
-from .models import AuditLog
+from .models import AuditLog, AuthAttempt
 
 
 def log_action(
@@ -19,4 +19,21 @@ def log_action(
         object_id=object_id,
         description=description,
         ip_address=ip_address,
+    )
+
+
+def log_auth_attempt(
+    *,
+    email: str,
+    endpoint: str,
+    ip_address: str | None = None,
+    status: str = "FAILED",
+    reason: str | None = None,
+) -> AuthAttempt:
+    return AuthAttempt.objects.create(
+        email=email.strip().lower() if email else "",
+        ip_address=ip_address,
+        endpoint=endpoint,
+        status=status,
+        reason=reason,
     )

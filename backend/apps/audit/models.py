@@ -52,3 +52,29 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} | {self.user} | {self.action_type} | {self.object_type}"
+
+
+class AuthAttempt(models.Model):
+    class StatusChoices(models.TextChoices):
+        SUCCESS = "SUCCESS", "Success"
+        FAILED = "FAILED", "Failed"
+        LOCKED_OUT = "LOCKED_OUT", "Locked Out"
+
+    email = models.EmailField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    endpoint = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.FAILED)
+    reason = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["timestamp"]),
+            models.Index(fields=["email", "timestamp"]),
+            models.Index(fields=["ip_address", "timestamp"]),
+            models.Index(fields=["endpoint", "timestamp"]),
+        ]
+
+    def __str__(self):
+        return f"AuthAttempt [{self.status}] {self.email} on {self.endpoint} at {self.timestamp}"

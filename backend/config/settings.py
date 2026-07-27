@@ -204,6 +204,11 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+    "DEFAULT_THROTTLE_RATES": {
+        "login_email": "5/15m",
+        "patient_otp": "10/h",
+        "mfa_strict": "5/5m",
+    },
 }
 
 SIMPLE_JWT = {

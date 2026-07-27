@@ -13,9 +13,10 @@ from django.conf import settings
 from .jwt import CustomTokenObtainPairSerializer
 from .serializers import MeSerializer
 
-from apps.audit.services import log_action
+from apps.audit.services import log_action, log_auth_attempt
 from apps.audit.models import AuditLog
 from apps.accounts.models import User
+from .throttling import LoginEmailRateThrottle, PatientOTPRateThrottle, MFAStrictRateThrottle
 
 
 import jwt
@@ -34,13 +35,26 @@ from .services import (
 class CustomTokenObtainPairView(TokenObtainPairView):
 
     serializer_class = CustomTokenObtainPairSerializer
+    throttle_classes = [LoginEmailRateThrottle]
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
         email = request.data.get("email", "").strip().lower()
+        ip_address = request.META.get("REMOTE_ADDR")
+
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            log_auth_attempt(
+                email=email,
+                ip_address=ip_address,
+                endpoint="/api/accounts/login/",
+                status="FAILED",
+                reason="Invalid email or password credentials"
+            )
+            raise e
+
+        data = serializer.validated_data
         user = User.objects.get(email=email)
 
         # Patients skip Staff MFA and get direct JWT tokens
@@ -308,18 +322,22 @@ class PatientOTPRequestView(APIView):
     Rejects REGISTER if email is already a User; rejects LOGIN if email is not a User.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [PatientOTPRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
         purpose = request.data.get("purpose", "").strip().upper()
+        ip_address = request.META.get("REMOTE_ADDR")
 
         if not email or not purpose:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/request/", status="FAILED", reason="Missing email or purpose")
             return Response(
                 {"success": False, "error": "Email and purpose ('REGISTER' or 'LOGIN') are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if purpose not in ["REGISTER", "LOGIN"]:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/request/", status="FAILED", reason="Invalid purpose")
             return Response(
                 {"success": False, "error": "Purpose must be either 'REGISTER' or 'LOGIN'."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -328,12 +346,14 @@ class PatientOTPRequestView(APIView):
         user_exists = User.objects.filter(email=email).exists()
 
         if purpose == "REGISTER" and user_exists:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/request/", status="FAILED", reason="Account already exists for REGISTER")
             return Response(
                 {"success": False, "error": "An account with this email already exists. Please log in instead."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if purpose == "LOGIN" and not user_exists:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/request/", status="FAILED", reason="No account found for LOGIN")
             return Response(
                 {"success": False, "error": "No account found with this email address. Please register first."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -341,6 +361,7 @@ class PatientOTPRequestView(APIView):
 
         ok, msg, _ = generate_and_send_otp(email, purpose)
         if not ok:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/request/", status="FAILED", reason=msg)
             return Response({"success": False, "error": msg}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"success": True, "message": msg}, status=status.HTTP_200_OK)
@@ -353,19 +374,23 @@ class PatientOTPVerifyView(APIView):
     On LOGIN success: issues JWT for the existing User.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [PatientOTPRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
         code = request.data.get("code", "").strip()
         purpose = request.data.get("purpose", "").strip().upper()
+        ip_address = request.META.get("REMOTE_ADDR")
 
         if not email or not code or not purpose:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/verify/", status="FAILED", reason="Missing parameters")
             return Response(
                 {"success": False, "error": "Email, code, and purpose are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if purpose not in ["REGISTER", "LOGIN"]:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/verify/", status="FAILED", reason="Invalid purpose")
             return Response(
                 {"success": False, "error": "Purpose must be either 'REGISTER' or 'LOGIN'."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -373,6 +398,7 @@ class PatientOTPVerifyView(APIView):
 
         ok, msg = verify_otp(email, code, purpose)
         if not ok:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/patient/otp/verify/", status="FAILED", reason=msg)
             return Response({"success": False, "error": msg}, status=status.HTTP_400_BAD_REQUEST)
 
         if purpose == "REGISTER":
@@ -686,14 +712,18 @@ class MFAVerifyView(APIView):
     issues full JWT access + refresh tokens upon success.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [MFAStrictRateThrottle]
 
     def post(self, request):
+        ip_address = request.META.get("REMOTE_ADDR")
         user, err = parse_mfa_pending_token(request, required_actions=["mfa_verify", "mfa_setup"])
         if err:
+            log_auth_attempt(email="", ip_address=ip_address, endpoint="/api/accounts/mfa/verify/", status="FAILED", reason=err)
             return Response({"success": False, "error": err}, status=status.HTTP_400_BAD_REQUEST)
 
         code = request.data.get("code", "").strip()
         if not code:
+            log_auth_attempt(email=user.email, ip_address=ip_address, endpoint="/api/accounts/mfa/verify/", status="FAILED", reason="Missing verification code")
             return Response({"success": False, "error": "Verification code or backup code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         # 1. Try TOTP code verification
@@ -704,6 +734,7 @@ class MFAVerifyView(APIView):
             is_valid = verify_backup_code(user, code)
 
         if not is_valid:
+            log_auth_attempt(email=user.email, ip_address=ip_address, endpoint="/api/accounts/mfa/verify/", status="FAILED", reason="Invalid verification code or backup code")
             return Response({"success": False, "error": "Invalid verification code or backup code."}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
@@ -713,7 +744,7 @@ class MFAVerifyView(APIView):
             object_type="User",
             object_id=user.id,
             description=f"Staff logged in via MFA: {user.email}",
-            ip_address=request.META.get("REMOTE_ADDR"),
+            ip_address=ip_address,
         )
 
         refresh = RefreshToken.for_user(user)
@@ -746,12 +777,15 @@ class MFARecoverView(APIView):
     and returns remaining backup code count (prompt_regeneration=True if <= 2).
     """
     permission_classes = [AllowAny]
+    throttle_classes = [MFAStrictRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
         backup_code = (request.data.get("backup_code") or request.data.get("code") or "").strip()
+        ip_address = request.META.get("REMOTE_ADDR")
 
         if not email or not backup_code:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/mfa/recover/", status="FAILED", reason="Missing email or backup code")
             return Response(
                 {"success": False, "error": "Both email and backup_code are required."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -759,12 +793,14 @@ class MFARecoverView(APIView):
 
         user = User.objects.filter(email=email).first()
         if not user or user.role == User.RoleChoices.PATIENT:
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/mfa/recover/", status="FAILED", reason="Invalid email or non-staff user")
             return Response(
                 {"success": False, "error": "Invalid email or backup code."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if not verify_backup_code(user, backup_code):
+            log_auth_attempt(email=email, ip_address=ip_address, endpoint="/api/accounts/mfa/recover/", status="FAILED", reason="Invalid or already used backup code")
             return Response(
                 {"success": False, "error": "Invalid or already used backup code."},
                 status=status.HTTP_400_BAD_REQUEST,
