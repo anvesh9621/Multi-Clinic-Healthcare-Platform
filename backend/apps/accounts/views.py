@@ -1,3 +1,4 @@
+import os
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -396,6 +397,121 @@ class PatientOTPVerifyView(APIView):
             {
                 "success": True,
                 "message": "Authentication successful.",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "role": user.role,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "role": user.role,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
+
+class PatientGoogleAuthView(APIView):
+    """
+    Public — verifies Google ID token from Sign-In JS SDK.
+    Patient-only: registers new patient or logs in existing patient.
+    Rejects staff users attempting Google Sign-In.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        client_id = getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "") or os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+        if not client_id:
+            return Response(
+                {"success": False, "error": "GOOGLE_OAUTH_CLIENT_ID is not configured on the server."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        token = request.data.get("id_token") or request.data.get("token")
+        if not token:
+            return Response(
+                {"success": False, "error": "id_token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            id_info = google_id_token.verify_oauth2_token(
+                token,
+                google_requests.Request(),
+                client_id
+            )
+        except Exception as e:
+            return Response(
+                {"success": False, "error": f"Invalid or expired Google ID token: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = id_info.get("email", "").strip().lower()
+        if not email:
+            return Response(
+                {"success": False, "error": "Google token does not contain a valid email address."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(email=email).first()
+
+        if user:
+            if user.role != User.RoleChoices.PATIENT:
+                return Response(
+                    {"success": False, "error": "Google Sign-In is only available for patient accounts."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            log_action(
+                user=user,
+                clinic=user.clinic,
+                action_type=AuditLog.ActionChoices.LOGIN,
+                object_type="User",
+                object_id=user.id,
+                description=f"Patient logged in via Google OAuth: {user.email}",
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
+        else:
+            with transaction.atomic():
+                first_name = id_info.get("given_name") or id_info.get("name", "")
+                last_name = id_info.get("family_name", "")
+
+                user = User.objects.create_user(
+                    email=email,
+                    role=User.RoleChoices.PATIENT,
+                    first_name=first_name.strip(),
+                    last_name=last_name.strip(),
+                )
+                user.set_unusable_password()
+                user.save()
+
+                Patient.objects.get_or_create(
+                    user=user,
+                    defaults={"phone": ""}
+                )
+
+                log_action(
+                    user=user,
+                    clinic=None,
+                    action_type=AuditLog.ActionChoices.CREATE,
+                    object_type="Patient",
+                    object_id=user.id,
+                    description=f"Patient self-registered via Google OAuth: {user.email}",
+                    ip_address=request.META.get("REMOTE_ADDR"),
+                )
+
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["clinic_id"] = user.clinic.id if user.clinic else None
+
+        return Response(
+            {
+                "success": True,
+                "message": "Google authentication successful.",
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
                 "role": user.role,

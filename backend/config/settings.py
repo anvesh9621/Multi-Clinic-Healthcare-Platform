@@ -273,3 +273,6 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# ── Google OAuth ──────────────────────────────────────────────────────────────
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
