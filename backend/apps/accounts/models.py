@@ -202,4 +202,15 @@ class EmailOTP(models.Model):
 
     def __str__(self):
         return f"OTP for {self.user_email} ({self.purpose}): {self.code}"
+
+
+class StaffMFA(models.Model):
+    user = models.OneToOneField("accounts.User", on_delete=models.CASCADE, related_name="mfa")
+    secret = models.CharField(max_length=32)
+    is_enabled = models.BooleanField(default=False)
+    backup_codes = models.JSONField(default=list)  # hashed, never plaintext
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"MFA for {self.user.email} ({'enabled' if self.is_enabled else 'pending'})"
 

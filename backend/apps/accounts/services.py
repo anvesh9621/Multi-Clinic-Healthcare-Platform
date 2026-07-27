@@ -115,3 +115,104 @@ def verify_otp(email: str, code: str, purpose: str) -> tuple[bool, str]:
     otp_obj.save(update_fields=["is_used"])
 
     return (True, "Verification successful.")
+
+
+import pyotp
+from django.contrib.auth.hashers import make_password, check_password
+from .models import StaffMFA, User
+
+
+def generate_mfa_secret(user: User) -> tuple[str, str]:
+    """
+    Generates or resets TOTP secret for a user (is_enabled=False until verified).
+    Returns (secret, provisioning_uri).
+    """
+    secret = pyotp.random_base32()
+    mfa, _ = StaffMFA.objects.get_or_create(user=user)
+    mfa.secret = secret
+    mfa.is_enabled = False
+    mfa.save()
+
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=user.email,
+        issuer_name="MediClinic"
+    )
+
+    return (secret, provisioning_uri)
+
+
+def generate_backup_codes(user: User) -> list[str]:
+    """
+    Generates 10 single-use backup codes, hashes them with Django's make_password,
+    stores them in StaffMFA.backup_codes, and returns the plaintext codes list.
+    """
+    mfa, _ = StaffMFA.objects.get_or_create(user=user)
+    plaintext_codes = []
+    hashed_codes = []
+
+    for _ in range(10):
+        raw_hex = secrets.token_hex(4).upper()
+        formatted_code = f"{raw_hex[:4]}-{raw_hex[4:]}"
+        plaintext_codes.append(formatted_code)
+        hashed_codes.append(make_password(formatted_code))
+
+    mfa.backup_codes = hashed_codes
+    mfa.save(update_fields=["backup_codes"])
+
+    return plaintext_codes
+
+
+def verify_totp(user: User, code: str) -> bool:
+    """
+    Verifies code against user's TOTP secret using pyotp's default time-window.
+    """
+    code = code.strip().replace(" ", "").replace("-", "")
+    mfa = StaffMFA.objects.filter(user=user).first()
+    if not mfa or not mfa.secret:
+        return False
+
+    totp = pyotp.TOTP(mfa.secret)
+    return totp.verify(code)
+
+
+def verify_backup_code(user: User, code: str) -> bool:
+    """
+    Checks code against user's hashed backup codes list.
+    If matched, removes the single-use code from the list and returns True.
+    """
+    code = code.strip().upper()
+    mfa = StaffMFA.objects.filter(user=user).first()
+    if not mfa or not mfa.backup_codes:
+        return False
+
+    backup_list = list(mfa.backup_codes)
+    for idx, hashed_code in enumerate(backup_list):
+        if check_password(code, hashed_code):
+            backup_list.pop(idx)
+            mfa.backup_codes = backup_list
+            mfa.save(update_fields=["backup_codes"])
+            return True
+
+    return False
+
+
+def enable_mfa(user: User, verification_code: str) -> tuple[bool, str, list[str]]:
+    """
+    Requires one successful TOTP code verification before flipping is_enabled=True.
+    Generates and returns fresh backup codes on initial enable.
+    Returns (success: bool, message: str, backup_codes: list[str])
+    """
+    mfa = StaffMFA.objects.filter(user=user).first()
+    if not mfa or not mfa.secret:
+        return (False, "MFA secret has not been generated yet. Please initiate setup first.", [])
+
+    if not verify_totp(user, verification_code):
+        return (False, "Invalid verification code. Please check your authenticator app and try again.", [])
+
+    mfa.is_enabled = True
+    mfa.save(update_fields=["is_enabled"])
+
+    plaintext_backup_codes = generate_backup_codes(user)
+
+    return (True, "MFA enabled successfully.", plaintext_backup_codes)
