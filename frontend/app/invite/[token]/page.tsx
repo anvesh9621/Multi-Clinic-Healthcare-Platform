@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useContext, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Lock, Eye, EyeOff, CheckCircle, AlertCircle, Stethoscope,
   User, Mail, Phone, Award, Globe, DollarSign, Loader2, BookOpen
 } from "lucide-react";
 import { checkInviteToken, acceptInvite } from "@/services/invitations";
+import { login, getCurrentUser } from "@/services/auth";
+import { AuthContext } from "@/context/AuthContext";
 
 interface InvitationData {
   email: string;
@@ -71,6 +73,8 @@ function RegistrationForm({ token }: { token: string }) {
   const removeLang = (lang: string) =>
     setLanguages(languages.filter((l) => l !== lang));
 
+  const { setUser } = useContext(AuthContext);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -101,7 +105,22 @@ function RegistrationForm({ token }: { token: string }) {
       };
 
       const res = await acceptInvite(payload);
-      setSuccess(res.email || "Account activated!");
+      const doctorEmail = res.email || inviteData?.email || "Account activated!";
+      setSuccess(doctorEmail);
+
+      // Auto-login newly created doctor account
+      if (doctorEmail) {
+        try {
+          await login(doctorEmail, password);
+          const userData = await getCurrentUser();
+          setUser(userData.data || userData);
+          setTimeout(() => {
+            router.push("/dashboard/appointments");
+          }, 1500);
+        } catch {
+          // Fallback if auto-login encounters network issue
+        }
+      }
     } catch (err: any) {
       const data = err.response?.data?.errors;
       if (data) {
@@ -152,19 +171,23 @@ function RegistrationForm({ token }: { token: string }) {
   if (success) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white border border-gray-100 p-8 rounded-3xl max-w-md w-full text-center shadow-2xl shadow-gray-200/50">
-          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white border border-gray-100 p-8 rounded-3xl max-w-md w-full text-center shadow-2xl shadow-gray-200/50 space-y-4">
+          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-2">
             <CheckCircle className="w-8 h-8 text-emerald-500" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Profile Completed!</h2>
-          <p className="text-gray-500 mb-6">
-            Your doctor account <span className="text-blue-600 font-medium">{success}</span> is now fully set up and ready to use.
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Profile Completed!</h2>
+          <p className="text-gray-500 text-sm">
+            Your doctor profile <span className="text-blue-600 font-medium">{success}</span> is set up and ready. Auto-logging you in...
           </p>
+          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 pt-2">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            Taking you to your dashboard...
+          </div>
           <button
-            onClick={() => router.push("/login")}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-md active:scale-[0.98]"
+            onClick={() => router.push("/dashboard/appointments")}
+            className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition-colors mt-2"
           >
-            Go to Login
+            Click here if not redirected
           </button>
         </div>
       </div>
