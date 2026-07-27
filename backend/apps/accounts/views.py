@@ -734,3 +734,210 @@ class MFAVerifyView(APIView):
                 "role": user.role,
             }
         }, status=status.HTTP_200_OK)
+
+
+from django.core.mail import send_mail
+
+
+class MFARecoverView(APIView):
+    """
+    Backup code recovery endpoint: accepts { email, backup_code }.
+    Validates backup code via verify_backup_code, issues JWT access + refresh tokens,
+    and returns remaining backup code count (prompt_regeneration=True if <= 2).
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        backup_code = (request.data.get("backup_code") or request.data.get("code") or "").strip()
+
+        if not email or not backup_code:
+            return Response(
+                {"success": False, "error": "Both email and backup_code are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(email=email).first()
+        if not user or user.role == User.RoleChoices.PATIENT:
+            return Response(
+                {"success": False, "error": "Invalid email or backup code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not verify_backup_code(user, backup_code):
+            return Response(
+                {"success": False, "error": "Invalid or already used backup code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        mfa = StaffMFA.objects.filter(user=user).first()
+        remaining_count = len(mfa.backup_codes) if mfa and mfa.backup_codes else 0
+        prompt_regeneration = remaining_count <= 2
+
+        log_action(
+            user=user,
+            clinic=user.clinic,
+            action_type=AuditLog.ActionChoices.LOGIN,
+            object_type="User",
+            object_id=user.id,
+            description=f"Staff recovered login via backup code: {user.email}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["clinic_id"] = user.clinic.id if user.clinic else None
+
+        return Response(
+            {
+                "success": True,
+                "message": "Backup code recovery successful.",
+                "remaining_backup_codes": remaining_count,
+                "prompt_regeneration": prompt_regeneration,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "role": user.role,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "role": user.role,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class MFAResetRequestView(APIView):
+    """
+    Lost-everything recovery request endpoint: accepts { email }.
+    Notifies the user's Clinic Admin (or Super Admin if requester is Clinic Admin/Super Admin).
+    Does NOT auto-reset MFA to prevent account takeover risks.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        if not email:
+            return Response(
+                {"success": False, "error": "Email is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(email=email).first()
+        if user and user.role != User.RoleChoices.PATIENT:
+            # Determine notification recipient emails
+            if user.role in [User.RoleChoices.DOCTOR, User.RoleChoices.RECEPTIONIST]:
+                admin_qs = User.objects.filter(clinic=user.clinic, role=User.RoleChoices.CLINIC_ADMIN)
+                target_emails = list(admin_qs.values_list("email", flat=True))
+                if not target_emails:
+                    sa_qs = User.objects.filter(role=User.RoleChoices.SUPER_ADMIN)
+                    target_emails = list(sa_qs.values_list("email", flat=True))
+            else:
+                sa_qs = User.objects.filter(role=User.RoleChoices.SUPER_ADMIN)
+                target_emails = list(sa_qs.values_list("email", flat=True))
+
+            if target_emails:
+                try:
+                    send_mail(
+                        subject=f"MediClinic Alert: MFA Reset Requested by {user.email}",
+                        message=(
+                            f"Hello Administrator,\n\n"
+                            f"A manual MFA reset has been requested for staff account: {user.email} ({user.role}).\n\n"
+                            f"Please verify the requester's identity before resetting their MFA via the Admin Dashboard.\n\n"
+                            f"— MediClinic Security Team"
+                        ),
+                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@mediclinic.com"),
+                        recipient_list=target_emails,
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+
+            log_action(
+                user=user,
+                clinic=user.clinic,
+                action_type=AuditLog.ActionChoices.UPDATE,
+                object_type="StaffMFA",
+                object_id=user.id,
+                description=f"Staff requested MFA reset: {user.email}",
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
+
+        return Response(
+            {
+                "success": True,
+                "message": "If an active staff account is associated with this email, your administrator has been notified to assist with resetting your MFA.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class MFAAdminResetView(APIView):
+    """
+    Admin-only endpoint to manually reset a staff user's MFA.
+    Clinic Admins can reset Doctor/Receptionist in their clinic.
+    Super Admins can reset any staff user's MFA.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_id = request.data.get("user_id")
+        target_email = request.data.get("email")
+
+        if user_id:
+            target_user = User.objects.filter(id=user_id).first()
+        elif target_email:
+            target_user = User.objects.filter(email=target_email.strip().lower()).first()
+        else:
+            return Response(
+                {"success": False, "error": "user_id or email is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not target_user or target_user.role == User.RoleChoices.PATIENT:
+            return Response(
+                {"success": False, "error": "Target staff user not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        requester = request.user
+
+        # Permission checks
+        if requester.role == User.RoleChoices.CLINIC_ADMIN:
+            if target_user.clinic_id != requester.clinic_id or target_user.role not in [
+                User.RoleChoices.DOCTOR,
+                User.RoleChoices.RECEPTIONIST,
+            ]:
+                return Response(
+                    {"success": False, "error": "You do not have permission to reset MFA for this user."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        elif requester.role == User.RoleChoices.SUPER_ADMIN:
+            pass  # Allowed
+        else:
+            return Response(
+                {"success": False, "error": "Only Clinic Admins and Super Admins can reset staff MFA."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        StaffMFA.objects.filter(user=target_user).delete()
+
+        log_action(
+            user=requester,
+            clinic=target_user.clinic,
+            action_type=AuditLog.ActionChoices.UPDATE,
+            object_type="StaffMFA",
+            object_id=target_user.id,
+            description=f"Admin {requester.email} reset MFA for staff user {target_user.email}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        return Response(
+            {
+                "success": True,
+                "message": f"MFA for {target_user.email} has been reset successfully. They will be prompted to set up MFA on their next login.",
+            },
+            status=status.HTTP_200_OK,
+        )
