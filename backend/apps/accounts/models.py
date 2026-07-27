@@ -172,4 +172,34 @@ class ClinicAdminInvitation(models.Model):
 
     def __str__(self):
         return f"Clinic Admin Invite: {self.email} to {self.clinic.name} ({self.status})"
+
+
+class EmailOTP(models.Model):
+    PURPOSE_CHOICES = [
+        ("REGISTER", "Registration"),
+        ("LOGIN", "Login"),
+    ]
+
+    user_email = models.EmailField()
+    code = models.CharField(max_length=6)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            from django.utils import timezone
+            from datetime import timedelta
+            self.expires_at = timezone.now() + timedelta(minutes=10)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        from django.utils import timezone
+        return not self.is_used and self.attempts < 5 and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"OTP for {self.user_email} ({self.purpose}): {self.code}"
 
