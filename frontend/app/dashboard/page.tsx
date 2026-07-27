@@ -26,10 +26,12 @@ export default function DashboardPage() {
         router.push("/dashboard/appointments");
     } else if (user && user.role === "SUPER_ADMIN") {
         router.push("/dashboard/super-admin");
+    } else if (user && user.role === "RECEPTIONIST") {
+        router.push("/dashboard/receptionist/queue");
     }
   }, [user, router]);
 
-  const isAuthorized = user && !["PATIENT", "DOCTOR", "SUPER_ADMIN"].includes(user.role);
+  const isAuthorized = user && !["PATIENT", "DOCTOR", "SUPER_ADMIN", "RECEPTIONIST"].includes(user.role);
 
   const { data, isLoading: loading, isError: error, refetch } = useQuery<{
     stats: ClinicDashboardStats;

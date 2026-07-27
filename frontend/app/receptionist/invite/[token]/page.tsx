@@ -125,7 +125,7 @@ export default function ReceptionistAcceptInvitePage() {
           const userData = await getCurrentUser();
           setUser(userData.data || userData);
           setTimeout(() => {
-            router.push("/dashboard/receptionist");
+            router.push("/dashboard/receptionist/queue");
           }, 1500);
         } catch {
           // Fallback to manual login redirect
