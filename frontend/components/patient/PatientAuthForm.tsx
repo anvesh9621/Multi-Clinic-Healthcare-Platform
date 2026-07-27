@@ -277,7 +277,16 @@ export function PatientAuthForm({ initialPurpose = "LOGIN" }: PatientAuthFormPro
     setError("");
 
     try {
-      await login(email, password);
+      const res = await login(email, password);
+      if (res.mfa_required) {
+        if (res.mfa_setup_required) {
+          router.push("/mfa/setup");
+        } else {
+          router.push("/mfa/verify");
+        }
+        return;
+      }
+
       const userRes = await getCurrentUser();
       const user = userRes.data || userRes;
       setUser(user);
