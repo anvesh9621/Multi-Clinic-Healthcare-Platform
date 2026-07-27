@@ -3,7 +3,8 @@ from .views import (
     MeView, PasswordResetRequestView, PasswordResetConfirmView,
     SuperAdminCreateClinicAdminView, SuperAdminImpersonateView,
     ClinicAdminInvitationStatusView, ClinicAdminInviteAcceptView,
-    PatientOTPRequestView, PatientOTPVerifyView, PatientGoogleAuthView
+    PatientOTPRequestView, PatientOTPVerifyView, PatientGoogleAuthView,
+    MFASetupView, MFAConfirmView, MFAVerifyView
 )
 
 urlpatterns = [
@@ -16,5 +17,8 @@ urlpatterns = [
     path("patient/otp/request/", PatientOTPRequestView.as_view(), name="patient-otp-request"),
     path("patient/otp/verify/", PatientOTPVerifyView.as_view(), name="patient-otp-verify"),
     path("patient/google/", PatientGoogleAuthView.as_view(), name="patient-google-auth"),
+    path("mfa/setup/", MFASetupView.as_view(), name="mfa-setup"),
+    path("mfa/confirm/", MFAConfirmView.as_view(), name="mfa-confirm"),
+    path("mfa/verify/", MFAVerifyView.as_view(), name="mfa-verify"),
     path("impersonate/", SuperAdminImpersonateView.as_view(), name="impersonate-admin"),
 ]

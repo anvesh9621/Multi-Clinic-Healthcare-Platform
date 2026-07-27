@@ -18,6 +18,19 @@ from apps.audit.models import AuditLog
 from apps.accounts.models import User
 
 
+import jwt
+import datetime
+from datetime import timedelta
+from rest_framework_simplejwt.tokens import RefreshToken
+from .models import StaffMFA
+from .services import (
+    generate_mfa_secret,
+    enable_mfa,
+    verify_totp,
+    verify_backup_code,
+)
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
 
     serializer_class = CustomTokenObtainPairSerializer
@@ -27,20 +40,48 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        email = request.data.get("email")
+        email = request.data.get("email", "").strip().lower()
         user = User.objects.get(email=email)
 
-        log_action(
-            user=user,
-            clinic=user.clinic,
-            action_type=AuditLog.ActionChoices.LOGIN,
-            object_type="User",
-            object_id=user.id,
-            description="User logged in",
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
+        # Patients skip Staff MFA and get direct JWT tokens
+        if user.role == User.RoleChoices.PATIENT:
+            log_action(
+                user=user,
+                clinic=user.clinic,
+                action_type=AuditLog.ActionChoices.LOGIN,
+                object_type="User",
+                object_id=user.id,
+                description="Patient logged in via password",
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
+            return Response(data)
 
-        return Response(data)
+        # Staff roles (CLINIC_ADMIN, DOCTOR, RECEPTIONIST, SUPER_ADMIN) require MFA
+        mfa = StaffMFA.objects.filter(user=user).first()
+        is_mfa_enabled = mfa is not None and mfa.is_enabled
+
+        action = "mfa_verify" if is_mfa_enabled else "mfa_setup"
+        payload = {
+            "token_type": "mfa_pending",
+            "user_id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "action": action,
+            "exp": datetime.datetime.now(datetime.timezone.utc) + timedelta(minutes=5),
+            "iat": datetime.datetime.now(datetime.timezone.utc),
+        }
+        pending_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+        return Response({
+            "mfa_required": True,
+            "mfa_setup_required": not is_mfa_enabled,
+            "pending_token": pending_token,
+            "message": (
+                "MFA verification required."
+                if is_mfa_enabled else
+                "MFA setup is mandatory for staff accounts before accessing the system."
+            )
+        }, status=status.HTTP_200_OK)
 
 
 class MeView(APIView):
@@ -525,3 +566,171 @@ class PatientGoogleAuthView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+def parse_mfa_pending_token(request, required_actions=("mfa_setup", "mfa_verify")):
+    token = request.data.get("pending_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+
+    if not token:
+        return None, "pending_token is required."
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        if payload.get("token_type") != "mfa_pending":
+            return None, "Invalid token type."
+        if payload.get("action") not in required_actions:
+            return None, f"Token action '{payload.get('action')}' is not authorized for this operation."
+
+        user_id = payload.get("user_id")
+        user = User.objects.filter(id=user_id).first()
+        if not user:
+            return None, "User associated with token not found."
+
+        if user.role == User.RoleChoices.PATIENT:
+            return None, "MFA endpoints are only available for staff accounts."
+
+        return user, None
+    except jwt.ExpiredSignatureError:
+        return None, "Pending MFA session expired. Please log in again."
+    except jwt.InvalidTokenError:
+        return None, "Invalid pending MFA token."
+
+
+class MFASetupView(APIView):
+    """
+    Generates MFA secret + provisioning URI for QR code rendering.
+    Accessible via authenticated staff user OR a valid pending MFA token.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if request.user and request.user.is_authenticated and request.user.role != User.RoleChoices.PATIENT:
+            user = request.user
+        else:
+            user, err = parse_mfa_pending_token(request, required_actions=["mfa_setup", "mfa_verify"])
+            if err:
+                return Response({"success": False, "error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+        secret, provisioning_uri = generate_mfa_secret(user)
+
+        return Response({
+            "success": True,
+            "secret": secret,
+            "provisioning_uri": provisioning_uri,
+            "message": "Scan the QR code or enter secret into your authenticator app, then confirm with a valid 6-digit code."
+        }, status=status.HTTP_200_OK)
+
+
+class MFAConfirmView(APIView):
+    """
+    Verifies TOTP code against the generated secret, calls enable_mfa,
+    and returns 10 single-use backup codes ONCE along with JWT access + refresh tokens.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if request.user and request.user.is_authenticated and request.user.role != User.RoleChoices.PATIENT:
+            user = request.user
+        else:
+            user, err = parse_mfa_pending_token(request, required_actions=["mfa_setup", "mfa_verify"])
+            if err:
+                return Response({"success": False, "error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+        code = request.data.get("code", "").strip()
+        if not code:
+            return Response({"success": False, "error": "Verification code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ok, msg, backup_codes = enable_mfa(user, code)
+        if not ok:
+            return Response({"success": False, "error": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        log_action(
+            user=user,
+            clinic=user.clinic,
+            action_type=AuditLog.ActionChoices.LOGIN,
+            object_type="User",
+            object_id=user.id,
+            description=f"Staff enrolled MFA: {user.email}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["clinic_id"] = user.clinic.id if user.clinic else None
+
+        return Response({
+            "success": True,
+            "message": "MFA enabled successfully.",
+            "backup_codes": backup_codes,
+            "backup_codes_notice": "SHOWN_ONLY_ONCE: Save these backup codes in a secure location. They will not be displayed again.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "role": user.role,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role,
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class MFAVerifyView(APIView):
+    """
+    Second step of staff login: verifies TOTP code or backup code against pending_token,
+    issues full JWT access + refresh tokens upon success.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        user, err = parse_mfa_pending_token(request, required_actions=["mfa_verify", "mfa_setup"])
+        if err:
+            return Response({"success": False, "error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+        code = request.data.get("code", "").strip()
+        if not code:
+            return Response({"success": False, "error": "Verification code or backup code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Try TOTP code verification
+        is_valid = verify_totp(user, code)
+
+        # 2. Try Backup Code verification if TOTP failed
+        if not is_valid:
+            is_valid = verify_backup_code(user, code)
+
+        if not is_valid:
+            return Response({"success": False, "error": "Invalid verification code or backup code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        log_action(
+            user=user,
+            clinic=user.clinic,
+            action_type=AuditLog.ActionChoices.LOGIN,
+            object_type="User",
+            object_id=user.id,
+            description=f"Staff logged in via MFA: {user.email}",
+            ip_address=request.META.get("REMOTE_ADDR"),
+        )
+
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["clinic_id"] = user.clinic.id if user.clinic else None
+
+        return Response({
+            "success": True,
+            "message": "MFA verification successful.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "role": user.role,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": user.role,
+            }
+        }, status=status.HTTP_200_OK)
