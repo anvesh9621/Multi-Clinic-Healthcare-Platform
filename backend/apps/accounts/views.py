@@ -136,39 +136,90 @@ class PasswordResetConfirmView(APIView):
         )
 
 from .permissions import IsSuperAdmin
-from .serializers import ClinicAdminCreateSerializer
+from .models import ClinicAdminInvitation
+from .serializers import (
+    ClinicAdminCreateSerializer,
+    ClinicAdminInvitationSerializer,
+    ClinicAdminAcceptInviteSerializer,
+)
 
 class SuperAdminCreateClinicAdminView(APIView):
     permission_classes = [IsSuperAdmin]
 
     def post(self, request):
-        serializer = ClinicAdminCreateSerializer(data=request.data)
+        serializer = ClinicAdminCreateSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(
                 {"success": False, "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        admin_user = serializer.save()
+        invite = serializer.save()
 
         log_action(
             user=request.user,
-            clinic=admin_user.clinic,
+            clinic=invite.clinic,
             action_type=AuditLog.ActionChoices.CREATE,
-            object_type="User",
-            object_id=admin_user.id,
-            description=f"Super Admin created clinic admin {admin_user.email}",
+            object_type="ClinicAdminInvitation",
+            object_id=invite.id,
+            description=f"Super Admin invited clinic admin {invite.email}",
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
         return Response(
             {
                 "success": True,
-                "message": "Clinic admin created successfully.",
-                "admin_id": admin_user.id,
+                "message": "Clinic admin invitation sent successfully.",
+                "invite_id": invite.id,
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class ClinicAdminInvitationStatusView(APIView):
+    """Public — checks if a clinic admin invite token is valid."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, token):
+        try:
+            invite = ClinicAdminInvitation.objects.get(token=token)
+            serializer = ClinicAdminInvitationSerializer(invite)
+            if not invite.is_valid:
+                error_msg = "This invitation has expired or has already been used."
+                if invite.status == "ACCEPTED":
+                    error_msg = "This invitation has already been accepted. You can log in with your credentials."
+                elif invite.status == "EXPIRED":
+                    error_msg = "This invitation link has expired. Please contact support or your system administrator."
+                elif invite.status == "CANCELLED":
+                    error_msg = "This invitation has been cancelled."
+
+                return Response(
+                    {"isValid": False, "error": error_msg, "status": invite.status, "invitation": serializer.data},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            return Response({"isValid": True, "invitation": serializer.data, "status": invite.status})
+
+        except ClinicAdminInvitation.DoesNotExist:
+            return Response({"isValid": False, "error": "Invalid invitation token.", "status": "NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class ClinicAdminInviteAcceptView(APIView):
+    """Public — clinic admin sets password to complete account creation."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ClinicAdminAcceptInviteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"success": False, "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+
+        return Response({
+            "success": True,
+            "message": "Clinic Admin account created successfully. You can now log in.",
+            "email": user.email,
+        })
 
 from rest_framework_simplejwt.tokens import RefreshToken
 

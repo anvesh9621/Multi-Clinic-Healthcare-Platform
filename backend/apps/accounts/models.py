@@ -133,4 +133,43 @@ class DoctorInviteToken(models.Model):
 
     def __str__(self):
         return f"Invite for {self.user.email} ({'used' if self.is_used else 'pending'})"
+
+
+class ClinicAdminInvitation(models.Model):
+    STATUS_CHOICES = (
+        ("PENDING", "Pending"),
+        ("ACCEPTED", "Accepted"),
+        ("EXPIRED", "Expired"),
+        ("CANCELLED", "Cancelled"),
+    )
+
+    clinic = models.ForeignKey(
+        "clinics.Clinic",
+        on_delete=models.CASCADE,
+        related_name="admin_invitations"
+    )
+    email = models.EmailField()
+    token = models.CharField(max_length=64, default=uuid.uuid4, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = ("clinic", "email", "status")
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            from django.utils import timezone
+            from datetime import timedelta
+            self.expires_at = timezone.now() + timedelta(hours=48)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        from django.utils import timezone
+        return self.status == "PENDING" and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"Clinic Admin Invite: {self.email} to {self.clinic.name} ({self.status})"
 

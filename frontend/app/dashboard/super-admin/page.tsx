@@ -110,7 +110,7 @@ export default function SuperAdminDashboard() {
     enabled: isAdminModalOpen && !!user && user.role === "SUPER_ADMIN",
   });
   const [adminFormData, setAdminFormData] = useState({
-    first_name: "", last_name: "", email: "", password: "", clinic_id: "",
+    email: "", clinic_id: "",
   });
   const [adminFormLoading, setAdminFormLoading] = useState(false);
   const [adminFormError, setAdminFormError] = useState("");
@@ -158,16 +158,20 @@ export default function SuperAdminDashboard() {
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault(); setAdminFormLoading(true); setAdminFormError(""); setAdminFormSuccess("");
     try {
-      await apiClient.post("/accounts/clinic-admins/create/", adminFormData);
-      setAdminFormSuccess("Clinic Admin created successfully!");
-      setAdminFormData({ first_name: "", last_name: "", email: "", password: "", clinic_id: "" });
+      await apiClient.post("/accounts/clinic-admins/create/", {
+        email: adminFormData.email.trim().toLowerCase(),
+        clinic_id: adminFormData.clinic_id,
+      });
+      setAdminFormSuccess("Clinic Admin invitation sent successfully! They will receive an email link.");
+      setAdminFormData({ email: "", clinic_id: "" });
       setTimeout(() => setIsAdminModalOpen(false), 2000);
       queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
     } catch (err: any) {
       const apiErrors = err.response?.data?.errors;
       if (apiErrors?.non_field_errors) setAdminFormError(apiErrors.non_field_errors[0]);
+      else if (apiErrors?.email) setAdminFormError(apiErrors.email[0]);
       else if (apiErrors?.clinic_id) setAdminFormError(apiErrors.clinic_id[0]);
-      else setAdminFormError("Failed to create Clinic Admin.");
+      else setAdminFormError(err.response?.data?.error || "Failed to invite Clinic Admin.");
     } finally { setAdminFormLoading(false); }
   };
 
@@ -469,29 +473,16 @@ export default function SuperAdminDashboard() {
         </form>
       </Modal>
 
-      {/* Create Clinic Admin Modal */}
-      <Modal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} title="Assign Tenant Admin" className="max-w-md">
+      {/* Invite Clinic Admin Modal */}
+      <Modal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} title="Invite Tenant Admin" className="max-w-md">
         <form onSubmit={handleCreateAdmin} className="space-y-4">
           {adminFormError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-xl">{adminFormError}</div>}
           {adminFormSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl">{adminFormSuccess}</div>}
           
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-ink mb-1">First Name *</label>
-              <Input type="text" required value={adminFormData.first_name} onChange={(e) => setAdminFormData({ ...adminFormData, first_name: e.target.value })} />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-ink mb-1">Last Name *</label>
-              <Input type="text" required value={adminFormData.last_name} onChange={(e) => setAdminFormData({ ...adminFormData, last_name: e.target.value })} />
-            </div>
-          </div>
           <div>
             <label className="block text-sm font-bold text-ink mb-1">Email *</label>
-            <Input type="email" required value={adminFormData.email} onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })} />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-ink mb-1">Password *</label>
-            <Input type="password" required minLength={8} value={adminFormData.password} onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })} />
+            <Input type="email" required placeholder="admin@clinic.com" value={adminFormData.email} onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })} />
+            <p className="text-xs text-muted mt-1">An invitation link will be sent to set up their profile and password.</p>
           </div>
           <div>
             <label className="block text-sm font-bold text-ink mb-1">Assign to Tenant *</label>
@@ -505,7 +496,7 @@ export default function SuperAdminDashboard() {
 
           <div className="pt-4 flex gap-3 justify-end">
             <Button type="button" variant="secondary" onClick={() => setIsAdminModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={adminFormLoading}>{adminFormLoading ? "Creating..." : "Assign Admin"}</Button>
+            <Button type="submit" disabled={adminFormLoading}>{adminFormLoading ? "Sending..." : "Send Invitation"}</Button>
           </div>
         </form>
       </Modal>
