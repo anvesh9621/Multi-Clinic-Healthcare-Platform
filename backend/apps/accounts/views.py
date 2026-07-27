@@ -254,3 +254,158 @@ class SuperAdminImpersonateView(APIView):
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         })
+
+
+from django.db import transaction
+from apps.patients.models import Patient
+from .services import generate_and_send_otp, verify_otp
+
+class PatientOTPRequestView(APIView):
+    """
+    Public — requests a 6-digit Email OTP for patient registration or login.
+    Rejects REGISTER if email is already a User; rejects LOGIN if email is not a User.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        purpose = request.data.get("purpose", "").strip().upper()
+
+        if not email or not purpose:
+            return Response(
+                {"success": False, "error": "Email and purpose ('REGISTER' or 'LOGIN') are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if purpose not in ["REGISTER", "LOGIN"]:
+            return Response(
+                {"success": False, "error": "Purpose must be either 'REGISTER' or 'LOGIN'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_exists = User.objects.filter(email=email).exists()
+
+        if purpose == "REGISTER" and user_exists:
+            return Response(
+                {"success": False, "error": "An account with this email already exists. Please log in instead."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if purpose == "LOGIN" and not user_exists:
+            return Response(
+                {"success": False, "error": "No account found with this email address. Please register first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ok, msg, _ = generate_and_send_otp(email, purpose)
+        if not ok:
+            return Response({"success": False, "error": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"success": True, "message": msg}, status=status.HTTP_200_OK)
+
+
+class PatientOTPVerifyView(APIView):
+    """
+    Public — verifies Email OTP for patient registration or login.
+    On REGISTER success: creates User (role=PATIENT, no password set) + Patient profile and issues JWT.
+    On LOGIN success: issues JWT for the existing User.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        code = request.data.get("code", "").strip()
+        purpose = request.data.get("purpose", "").strip().upper()
+
+        if not email or not code or not purpose:
+            return Response(
+                {"success": False, "error": "Email, code, and purpose are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if purpose not in ["REGISTER", "LOGIN"]:
+            return Response(
+                {"success": False, "error": "Purpose must be either 'REGISTER' or 'LOGIN'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ok, msg = verify_otp(email, code, purpose)
+        if not ok:
+            return Response({"success": False, "error": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+        if purpose == "REGISTER":
+            with transaction.atomic():
+                if User.objects.filter(email=email).exists():
+                    return Response(
+                        {"success": False, "error": "An account with this email already exists."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                first_name = request.data.get("first_name", "").strip()
+                last_name = request.data.get("last_name", "").strip()
+                phone = request.data.get("phone", "").strip()
+
+                user = User.objects.create_user(
+                    email=email,
+                    role=User.RoleChoices.PATIENT,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+                user.set_unusable_password()
+                user.save()
+
+                Patient.objects.get_or_create(
+                    user=user,
+                    defaults={"phone": phone}
+                )
+
+                log_action(
+                    user=user,
+                    clinic=None,
+                    action_type=AuditLog.ActionChoices.CREATE,
+                    object_type="Patient",
+                    object_id=user.id,
+                    description=f"Patient self-registered via Email OTP: {user.email}",
+                    ip_address=request.META.get("REMOTE_ADDR"),
+                )
+
+        else:  # LOGIN
+            user = User.objects.filter(email=email).first()
+            if not user:
+                return Response(
+                    {"success": False, "error": "No account found for this email address."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            log_action(
+                user=user,
+                clinic=user.clinic,
+                action_type=AuditLog.ActionChoices.LOGIN,
+                object_type="User",
+                object_id=user.id,
+                description=f"Patient logged in via Email OTP: {user.email}",
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
+
+        # Issue JWT tokens
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["clinic_id"] = user.clinic.id if user.clinic else None
+
+        return Response(
+            {
+                "success": True,
+                "message": "Authentication successful.",
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "role": user.role,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "role": user.role,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
