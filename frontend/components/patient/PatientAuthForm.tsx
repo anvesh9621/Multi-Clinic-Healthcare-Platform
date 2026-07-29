@@ -68,11 +68,18 @@ export function PatientAuthForm({ initialPurpose = "LOGIN" }: PatientAuthFormPro
     return () => clearInterval(interval);
   }, [cooldownTimer]);
 
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
   // Google Sign-In SDK Initialization
   useEffect(() => {
-    const googleClientId =
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-      "test-client-id.apps.googleusercontent.com";
+    if (!googleClientId) {
+      console.error(
+        "NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set — Google Sign-In will not work. " +
+        "Add it to .env.local (frontend) — this is separate from the backend's " +
+        "GOOGLE_OAUTH_CLIENT_ID."
+      );
+      return; // don't attempt to initialize with an invalid ID
+    }
 
     // Load Google Identity Services script
     const scriptId = "google-jssdk";
@@ -137,7 +144,7 @@ export function PatientAuthForm({ initialPurpose = "LOGIN" }: PatientAuthFormPro
     } else {
       initializeGoogleBtn();
     }
-  }, [setUser, router, redirectTarget]);
+  }, [setUser, router, redirectTarget, googleClientId]);
 
   // Request OTP (Step 1)
   const handleRequestOTP = async (e: React.FormEvent) => {
@@ -315,7 +322,7 @@ export function PatientAuthForm({ initialPurpose = "LOGIN" }: PatientAuthFormPro
           {authMode === "password"
             ? "Sign in with your registered email and password"
             : otpStep === 1
-            ? "Quick & secure sign-in with Email OTP or Google"
+            ? (googleClientId ? "Quick & secure sign-in with Email OTP or Google" : "Quick & secure sign-in with Email OTP")
             : `We sent a 6-digit code to ${email}`}
         </p>
       </div>
@@ -377,20 +384,23 @@ export function PatientAuthForm({ initialPurpose = "LOGIN" }: PatientAuthFormPro
                 )}
               </Button>
 
-              {/* Divider */}
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-paper px-3 text-muted font-medium">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
+              {/* Divider & Google Sign-In Container */}
+              {googleClientId && (
+                <>
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-paper px-3 text-muted font-medium">
+                        Or continue with
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Google Sign-In Container */}
-              <div id="google-signin-container" className="w-full min-h-[44px] flex justify-center" />
+                  <div id="google-signin-container" className="w-full min-h-[44px] flex justify-center" />
+                </>
+              )}
             </form>
           )}
 
