@@ -8,6 +8,7 @@ import { CheckCircle2, AlertTriangle, Building, CreditCard, Landmark, FileText, 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { FormLegend } from "@/components/ui/FormLegend";
 
 export default function BankAccountPage() {
   const { user } = useContext(AuthContext);
@@ -133,9 +134,12 @@ export default function BankAccountPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <FormLegend />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-ink mb-2">Account Holder Name *</label>
+                  <label className="block text-sm font-bold text-ink mb-2">
+                    Account Holder Name <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                  </label>
                   <Input
                     type="text"
                     name="bank_account_name"
@@ -149,7 +153,9 @@ export default function BankAccountPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-ink mb-2">Account Number *</label>
+                  <label className="block text-sm font-bold text-ink mb-2">
+                    Account Number <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                  </label>
                   <Input
                     type="text"
                     name="bank_account_number"
@@ -162,7 +168,9 @@ export default function BankAccountPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-ink mb-2">IFSC Code *</label>
+                  <label className="block text-sm font-bold text-ink mb-2">
+                    IFSC Code <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                  </label>
                   <Input
                     type="text"
                     name="bank_ifsc"
@@ -176,7 +184,9 @@ export default function BankAccountPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-ink mb-2">Business PAN *</label>
+                  <label className="block text-sm font-bold text-ink mb-2">
+                    Business PAN <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                  </label>
                   <Input
                     type="text"
                     name="business_pan"

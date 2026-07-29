@@ -174,10 +174,13 @@ export default function DoctorSchedulePage() {
           <div className="p-5 border-b border-border">
             <form onSubmit={handleAddSchedule} className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Day</label>
+                <label className="block text-xs font-bold text-ink mb-1">
+                  Day <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
                 <select 
                   value={dayOfWeek} onChange={e => setDayOfWeek(e.target.value)}
                   className={`${selectClass} w-32`}
+                  required
                 >
                   {DAYS_OF_WEEK.map((day, idx) => (
                       <option key={idx} value={idx}>{day}</option>
@@ -185,21 +188,27 @@ export default function DoctorSchedulePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Start</label>
+                <label className="block text-xs font-bold text-ink mb-1">
+                  Start <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
                 <Input 
                   type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required
                   className="py-1.5"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">End</label>
+                <label className="block text-xs font-bold text-ink mb-1">
+                  End <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
                 <Input 
                   type="time" value={endTime} onChange={e => setEndTime(e.target.value)} required
                   className="py-1.5"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-ink mb-1">Slot (min)</label>
+                <label className="block text-xs font-bold text-ink mb-1">
+                  Slot (min) <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                </label>
                 <Input 
                   type="number" value={slotDuration} onChange={e => setSlotDuration(e.target.value)} required min="5" step="5"
                   className="w-20 py-1.5"
@@ -257,14 +266,18 @@ export default function DoctorSchedulePage() {
              <form onSubmit={handleAddLeave} className="space-y-4">
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-xs font-bold text-ink mb-1">Start Date</label>
+                    <label className="block text-xs font-bold text-ink mb-1">
+                      Start Date <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                    </label>
                     <Input 
                       type="date" value={leaveStartDate} onChange={e => setLeaveStartDate(e.target.value)} required min={new Date().toISOString().split("T")[0]}
                       className="py-1.5"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-xs font-bold text-ink mb-1">End Date</label>
+                    <label className="block text-xs font-bold text-ink mb-1">
+                      End Date <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+                    </label>
                     <Input 
                       type="date" value={leaveEndDate} onChange={e => setLeaveEndDate(e.target.value)} required min={leaveStartDate || new Date().toISOString().split("T")[0]}
                       className="py-1.5"

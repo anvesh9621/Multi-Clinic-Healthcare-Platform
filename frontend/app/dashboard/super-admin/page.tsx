@@ -34,6 +34,7 @@ import { Card } from "@/components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { FormLegend } from "@/components/ui/FormLegend";
 
 interface ClinicRow {
   id: number;
@@ -446,19 +447,26 @@ export default function SuperAdminDashboard() {
       {/* Create Clinic Modal */}
       <Modal isOpen={isClinicModalOpen} onClose={() => setIsClinicModalOpen(false)} title="Create Tenant" className="max-w-md">
         <form onSubmit={handleCreateClinic} className="space-y-4">
+          <FormLegend />
           {clinicFormError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-xl">{clinicFormError}</div>}
           {clinicFormSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl">{clinicFormSuccess}</div>}
           
           <div>
-            <label className="block text-sm font-bold text-ink mb-1">Clinic Name *</label>
+            <label className="block text-sm font-bold text-ink mb-1">
+              Clinic Name <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
             <Input type="text" required value={clinicFormData.name} onChange={(e) => setClinicFormData({ ...clinicFormData, name: e.target.value })} placeholder="City Health Care" />
           </div>
           <div>
-            <label className="block text-sm font-bold text-ink mb-1">Address *</label>
+            <label className="block text-sm font-bold text-ink mb-1">
+              Address <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
             <textarea required rows={2} value={clinicFormData.address} onChange={(e) => setClinicFormData({ ...clinicFormData, address: e.target.value })} className="w-full border border-border rounded-xl px-4 py-2.5 bg-warm-surface text-ink font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none shadow-sm text-sm" placeholder="Street address..." />
           </div>
           <div>
-            <label className="block text-sm font-bold text-ink mb-1">Subscription Plan *</label>
+            <label className="block text-sm font-bold text-ink mb-1">
+              Subscription Plan <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
             <select required value={clinicFormData.subscription_plan} onChange={(e) => setClinicFormData({ ...clinicFormData, subscription_plan: e.target.value })} className={selectClass}>
               <option value="BASIC">Basic</option>
               <option value="PRO">Pro</option>
@@ -476,16 +484,21 @@ export default function SuperAdminDashboard() {
       {/* Invite Clinic Admin Modal */}
       <Modal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} title="Invite Tenant Admin" className="max-w-md">
         <form onSubmit={handleCreateAdmin} className="space-y-4">
+          <FormLegend />
           {adminFormError && <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-xl">{adminFormError}</div>}
           {adminFormSuccess && <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold rounded-xl">{adminFormSuccess}</div>}
           
           <div>
-            <label className="block text-sm font-bold text-ink mb-1">Email *</label>
+            <label className="block text-sm font-bold text-ink mb-1">
+              Email <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
             <Input type="email" required placeholder="admin@clinic.com" value={adminFormData.email} onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })} />
             <p className="text-xs text-muted mt-1">An invitation link will be sent to set up their profile and password.</p>
           </div>
           <div>
-            <label className="block text-sm font-bold text-ink mb-1">Assign to Tenant *</label>
+            <label className="block text-sm font-bold text-ink mb-1">
+              Assign to Tenant <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
             <select required value={adminFormData.clinic_id} onChange={(e) => setAdminFormData({ ...adminFormData, clinic_id: e.target.value })} className={selectClass}>
               <option value="" disabled>Select a clinic</option>
               {clinics.map((clinic) => (

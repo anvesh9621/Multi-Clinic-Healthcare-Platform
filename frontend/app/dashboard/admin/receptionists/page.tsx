@@ -299,7 +299,7 @@ export default function ReceptionistsListPage() {
             <form onSubmit={handleSendInvite} className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-bold text-ink mb-2">
-                  Receptionist Email Address *
+                  Receptionist Email Address <span className="text-red-500 ml-1" aria-hidden="true">*</span>
                 </label>
                 <Input
                   type="email"

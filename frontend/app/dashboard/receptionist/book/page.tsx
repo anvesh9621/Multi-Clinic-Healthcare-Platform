@@ -9,6 +9,7 @@ import { AuthContext } from "@/context/AuthContext";
 import { CalendarCheck, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { FormLegend } from "@/components/ui/FormLegend";
 
 import { DoctorEntry, Patient } from "@/types/api";
 
@@ -97,13 +98,16 @@ function BookingForm() {
       <Card className="p-8 space-y-8">
         <div>
           <h1 className="text-2xl font-bold text-ink tracking-tight heading-font">Book Appointment for Patient</h1>
-          <p className="text-muted mt-1">Schedule a new visit for a registered patient.</p>
+          <p className="text-muted mt-1 mb-3">Schedule a new visit for a registered patient.</p>
+          <FormLegend />
         </div>
 
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-bold text-ink mb-2">Patient *</label>
-            <select className={selectClass} value={patientId} onChange={(e) => setPatientId(e.target.value)}>
+            <label className="block text-sm font-bold text-ink mb-2">
+              Patient <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
+            <select className={selectClass} value={patientId} onChange={(e) => setPatientId(e.target.value)} required>
               <option value="">-- Select Patient --</option>
               {patients.map((pat) => (
                 <option key={pat.id} value={pat.id}>
@@ -114,8 +118,10 @@ function BookingForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-ink mb-2">Doctor *</label>
-            <select className={selectClass} onChange={(e) => setDoctorClinicId(Number(e.target.value))}>
+            <label className="block text-sm font-bold text-ink mb-2">
+              Doctor <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
+            <select className={selectClass} onChange={(e) => setDoctorClinicId(Number(e.target.value))} required>
               <option value="">-- Select Doctor --</option>
               {doctors.map((doc) => (
                 <option key={doc.id} value={doc.id}>
@@ -126,11 +132,14 @@ function BookingForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-ink mb-2">Date *</label>
+            <label className="block text-sm font-bold text-ink mb-2">
+              Date <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+            </label>
             <input
               type="date"
               className={selectClass}
               onChange={(e) => setDate(e.target.value)}
+              required
             />
           </div>
 

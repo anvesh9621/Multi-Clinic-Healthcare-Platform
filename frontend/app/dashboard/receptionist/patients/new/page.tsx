@@ -8,6 +8,7 @@ import { UserPlus, AlertCircle, Mail, Lock, Phone, Calendar, MapPin, UserCheck }
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { FormLegend } from "@/components/ui/FormLegend";
 
 export default function RegisterPatientPage() {
   const { user } = useContext(AuthContext);
@@ -57,7 +58,8 @@ export default function RegisterPatientPage() {
       <Card className="p-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink heading-font mb-2">Register New Patient</h1>
-          <p className="text-muted text-sm mb-6">Create a profile for a new patient to book consultations.</p>
+          <p className="text-muted text-sm mb-4">Create a profile for a new patient to book consultations.</p>
+          <FormLegend />
         </div>
 
         {error && (
@@ -70,7 +72,9 @@ export default function RegisterPatientPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-bold text-ink mb-2">Email Address *</label>
+              <label className="block text-sm font-bold text-ink mb-2">
+                Email Address <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+              </label>
               <Input
                 type="email"
                 name="email"
@@ -83,7 +87,9 @@ export default function RegisterPatientPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-ink mb-2">Temporary Password *</label>
+              <label className="block text-sm font-bold text-ink mb-2">
+                Temporary Password <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+              </label>
               <Input
                 type="password"
                 name="password"
@@ -96,7 +102,9 @@ export default function RegisterPatientPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-ink mb-2">Phone Number *</label>
+              <label className="block text-sm font-bold text-ink mb-2">
+                Phone Number <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+              </label>
               <Input
                 type="text"
                 name="phone"

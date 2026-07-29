@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { FormLegend } from "@/components/ui/FormLegend";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -181,6 +182,8 @@ export default function PatientProfilePage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <FormLegend />
+
           {/* Personal Information */}
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -194,23 +197,29 @@ export default function PatientProfilePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-semibold text-ink mb-2">First Name</label>
+                <label className="block text-sm font-semibold text-ink mb-2">
+                  First Name <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                </label>
                 <Input
                   type="text"
                   name="first_name"
                   value={form.first_name}
                   onChange={handleChange}
                   placeholder="First name"
+                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-ink mb-2">Last Name</label>
+                <label className="block text-sm font-semibold text-ink mb-2">
+                  Last Name <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                </label>
                 <Input
                   type="text"
                   name="last_name"
                   value={form.last_name}
                   onChange={handleChange}
                   placeholder="Last name"
+                  required
                 />
               </div>
               <div>
@@ -254,13 +263,16 @@ export default function PatientProfilePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-semibold text-ink mb-2">Phone Number</label>
+                <label className="block text-sm font-semibold text-ink mb-2">
+                  Phone Number <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                </label>
                 <Input
                   type="tel"
                   name="phone"
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="+91 9876543210"
+                  required
                 />
               </div>
               <div>

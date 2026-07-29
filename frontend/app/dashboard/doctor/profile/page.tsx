@@ -9,6 +9,7 @@ import apiClient from "@/services/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { FormLegend } from "@/components/ui/FormLegend";
 
 const SPECIALIZATIONS = [
   "General Physician", "Cardiologist", "Dermatologist", "ENT Specialist",
@@ -213,6 +214,7 @@ export default function DoctorProfilePage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Personal Info */}
           <Card className="p-6">
+            <FormLegend />
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-primary/10 rounded-lg text-primary">
                 <User className="w-5 h-5" />
@@ -221,19 +223,25 @@ export default function DoctorProfilePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-bold text-ink mb-2">First Name</label>
+                <label className="block text-sm font-bold text-ink mb-2">
+                  First Name <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                </label>
                 <Input
                   type="text"
                   value={form.first_name || ""}
                   onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
+                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-ink mb-2">Last Name</label>
+                <label className="block text-sm font-bold text-ink mb-2">
+                  Last Name <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                </label>
                 <Input
                   type="text"
                   value={form.last_name || ""}
                   onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
+                  required
                 />
               </div>
               <div>
@@ -262,12 +270,15 @@ export default function DoctorProfilePage() {
             </div>
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-bold text-ink mb-2">Specialization</label>
+                <label className="block text-sm font-bold text-ink mb-2">
+                  Specialization <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+                </label>
                 <div className="relative">
                   <select
                     value={form.specialization || ""}
                     onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}
                     className={selectClass}
+                    required
                   >
                     <option value="">Select specialization…</option>
                     {SPECIALIZATIONS.map((s) => (

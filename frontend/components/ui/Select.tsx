@@ -1,13 +1,14 @@
 import React from 'react';
 import { cn } from './Button';
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  icon?: React.ReactNode;
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   helperText?: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
 }
 
-export function Input({ className, icon, label, required, helperText, ...props }: InputProps) {
+export function Select({ className, label, required, helperText, icon, children, ...props }: SelectProps) {
   return (
     <div className="w-full space-y-1.5">
       {label && (
@@ -22,26 +23,19 @@ export function Input({ className, icon, label, required, helperText, ...props }
             {icon}
           </div>
         )}
-        <input
+        <select
           required={required}
           className={cn(
-            "flex w-full rounded-lg border border-border bg-paper px-4 py-3 text-base text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed",
+            "flex w-full rounded-lg border border-border bg-paper px-4 py-3 text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed",
             icon && "pl-11",
             className
           )}
           {...props}
-        />
+        >
+          {children}
+        </select>
       </div>
       {helperText && <p className="text-xs text-muted mt-1">{helperText}</p>}
     </div>
-  );
-}
-
-export function Label({ children, required, className }: { children: React.ReactNode; required?: boolean; className?: string }) {
-  return (
-    <label className={cn("block text-sm font-semibold text-gray-700", className)}>
-      {children}
-      {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
-    </label>
   );
 }
