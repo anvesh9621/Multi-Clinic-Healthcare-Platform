@@ -150,17 +150,15 @@ class PatientOTPVerifyTests(APITestCase):
     def test_code_cannot_be_reused(self):
         """Code cannot be reused after successful verification (single-use)."""
         EmailOTP.objects.create(
-            user_email=self.new_email,
+            user_email=self.existing_patient.email,
             code="123456",
-            purpose="REGISTER",
+            purpose="LOGIN",
             expires_at=self.now + timedelta(minutes=10)
         )
         payload = {
-            "email": self.new_email,
+            "email": self.existing_patient.email,
             "code": "123456",
-            "purpose": "REGISTER",
-            "first_name": "New",
-            "last_name": "Patient"
+            "purpose": "LOGIN"
         }
         res1 = self.client.post(self.verify_url, payload)
         self.assertEqual(res1.status_code, status.HTTP_200_OK)
@@ -168,6 +166,7 @@ class PatientOTPVerifyTests(APITestCase):
         # Second verification with the same code fails because is_used=True
         res2 = self.client.post(self.verify_url, payload)
         self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("invalid or expired", res2.data.get("error", "").lower())
 
     def test_successful_register_creates_user_with_unusable_password(self):
         """Successful REGISTER creates a User with has_usable_password() returning False."""
