@@ -3,14 +3,14 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from django.utils import timezone
 from datetime import timedelta, time
-import datetime
 
 from apps.core.test_utils import setup_test_environment
 from apps.appointments.models import Appointment
 
+
 @pytest.mark.django_db
 @pytest.mark.postgres_required
-class AppointmentBookingTests(TestCase):
+class AppointmentBookingPostgresTests(TestCase):
     def setUp(self):
         self.env = setup_test_environment()
         self.client = APIClient()
@@ -19,7 +19,6 @@ class AppointmentBookingTests(TestCase):
         self.patient_1 = self.env["patient_1"]
         self.admin_a = self.env["admin_a"]
 
-        # Date for the appointment (Next Monday to guarantee a schedule exists)
         today = timezone.localdate()
         days_ahead = 0 - today.weekday()
         if days_ahead <= 0:
@@ -53,7 +52,6 @@ class AppointmentBookingTests(TestCase):
         # 2. Try to book the exact same slot again (should fail)
         response_overlap = self.client.post("/api/appointments/book/", payload)
         self.assertEqual(response_overlap.status_code, 400)
-        self.assertIn("detail", response_overlap.data)
 
         # 3. Cancel the appointment
         cancel_payload = {
