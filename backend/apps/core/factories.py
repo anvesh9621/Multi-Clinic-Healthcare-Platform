@@ -5,7 +5,7 @@ from datetime import date, time, timedelta
 from apps.clinics.models import Clinic
 from apps.accounts.models import User
 from apps.patients.models import Patient
-from apps.doctors.models import Doctor, DoctorClinic
+from apps.doctors.models import Doctor, DoctorClinic, DoctorSchedule
 from apps.subscriptions.models import Subscription
 from apps.appointments.models import Appointment
 
@@ -116,6 +116,24 @@ class DoctorClinicFactory(factory.django.DjangoModelFactory):
     doctor = SubFactory(DoctorProfileFactory)
     clinic = SubFactory(ClinicFactory)
     consultation_fee = 500
+
+
+class DoctorScheduleFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = DoctorSchedule
+
+    doctor_clinic = SubFactory(DoctorClinicFactory)
+    day_of_week = 0
+    start_time = time(9, 0)
+    end_time = time(17, 0)
+    slot_duration = 30
+
+
+def create_doctor_clinic_with_full_week_schedule(**kwargs):
+    doctor_clinic = DoctorClinicFactory(**kwargs)
+    for day in range(7):
+        DoctorScheduleFactory(doctor_clinic=doctor_clinic, day_of_week=day)
+    return doctor_clinic
 
 
 class PatientProfileFactory(factory.django.DjangoModelFactory):

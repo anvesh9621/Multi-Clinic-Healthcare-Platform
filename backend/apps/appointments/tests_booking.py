@@ -6,7 +6,12 @@ from django.utils.timezone import make_aware
 from datetime import datetime, timedelta, time
 from django.db import transaction, IntegrityError
 
-from apps.core.test_utils import setup_test_environment
+from apps.core.factories import (
+    ClinicFactory,
+    ClinicAdminFactory,
+    PatientProfileFactory,
+    create_doctor_clinic_with_full_week_schedule,
+)
 from apps.appointments.models import Appointment
 
 
@@ -14,12 +19,11 @@ from apps.appointments.models import Appointment
 @pytest.mark.postgres_required
 class AppointmentBookingPostgresTests(TestCase):
     def setUp(self):
-        self.env = setup_test_environment()
         self.client = APIClient()
-        self.clinic_a = self.env["clinic_a"]
-        self.doctor_a = self.env["doctor_a"]
-        self.patient_1 = self.env["patient_1"]
-        self.admin_a = self.env["admin_a"]
+        self.clinic_a = ClinicFactory()
+        self.admin_a = ClinicAdminFactory(clinic=self.clinic_a)
+        self.doctor_a = create_doctor_clinic_with_full_week_schedule(clinic=self.clinic_a)
+        self.patient_1 = PatientProfileFactory()
 
         today = timezone.localdate()
         days_ahead = 0 - today.weekday()

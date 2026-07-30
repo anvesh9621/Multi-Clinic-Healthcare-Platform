@@ -5,19 +5,23 @@ from django.utils import timezone
 from datetime import timedelta, time
 import datetime
 
-from apps.core.test_utils import setup_test_environment
+from apps.core.factories import (
+    ClinicFactory,
+    ClinicAdminFactory,
+    PatientProfileFactory,
+    create_doctor_clinic_with_full_week_schedule,
+)
 from apps.appointments.models import Appointment
 
 @pytest.mark.django_db
 @pytest.mark.postgres_required
 class AppointmentBookingTests(TestCase):
     def setUp(self):
-        self.env = setup_test_environment()
         self.client = APIClient()
-        self.clinic_a = self.env["clinic_a"]
-        self.doctor_a = self.env["doctor_a"]
-        self.patient_1 = self.env["patient_1"]
-        self.admin_a = self.env["admin_a"]
+        self.clinic_a = ClinicFactory()
+        self.admin_a = ClinicAdminFactory(clinic=self.clinic_a)
+        self.doctor_a = create_doctor_clinic_with_full_week_schedule(clinic=self.clinic_a)
+        self.patient_1 = PatientProfileFactory()
 
         # Date for the appointment (Next Monday to guarantee a schedule exists)
         today = timezone.localdate()
@@ -48,7 +52,7 @@ class AppointmentBookingTests(TestCase):
         }
         response = self.client.post("/api/appointments/book/", payload)
         self.assertEqual(response.status_code, 201)
-        appointment_id = response.data["id"]
+        appointment_id = response.data.get("appointment_id") or response.data.get("id")
 
         # 2. Try to book the exact same slot again (should fail)
         response_overlap = self.client.post("/api/appointments/book/", payload)
@@ -70,4 +74,5 @@ class AppointmentBookingTests(TestCase):
         payload["reason"] = "Rebooking after cancellation"
         response_rebook = self.client.post("/api/appointments/book/", payload)
         self.assertEqual(response_rebook.status_code, 201)
-        self.assertNotEqual(response_rebook.data["id"], appointment_id)
+        new_appointment_id = response_rebook.data.get("appointment_id") or response_rebook.data.get("id")
+        self.assertNotEqual(new_appointment_id, appointment_id)

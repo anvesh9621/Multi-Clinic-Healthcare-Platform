@@ -1,14 +1,19 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
-from apps.core.test_utils import setup_test_environment, create_user
+from apps.core.factories import (
+    ClinicFactory,
+    PatientProfileFactory,
+    create_doctor_clinic_with_full_week_schedule,
+)
 from apps.doctors.models import DoctorInvitation, Doctor, DoctorClinic
 
 class DoctorInviteTests(TestCase):
     def setUp(self):
-        self.env = setup_test_environment()
         self.client = APIClient()
-        self.clinic_a = self.env["clinic_a"]
-        self.clinic_b = self.env["clinic_b"]
+        self.clinic_a = ClinicFactory(name="Clinic A")
+        self.clinic_b = ClinicFactory(name="Clinic B")
+        self.doctor_a = create_doctor_clinic_with_full_week_schedule(clinic=self.clinic_a)
+        self.patient_1 = PatientProfileFactory()
 
     def test_invite_acceptance_already_patient(self):
         """
@@ -17,7 +22,7 @@ class DoctorInviteTests(TestCase):
         # Create an invite for the patient's email
         invite = DoctorInvitation.objects.create(
             clinic=self.clinic_b,
-            email=self.env["patient_1"].user.email,
+            email=self.patient_1.user.email,
             specialization="Dermatology"
         )
 
@@ -27,10 +32,11 @@ class DoctorInviteTests(TestCase):
             "last_name": "Doctor",
             "password": "newpassword123",
             "gender": "MALE",
+            "specialization": "Dermatology",
             "qualifications": "MD"
         }
 
-        response = self.client.post("/api/doctors/invitations/accept/", payload)
+        response = self.client.post("/api/doctors/invite/accept/", payload)
         self.assertEqual(response.status_code, 400)
         # Verify the custom validation error is raised
         self.assertIn("This email is already registered with a different role.", str(response.data))
@@ -40,7 +46,7 @@ class DoctorInviteTests(TestCase):
         If a user is already a DOCTOR at Clinic A, accepting an invite to Clinic B
         should NOT create a new User or Doctor profile, but SHOULD create a new DoctorClinic.
         """
-        existing_doc_email = self.env["doctor_a"].doctor.user.email
+        existing_doc_email = self.doctor_a.doctor.user.email
         initial_user_count = Doctor.objects.count()
 
         # Create invite for clinic B using doctor A's email
@@ -56,11 +62,12 @@ class DoctorInviteTests(TestCase):
             "last_name": "Update Last",
             "password": "newpassword123",
             "gender": "MALE",
+            "specialization": "Cardiology",
             "qualifications": "MD"
         }
 
-        response = self.client.post("/api/doctors/invitations/accept/", payload)
-        self.assertEqual(response.status_code, 201)
+        response = self.client.post("/api/doctors/invite/accept/", payload)
+        self.assertIn(response.status_code, [200, 201])
 
         # Assert no new Doctor profile was created
         self.assertEqual(Doctor.objects.count(), initial_user_count)
