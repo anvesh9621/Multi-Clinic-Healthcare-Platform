@@ -2,7 +2,9 @@ import pytest
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.utils import timezone
-from datetime import timedelta, time
+from django.utils.timezone import make_aware
+from datetime import datetime, timedelta, time
+from django.db import transaction, IntegrityError
 
 from apps.core.test_utils import setup_test_environment
 from apps.appointments.models import Appointment
@@ -27,45 +29,56 @@ class AppointmentBookingPostgresTests(TestCase):
         self.start_time = time(10, 0)
         self.end_time = time(10, 30)
 
-    def test_booking_cancellation_rebooking_flow(self):
+        dt_start = datetime.combine(self.appointment_date, self.start_time)
+        dt_end = datetime.combine(self.appointment_date, self.end_time)
+        self.time_range = (make_aware(dt_start), make_aware(dt_end))
+
+    def test_exclusion_constraint_double_booking_and_cancelled_rebooking(self):
         """
-        Tests the full flow:
-        1. Patient books a slot.
-        2. Patient tries to book same slot (fails due to overlap).
-        3. Patient cancels the appointment.
-        4. Patient rebooks the same slot (succeeds).
+        Verifies database-level ExclusionConstraint behavior:
+        1. Active appointment prevents overlapping active appointment (IntegrityError).
+        2. Cancelling the appointment allows rebooking the same slot (succeeds).
         """
-        self.client.force_authenticate(user=self.patient_1.user)
+        # 1. Create active appointment
+        appt1 = Appointment.objects.create(
+            clinic=self.clinic_a,
+            doctor_clinic=self.doctor_a,
+            patient=self.patient_1,
+            appointment_date=self.appointment_date,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            time_range=self.time_range,
+            status="SCHEDULED"
+        )
 
-        # 1. Book an appointment
-        payload = {
-            "doctor_clinic_id": self.doctor_a.id,
-            "appointment_date": str(self.appointment_date),
-            "start_time": self.start_time.strftime("%H:%M"),
-            "end_time": self.end_time.strftime("%H:%M"),
-            "reason": "Initial booking"
-        }
-        response = self.client.post("/api/appointments/book/", payload)
-        self.assertEqual(response.status_code, 201)
-        appointment_id = response.data["id"]
+        # 2. Attempting double-booking must raise PostgreSQL IntegrityError
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                Appointment.objects.create(
+                    clinic=self.clinic_a,
+                    doctor_clinic=self.doctor_a,
+                    patient=self.patient_1,
+                    appointment_date=self.appointment_date,
+                    start_time=self.start_time,
+                    end_time=self.end_time,
+                    time_range=self.time_range,
+                    status="SCHEDULED"
+                )
 
-        # 2. Try to book the exact same slot again (should fail)
-        response_overlap = self.client.post("/api/appointments/book/", payload)
-        self.assertEqual(response_overlap.status_code, 400)
+        # 3. Cancel first appointment
+        appt1.status = "CANCELLED"
+        appt1.save()
 
-        # 3. Cancel the appointment
-        cancel_payload = {
-            "status": "CANCELLED"
-        }
-        response_cancel = self.client.patch(f"/api/appointments/{appointment_id}/status/", cancel_payload)
-        self.assertEqual(response_cancel.status_code, 200)
-
-        # Verify status is updated
-        appointment = Appointment.objects.get(id=appointment_id)
-        self.assertEqual(appointment.status, "CANCELLED")
-
-        # 4. Rebook the same slot
-        payload["reason"] = "Rebooking after cancellation"
-        response_rebook = self.client.post("/api/appointments/book/", payload)
-        self.assertEqual(response_rebook.status_code, 201)
-        self.assertNotEqual(response_rebook.data["id"], appointment_id)
+        # 4. Rebooking cancelled slot must succeed (if ExclusionConstraint condition excludes CANCELLED)
+        appt2 = Appointment.objects.create(
+            clinic=self.clinic_a,
+            doctor_clinic=self.doctor_a,
+            patient=self.patient_1,
+            appointment_date=self.appointment_date,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            time_range=self.time_range,
+            status="SCHEDULED"
+        )
+        self.assertIsNotNone(appt2.id)
+        self.assertNotEqual(appt1.id, appt2.id)

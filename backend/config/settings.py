@@ -127,7 +127,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # In production, DATABASE_URL takes precedence.
 # If DATABASE_URL is not set, all DB_* variables must be explicitly configured;
 # DB_PASSWORD has NO fallback — a missing password will raise KeyError at startup.
-if os.environ.get('DATABASE_URL'):
+if os.environ.get('DATABASE_URL') and not os.environ.get('DB_HOST'):
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ['DATABASE_URL'],
@@ -137,21 +137,19 @@ if os.environ.get('DATABASE_URL'):
     }
 else:
     _db_password = os.environ.get('DB_PASSWORD')
-    if not _db_password:
-        if not DEBUG:
-            raise ImproperlyConfigured(
-                "DB_PASSWORD environment variable is not set. "
-                "This is required in production when DATABASE_URL is not provided."
-            )
-        # In dev, allow an empty password (local postgres with trust auth)
-        _db_password = os.environ.get('DB_PASSWORD', '')
+    if not _db_password and not DEBUG:
+        raise ImproperlyConfigured(
+            "DB_PASSWORD environment variable is not set. "
+            "This is required in production when DATABASE_URL is not provided."
+        )
+    _db_password = os.environ.get('DB_PASSWORD', '')
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.environ.get('DB_NAME', 'mediclinic_db'),
             'USER': os.environ.get('DB_USER', 'postgres'),
             'PASSWORD': _db_password,
-            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
             'PORT': os.environ.get('DB_PORT', '5432'),
             'TEST': {
                 'NAME': 'test_mediclinic_db',
