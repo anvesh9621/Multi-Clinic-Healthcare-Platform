@@ -1,27 +1,21 @@
 from datetime import date, time
-from django.test import TestCase
-from rest_framework.test import APIClient
+from apps.core.test_tenancy import TenantIsolationTestCase
 from apps.core.factories import (
-    ClinicFactory,
-    ClinicAdminFactory,
     PatientProfileFactory,
     create_doctor_clinic_with_full_week_schedule,
 )
 from apps.appointments.models import Appointment
 
-class TenantIsolationTests(TestCase):
+
+class TenantIsolationTests(TenantIsolationTestCase):
     def setUp(self):
-        self.client = APIClient()
-        
-        self.clinic_a = ClinicFactory(name="Clinic A")
-        self.clinic_b = ClinicFactory(name="Clinic B")
-        self.admin_a = ClinicAdminFactory(clinic=self.clinic_a)
-        
+        super().setUp()
+
         self.doctor_a = create_doctor_clinic_with_full_week_schedule(clinic=self.clinic_a)
         self.doctor_b = create_doctor_clinic_with_full_week_schedule(clinic=self.clinic_b)
-        
+
         self.patient_1 = PatientProfileFactory(user__clinic=self.clinic_a)
-        
+
         # Create appointment in Clinic B
         self.appointment_b = Appointment.objects.create(
             clinic=self.clinic_b,
@@ -31,7 +25,7 @@ class TenantIsolationTests(TestCase):
             start_time=time(10, 0),
             end_time=time(10, 30)
         )
-        
+
         # Patient 1 also visits Clinic A
         self.appointment_a = Appointment.objects.create(
             clinic=self.clinic_a,
@@ -46,14 +40,7 @@ class TenantIsolationTests(TestCase):
         """
         Clinic Admin A should only see Appointment A, never Appointment B.
         """
-        self.client.force_authenticate(user=self.admin_a)
-        response = self.client.get("/api/appointments/")
-        
-        self.assertEqual(response.status_code, 200)
-        
-        appointment_ids = [app["id"] for app in response.data]
-        self.assertIn(self.appointment_a.id, appointment_ids)
-        self.assertNotIn(self.appointment_b.id, appointment_ids)
+        self.assert_clinic_a_cannot_see_clinic_b_data("/api/appointments/", self.appointment_b.id)
 
     def test_clinic_admin_sees_only_own_clinic_patients(self):
         """
@@ -62,7 +49,7 @@ class TenantIsolationTests(TestCase):
         """
         self.client.force_authenticate(user=self.admin_a)
         response = self.client.get("/api/patients/")
-        
+
         self.assertEqual(response.status_code, 200)
         patient_ids = [p["id"] for p in response.data]
         self.assertIn(self.patient_1.id, patient_ids)
