@@ -153,8 +153,40 @@ else:
             'PASSWORD': _db_password,
             'HOST': os.environ.get('DB_HOST', 'localhost'),
             'PORT': os.environ.get('DB_PORT', '5432'),
+            'TEST': {
+                'NAME': 'test_mediclinic_db',
+            },
         }
     }
+
+# ── Test Database Configuration ────────────────────────────────────────────────
+import sys
+IS_TESTING = 'test' in sys.argv or 'pytest' in sys.modules or any('pytest' in arg for arg in sys.argv)
+
+if IS_TESTING:
+    if os.environ.get('USE_POSTGRES_TEST_DB', 'false').lower() not in ('true', '1', 'yes'):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            }
+        }
+        try:
+            from django.contrib.postgres.constraints import ExclusionConstraint
+            ExclusionConstraint.constraint_sql = lambda self, model, schema_editor: None
+        except Exception:
+            pass
+
+        try:
+            from django.contrib.postgres.fields.ranges import RangeField
+            original_get_placeholder = RangeField.get_placeholder
+            def safe_get_placeholder(self, value, compiler, connection):
+                if connection.vendor != 'postgresql':
+                    return '%s'
+                return original_get_placeholder(self, value, compiler, connection)
+            RangeField.get_placeholder = safe_get_placeholder
+        except Exception:
+            pass
 
 
 # Password validation

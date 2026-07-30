@@ -2,7 +2,6 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from apps.core.test_utils import setup_test_environment
 from apps.appointments.models import Appointment
-from apps.patients.models import PatientHistory
 
 class PatientIsolationTests(TestCase):
     def setUp(self):
@@ -11,15 +10,11 @@ class PatientIsolationTests(TestCase):
         self.patient_1 = self.env["patient_1"]
         self.patient_2 = self.env["patient_2"]
         
-        # Create Patient History for patient 1
-        PatientHistory.objects.create(
-            patient=self.patient_1,
-            blood_group="O+",
-            allergies="Peanuts",
-            chronic_diseases="None",
-            past_surgeries="None",
-            family_history="None"
-        )
+        # Update Patient Medical Profile for patient 1
+        self.patient_1.blood_group = "O+"
+        self.patient_1.allergies = "Peanuts"
+        self.patient_1.profile_completed = True
+        self.patient_1.save()
 
         # Create appointments
         self.appointment_1 = Appointment.objects.create(
