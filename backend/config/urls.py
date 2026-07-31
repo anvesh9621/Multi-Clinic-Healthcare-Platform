@@ -11,8 +11,12 @@ from apps.appointments.public_views import (
 )
 
 
+from apps.core.views import TestSeedInvitationView
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/test-seed-invitation/", TestSeedInvitationView.as_view(), name="test-seed-invitation"),
 
     # Appointment APIs
     path("api/accounts/", include("apps.accounts.urls")),

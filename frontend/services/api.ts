@@ -43,7 +43,7 @@ api.interceptors.response.use(
       if (!refreshToken) {
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
-        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login") && !window.location.pathname.startsWith("/register") && window.location.pathname !== "/") {
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login") && !window.location.pathname.startsWith("/register") && !window.location.pathname.includes("invite") && window.location.pathname !== "/") {
           window.location.href = "/login";
         }
         return Promise.reject(error);
@@ -80,7 +80,7 @@ api.interceptors.response.use(
         processQueue(refreshError, null);
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
-        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login") && !window.location.pathname.startsWith("/register") && window.location.pathname !== "/") {
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login") && !window.location.pathname.startsWith("/register") && !window.location.pathname.includes("invite") && window.location.pathname !== "/") {
           window.location.href = "/login";
         }
         return Promise.reject(refreshError);
