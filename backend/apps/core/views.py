@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from apps.clinics.models import Clinic, ReceptionistInvitation
 from apps.doctors.models import DoctorInvitation
-from apps.accounts.models import ClinicAdminInvitation, User
+from apps.accounts.models import ClinicAdminInvitation, User, EmailOTP
 
 
 class TestSeedInvitationView(APIView):
@@ -78,3 +78,56 @@ class TestSeedInvitationView(APIView):
             })
 
         return Response({"error": "Invalid role"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TestGetOTPView(APIView):
+    """
+    DEBUG-only view to retrieve the generated OTP for a user email during E2E testing.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request):
+        if not getattr(settings, "DEBUG", False):
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        email = request.query_params.get("email")
+        if not email:
+            return Response({"error": "email parameter required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        otp = EmailOTP.objects.filter(user_email=email).order_by("-created_at").first()
+        if not otp:
+            return Response({"error": "No OTP found for this email"}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            "success": True,
+            "code": otp.code,
+            "purpose": otp.purpose,
+            "is_used": otp.is_used,
+            "created_at": otp.created_at
+        })
+
+
+class TestSeedPatientView(APIView):
+    """
+    DEBUG-only view to seed a Patient user for E2E testing.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        if not getattr(settings, "DEBUG", False):
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        unique_id = uuid4().hex[:8]
+        email = request.data.get("email") or f"e2e_patient_{unique_id}@example.com"
+
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "role": User.RoleChoices.PATIENT,
+                "first_name": "E2E",
+                "last_name": "Patient",
+            }
+        )
+        return Response({"success": True, "email": user.email, "created": created})
