@@ -40,6 +40,7 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Run Pytest with Coverage
+        working-directory: backend
         env:
           DEBUG: "true"
           USE_POSTGRES_TEST_DB: "true"
@@ -48,8 +49,7 @@ jobs:
           DB_NAME: test_mediclinic
           DB_USER: postgres
           DB_PASSWORD: postgres
-        run: |
-          pytest --cov=apps --cov-report=term-missing
+        run: pytest -v --cov=apps --cov-report=term-missing
 
   frontend-test:
     name: Frontend Vitest & Playwright E2E Suite
