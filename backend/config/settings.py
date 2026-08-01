@@ -157,9 +157,28 @@ else:
         }
     }
 
-# ── Test Database Configuration ────────────────────────────────────────────────
+# ── Test & E2E Database Configuration ─────────────────────────────────────────
 import sys
 IS_TESTING = 'test' in sys.argv or 'pytest' in sys.modules or any('pytest' in arg for arg in sys.argv)
+IS_E2E_SERVER = os.environ.get("E2E_TEST_MODE") == "true"
+
+def _apply_sqlite_patches():
+    try:
+        from django.contrib.postgres.constraints import ExclusionConstraint
+        ExclusionConstraint.constraint_sql = lambda self, model, schema_editor: None
+    except Exception:
+        pass
+
+    try:
+        from django.contrib.postgres.fields.ranges import RangeField
+        original_get_placeholder = RangeField.get_placeholder
+        def safe_get_placeholder(self, value, compiler, connection):
+            if connection.vendor != 'postgresql':
+                return '%s'
+            return original_get_placeholder(self, value, compiler, connection)
+        RangeField.get_placeholder = safe_get_placeholder
+    except Exception:
+        pass
 
 if IS_TESTING:
     if os.environ.get('USE_POSTGRES_TEST_DB', 'false').lower() not in ('true', '1', 'yes'):
@@ -169,22 +188,15 @@ if IS_TESTING:
                 'NAME': ':memory:',
             }
         }
-        try:
-            from django.contrib.postgres.constraints import ExclusionConstraint
-            ExclusionConstraint.constraint_sql = lambda self, model, schema_editor: None
-        except Exception:
-            pass
-
-        try:
-            from django.contrib.postgres.fields.ranges import RangeField
-            original_get_placeholder = RangeField.get_placeholder
-            def safe_get_placeholder(self, value, compiler, connection):
-                if connection.vendor != 'postgresql':
-                    return '%s'
-                return original_get_placeholder(self, value, compiler, connection)
-            RangeField.get_placeholder = safe_get_placeholder
-        except Exception:
-            pass
+        _apply_sqlite_patches()
+elif IS_E2E_SERVER:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'e2e_test_db.sqlite3',
+        }
+    }
+    _apply_sqlite_patches()
 
 
 # Password validation

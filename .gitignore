@@ -11,3 +11,7 @@ htmlcov/
 # Dump files
 *_dump.txt
 *.dump.txt
+
+# Databases
+*.sqlite3
+e2e_test_db.sqlite3
