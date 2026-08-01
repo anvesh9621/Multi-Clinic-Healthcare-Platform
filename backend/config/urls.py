@@ -11,7 +11,13 @@ from apps.appointments.public_views import (
 )
 
 
-from apps.core.views import TestSeedInvitationView, TestGetOTPView, TestSeedPatientView
+from apps.core.views import (
+    TestSeedInvitationView,
+    TestGetOTPView,
+    TestSeedPatientView,
+    TestSeedStaffView,
+    TestGenerateTOTPView,
+)
 
 
 urlpatterns = [
@@ -19,6 +25,8 @@ urlpatterns = [
     path("api/test-seed-invitation/", TestSeedInvitationView.as_view(), name="test-seed-invitation"),
     path("api/test-get-otp/", TestGetOTPView.as_view(), name="test-get-otp"),
     path("api/test-seed-patient/", TestSeedPatientView.as_view(), name="test-seed-patient"),
+    path("api/test-seed-staff/", TestSeedStaffView.as_view(), name="test-seed-staff"),
+    path("api/test-generate-totp/", TestGenerateTOTPView.as_view(), name="test-generate-totp"),
 
     # Appointment APIs
     path("api/accounts/", include("apps.accounts.urls")),

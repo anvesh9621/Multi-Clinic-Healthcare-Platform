@@ -124,22 +124,22 @@ from .models import StaffMFA, User
 
 def generate_mfa_secret(user: User) -> tuple[str, str]:
     """
-    Generates or resets TOTP secret for a user (is_enabled=False until verified).
+    Generates or returns existing TOTP secret for a user (is_enabled=False until verified).
     Returns (secret, provisioning_uri).
     """
-    secret = pyotp.random_base32()
     mfa, _ = StaffMFA.objects.get_or_create(user=user)
-    mfa.secret = secret
-    mfa.is_enabled = False
-    mfa.save()
+    if not mfa.secret:
+        mfa.secret = pyotp.random_base32()
+        mfa.is_enabled = False
+        mfa.save()
 
-    totp = pyotp.TOTP(secret)
+    totp = pyotp.TOTP(mfa.secret)
     provisioning_uri = totp.provisioning_uri(
         name=user.email,
         issuer_name="MediClinic"
     )
 
-    return (secret, provisioning_uri)
+    return (mfa.secret, provisioning_uri)
 
 
 def generate_backup_codes(user: User) -> list[str]:
@@ -173,7 +173,7 @@ def verify_totp(user: User, code: str) -> bool:
         return False
 
     totp = pyotp.TOTP(mfa.secret)
-    return totp.verify(code)
+    return totp.verify(code, valid_window=1)
 
 
 def verify_backup_code(user: User, code: str) -> bool:

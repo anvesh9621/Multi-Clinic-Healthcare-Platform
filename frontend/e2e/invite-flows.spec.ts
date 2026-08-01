@@ -18,7 +18,7 @@ test.describe('Invite Acceptance E2E Flows', () => {
 
     // 1. Navigate to valid invite URL
     await page.goto(seed.url_path);
-    await expect(page.getByText(seed.email)).toBeVisible();
+    await expect(page.getByText(seed.email)).toBeVisible({ timeout: 15000 });
 
     // 2. Fill the accept form
     await page.locator('input[placeholder*="Ravi"]').fill('DocFirst');

@@ -131,3 +131,81 @@ class TestSeedPatientView(APIView):
             }
         )
         return Response({"success": True, "email": user.email, "created": created})
+
+
+class TestSeedStaffView(APIView):
+    """
+    DEBUG-only view to seed a Staff user (Doctor, Receptionist, or Clinic Admin) with password for E2E testing.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        if not getattr(settings, "DEBUG", False):
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        role = (request.data.get("role") or "DOCTOR").upper()
+        unique_id = uuid4().hex[:8]
+        email = request.data.get("email") or f"e2e_staff_{role.lower()}_{unique_id}@example.com"
+        password = request.data.get("password") or "TestPassword123!"
+
+        clinic = Clinic.objects.create(
+            name=f"E2E Staff Clinic {unique_id}",
+            address="123 Staff Street"
+        )
+
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "role": role,
+                "first_name": "E2E",
+                "last_name": "Staff",
+                "clinic": clinic,
+            }
+        )
+        user.set_password(password)
+        user.save()
+
+        return Response({
+            "success": True,
+            "email": user.email,
+            "password": password,
+            "role": user.role,
+            "created": created
+        })
+
+
+class TestGenerateTOTPView(APIView):
+    """
+    DEBUG-only view to generate a valid TOTP code for a secret or staff user for E2E testing.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        if not getattr(settings, "DEBUG", False):
+            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        secret = request.data.get("secret")
+        email = request.data.get("email")
+
+        if email:
+            email = email.strip().lower()
+            if not secret:
+                from apps.accounts.models import StaffMFA
+                user = User.objects.filter(email=email).first()
+                if user:
+                    mfa = StaffMFA.objects.filter(user=user).first()
+                    if mfa:
+                        secret = mfa.secret
+
+        if not secret:
+            return Response({"error": "secret or valid email required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        import pyotp
+        totp = pyotp.TOTP(secret)
+        return Response({
+            "success": True,
+            "code": totp.now(),
+            "secret": secret
+        })
