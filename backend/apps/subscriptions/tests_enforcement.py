@@ -34,13 +34,34 @@ class SubscriptionEnforcementTests(APITestCase):
         """New clinic creation automatically gets a Subscription with status='trialing' via signal."""
         new_clinic = Clinic.objects.create(
             name="Auto Sub Clinic",
-            address="123 Medical Way",
-            subscription_plan="BASIC"
+            address="123 Medical Way"
         )
         sub = getattr(new_clinic, "subscription", None)
         self.assertIsNotNone(sub)
         self.assertEqual(sub.status, "trialing")
         self.assertEqual(sub.plan, "starter")
+
+    def test_clinic_model_changes_do_not_affect_middleware_enforcement(self):
+        """Modifying Clinic model fields has zero effect on middleware enforcement; only Subscription.status/plan governs access."""
+        sub = self.clinic.subscription
+        sub.status = "cancelled"
+        sub.save()
+
+        # Modify clinic model attributes
+        self.clinic.name = "Renamed Clinic"
+        self.clinic.address = "New Address St"
+        self.clinic.save()
+
+        # Middleware must still block write requests because Subscription.status='cancelled'
+        res = self.client.post(self.write_url, self.write_payload)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("Account suspended or inactive", str(res.json()))
+
+        # Activating subscription allows write requests
+        sub.status = "active"
+        sub.save()
+        res_active = self.client.post(self.write_url, self.write_payload)
+        self.assertNotEqual(res_active.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_trialing_or_active_subscription_allows_writes(self):
         """Clinic with status='trialing' or 'active' allows mutating write requests."""

@@ -120,7 +120,7 @@ export default function SuperAdminDashboard() {
   // Modal State for Clinic Creation
   const [isClinicModalOpen, setIsClinicModalOpen] = useState(false);
   const [clinicFormData, setClinicFormData] = useState({
-    name: "", address: "", subscription_plan: "BASIC",
+    name: "", address: "",
   });
   const [clinicFormLoading, setClinicFormLoading] = useState(false);
   const [clinicFormError, setClinicFormError] = useState("");
@@ -128,6 +128,7 @@ export default function SuperAdminDashboard() {
 
   // Billing Fallback Actions (Super Admin only)
   const [billingClinic, setBillingClinic] = useState<ClinicRow | null>(null);
+  const [billingActionLoading, setBillingActionLoading] = useState(false);
   const [billingAction, setBillingAction] = useState<"generate" | "change-plan" | null>(null);
   const [billingPlan, setBillingPlan] = useState("professional");
   const [billingLoading, setBillingLoading] = useState(false);
@@ -181,7 +182,7 @@ export default function SuperAdminDashboard() {
     try {
       await apiClient.post("/clinics/create/", clinicFormData);
       setClinicFormSuccess("Clinic created successfully!");
-      setClinicFormData({ name: "", address: "", subscription_plan: "BASIC" });
+      setClinicFormData({ name: "", address: "" });
       setTimeout(() => setIsClinicModalOpen(false), 2000);
       queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
     } catch (err: any) {
@@ -462,16 +463,6 @@ export default function SuperAdminDashboard() {
               Address <span className="text-red-500 ml-1" aria-hidden="true">*</span>
             </label>
             <textarea required rows={2} value={clinicFormData.address} onChange={(e) => setClinicFormData({ ...clinicFormData, address: e.target.value })} className="w-full border border-border rounded-xl px-4 py-2.5 bg-warm-surface text-ink font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none shadow-sm text-sm" placeholder="Street address..." />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-ink mb-1">
-              Subscription Plan <span className="text-red-500 ml-1" aria-hidden="true">*</span>
-            </label>
-            <select required value={clinicFormData.subscription_plan} onChange={(e) => setClinicFormData({ ...clinicFormData, subscription_plan: e.target.value })} className={selectClass}>
-              <option value="BASIC">Basic</option>
-              <option value="PRO">Pro</option>
-              <option value="ENTERPRISE">Enterprise</option>
-            </select>
           </div>
 
           <div className="pt-4 flex gap-3 justify-end">

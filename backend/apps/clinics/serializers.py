@@ -129,7 +129,6 @@ class ClinicRegistrationSerializer(serializers.Serializer):
     admin_password = serializers.CharField(write_only=True)
     admin_first_name = serializers.CharField(max_length=150)
     admin_last_name = serializers.CharField(max_length=150)
-    subscription_plan = serializers.CharField(max_length=20, required=False, default="BASIC")
 
     def validate_admin_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -143,7 +142,6 @@ class ClinicRegistrationSerializer(serializers.Serializer):
             clinic = Clinic.objects.create(
                 name=validated_data["clinic_name"],
                 address=validated_data["clinic_address"],
-                subscription_plan=validated_data.get("subscription_plan", "BASIC")
             )
 
             user = User.objects.create_user(
@@ -164,4 +162,4 @@ class ClinicRegistrationSerializer(serializers.Serializer):
 class SuperAdminClinicCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Clinic
-        fields = ['id', 'name', 'address', 'subscription_plan']
+        fields = ['id', 'name', 'address']

@@ -16,7 +16,6 @@ class ClinicFactory(factory.django.DjangoModelFactory):
 
     name = Sequence(lambda n: f"Clinic {n}")
     address = Sequence(lambda n: f"{n} Health St, Medical City")
-    subscription_plan = "BASIC"
 
 
 class SubscriptionFactory(factory.django.DjangoModelFactory):

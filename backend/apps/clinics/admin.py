@@ -4,5 +4,5 @@ from .models import Clinic
 
 @admin.register(Clinic)
 class ClinicAdmin(admin.ModelAdmin):
-    list_display = ("name", "subscription_plan", "is_active")
+    list_display = ("name", "is_active")
     search_fields = ("name",)
