@@ -13,7 +13,7 @@ export default function RecordPage() {
   const [record, setRecord] = useState<MedicalRecord | null>(null);
 
   useEffect(() => {
-
+    if (!id) return;
     const fetchRecord = async () => {
         try {
             const res = await api.get(`/records/consultation/${id}/`);
@@ -25,7 +25,7 @@ export default function RecordPage() {
 
     fetchRecord();
 
-  }, []);
+  }, [id]);
 
   if (!record) return <div className="p-6">Loading record...</div>;
 

@@ -27,7 +27,7 @@ export default function IntakeFormPage() {
         error("Failed to load intake form.");
       })
       .finally(() => setLoading(false));
-  }, [appointmentId]);
+  }, [appointmentId, error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

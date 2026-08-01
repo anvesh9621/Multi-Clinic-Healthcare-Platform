@@ -388,6 +388,7 @@ function DoctorCard({ doctor }: { doctor: DoctorEntry }) {
     <Card hoverable className="p-6 flex flex-col h-full">
       <div className="flex items-start gap-4 mb-5">
         {doctor.profile_photo ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={doctor.profile_photo}
             alt={doctor.first_name}

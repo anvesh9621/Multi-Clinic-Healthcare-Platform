@@ -69,6 +69,7 @@ export default function ConsultPage(props: { params: Promise<{ appointmentId: st
       return;
     }
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, appointmentId]);
 
   const fetchData = async () => {

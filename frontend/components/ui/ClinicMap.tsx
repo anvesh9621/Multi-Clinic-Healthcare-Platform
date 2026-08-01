@@ -173,6 +173,7 @@ export default function ClinicMap({ clinics, selectedId, onSelect }: ClinicMapPr
       // Cleanup global on unmount
       delete (window as any).__selectClinic;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinics, selectedId]);
 
   if (mappable.length === 0) {

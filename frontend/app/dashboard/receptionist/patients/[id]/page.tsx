@@ -46,6 +46,7 @@ export default function PatientHistoryPage() {
     } else if (user) {
       router.push("/dashboard");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, router, params.id]);
 
   const fetchHistory = async () => {

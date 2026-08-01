@@ -95,6 +95,7 @@ export default function DoctorSelector() {
             >
               <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {doc.photo_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={doc.photo_url} alt={doc.name} className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-8 h-8 text-violet-300" />

@@ -45,6 +45,7 @@ export default function DoctorSchedulePage() {
       return;
     }
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, router]);
 
   const fetchData = async () => {

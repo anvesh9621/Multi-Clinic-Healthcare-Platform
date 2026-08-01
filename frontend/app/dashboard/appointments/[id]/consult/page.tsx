@@ -21,21 +21,20 @@ export default function ConsultPage() {
   const [recordExists, setRecordExists] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Check if record already exists
-  const checkRecord = async () => {
-    try {
-      await api.get(`/records/${id}/`);
-      setRecordExists(true);
-    } catch {
-      setRecordExists(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    if (!id) return;
+    const checkRecord = async () => {
+      try {
+        await api.get(`/records/${id}/`);
+        setRecordExists(true);
+      } catch {
+        setRecordExists(false);
+      } finally {
+        setLoading(false);
+      }
+    };
     checkRecord();
-  }, []);
+  }, [id]);
 
   const addMedicine = () => {
     setMedicines([

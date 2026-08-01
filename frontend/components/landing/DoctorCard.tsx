@@ -16,6 +16,7 @@ export function DoctorCard({ name, specialty, rating, reviews, imageUrl }: Docto
     <Card hoverable className="p-6 flex flex-col text-center">
       <div className="w-24 h-24 rounded-full overflow-hidden mb-4 mx-auto border-4 border-gray-50 shadow-sm bg-gray-100 flex items-center justify-center">
         {imageUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
         ) : (
           <span className="text-gray-400 text-sm">No Image</span>

@@ -174,6 +174,7 @@ export default function DoctorProfilePage() {
           <Card className="p-6 text-center">
             <div className="relative inline-block mb-4">
               {photoPreview ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={photoPreview}
                   alt="Profile"

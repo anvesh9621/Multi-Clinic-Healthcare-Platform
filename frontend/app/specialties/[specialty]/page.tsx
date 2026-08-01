@@ -54,6 +54,7 @@ export default async function SpecialtyDoctorsPage({ params }: { params: Promise
                 <div className="p-6 flex items-start gap-4">
                   <div className="w-20 h-20 rounded-full bg-blue-50 border-4 border-white shadow-sm overflow-hidden shrink-0 flex items-center justify-center">
                     {doctor.profile_photo ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={doctor.profile_photo} alt={`Dr. ${doctor.first_name} ${doctor.last_name}`} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-blue-600 font-bold text-xl">{doctor.first_name?.[0]}{doctor.last_name?.[0]}</span>
