@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Dump files
+*_dump.txt
+*.dump.txt

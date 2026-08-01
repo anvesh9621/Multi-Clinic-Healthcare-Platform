@@ -2,32 +2,15 @@ name: Test Suite
 
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   backend-test:
     name: Backend Pytest Suite
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: test_mediclinic
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -36,19 +19,63 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install Backend Dependencies
+      - name: Install requirements
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Run Backend Tests (PostgreSQL)
+      - name: Run Pytest with Coverage
+        run: |
+          pytest --cov=apps --cov-report=term-missing
+
+  frontend-test:
+    name: Frontend Vitest & Playwright E2E Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Set up Python for E2E Backend Server
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Backend Dependencies for E2E Server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Start Django Backend Server for E2E
         env:
-          USE_POSTGRES_TEST_DB: "true"
-          DB_HOST: "localhost"
-          DB_PORT: "5432"
-          DB_NAME: "test_mediclinic"
-          DB_USER: "postgres"
-          DB_PASSWORD: "postgres"
+          E2E_TEST_MODE: "true"
         run: |
           cd backend
-          pytest -v
+          python manage.py migrate
+          python manage.py runserver 8000 &
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Vitest Unit Tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Install Playwright Browsers & OS Dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright E2E Tests
+        working-directory: frontend
+        env:
+          E2E_TEST_MODE: "true"
+        run: npm run test:e2e
