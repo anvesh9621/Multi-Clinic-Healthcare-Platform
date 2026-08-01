@@ -1,4 +1,4 @@
-from django.conf import settings
+import os
 from rest_framework.throttling import SimpleRateThrottle
 from apps.audit.services import log_auth_attempt
 
@@ -8,7 +8,7 @@ class BaseCustomRateThrottle(SimpleRateThrottle):
     Base throttle class that supports custom duration strings like '5/15m', '5/5m', '10/h'.
     """
     def allow_request(self, request, view):
-        if getattr(settings, "DEBUG", False):
+        if os.environ.get("E2E_TEST_MODE") == "true":
             return True
         return super().allow_request(request, view)
     def parse_rate(self, rate):

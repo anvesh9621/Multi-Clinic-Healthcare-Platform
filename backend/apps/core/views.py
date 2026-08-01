@@ -1,5 +1,6 @@
+import os
 from uuid import uuid4
-from django.conf import settings
+from django.http import Http404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,14 +11,14 @@ from apps.accounts.models import ClinicAdminInvitation, User, EmailOTP
 
 class TestSeedInvitationView(APIView):
     """
-    DEBUG-only view to seed invitations for E2E testing.
+    E2E-only view to seed invitations for E2E testing.
     """
     permission_classes = []
     authentication_classes = []
 
     def post(self, request):
-        if not getattr(settings, "DEBUG", False):
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if os.environ.get("E2E_TEST_MODE") != "true":
+            raise Http404()
 
         role = (request.data.get("role") or "DOCTOR").upper()
         unique_id = uuid4().hex[:8]
@@ -82,14 +83,14 @@ class TestSeedInvitationView(APIView):
 
 class TestGetOTPView(APIView):
     """
-    DEBUG-only view to retrieve the generated OTP for a user email during E2E testing.
+    E2E-only view to retrieve the generated OTP for a user email during E2E testing.
     """
     permission_classes = []
     authentication_classes = []
 
     def get(self, request):
-        if not getattr(settings, "DEBUG", False):
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if os.environ.get("E2E_TEST_MODE") != "true":
+            raise Http404()
 
         email = request.query_params.get("email")
         if not email:
@@ -110,14 +111,14 @@ class TestGetOTPView(APIView):
 
 class TestSeedPatientView(APIView):
     """
-    DEBUG-only view to seed a Patient user for E2E testing.
+    E2E-only view to seed a Patient user for E2E testing.
     """
     permission_classes = []
     authentication_classes = []
 
     def post(self, request):
-        if not getattr(settings, "DEBUG", False):
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if os.environ.get("E2E_TEST_MODE") != "true":
+            raise Http404()
 
         unique_id = uuid4().hex[:8]
         email = request.data.get("email") or f"e2e_patient_{unique_id}@example.com"
@@ -135,14 +136,14 @@ class TestSeedPatientView(APIView):
 
 class TestSeedStaffView(APIView):
     """
-    DEBUG-only view to seed a Staff user (Doctor, Receptionist, or Clinic Admin) with password for E2E testing.
+    E2E-only view to seed a Staff user (Doctor, Receptionist, or Clinic Admin) with password for E2E testing.
     """
     permission_classes = []
     authentication_classes = []
 
     def post(self, request):
-        if not getattr(settings, "DEBUG", False):
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if os.environ.get("E2E_TEST_MODE") != "true":
+            raise Http404()
 
         role = (request.data.get("role") or "DOCTOR").upper()
         unique_id = uuid4().hex[:8]
@@ -177,14 +178,14 @@ class TestSeedStaffView(APIView):
 
 class TestGenerateTOTPView(APIView):
     """
-    DEBUG-only view to generate a valid TOTP code for a secret or staff user for E2E testing.
+    E2E-only view to generate a valid TOTP code for a secret or staff user for E2E testing.
     """
     permission_classes = []
     authentication_classes = []
 
     def post(self, request):
-        if not getattr(settings, "DEBUG", False):
-            return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        if os.environ.get("E2E_TEST_MODE") != "true":
+            raise Http404()
 
         secret = request.data.get("secret")
         email = request.data.get("email")

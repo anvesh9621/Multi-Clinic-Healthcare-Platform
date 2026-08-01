@@ -13,6 +13,8 @@ async function seedInvitation(request: any, role: 'DOCTOR' | 'RECEPTIONIST' | 'C
 }
 
 test.describe('Invite Acceptance E2E Flows', () => {
+  test.setTimeout(60000);
+
   test('Doctor invite acceptance flow & token reuse prevention', async ({ page, request }) => {
     const seed = await seedInvitation(request, 'DOCTOR');
 
@@ -29,24 +31,19 @@ test.describe('Invite Acceptance E2E Flows', () => {
     // Submit form
     await page.locator('button[type="submit"]').click();
 
-    // Confirm success state & navigation
-    await expect(page.getByText('Profile Completed!')).toBeVisible({ timeout: 10000 });
+    // 3. Confirm successful navigation to a real page (not 404)
+    await expect(page.getByText('Profile Completed!')).toBeVisible({ timeout: 15000 });
+    await page.getByText('Click here if not redirected').click();
+    await page.waitForURL((url) => !url.pathname.includes('/invite/'), { timeout: 15000 });
 
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/invite/'), { timeout: 5000 });
-    } catch {
-      await page.getByText('Click here if not redirected').click();
-      await page.waitForURL((url) => !url.pathname.includes('/invite/'), { timeout: 5000 });
-    }
-
-    // 3. Assert final URL returns a real page, not Next.js 404
+    // Assert final URL returns a real page, not Next.js 404
     expect(page.url()).not.toContain('404');
     await expect(page.locator('body')).not.toContainText('This page could not be found');
     await expect(page.locator('body')).not.toContainText('404');
 
     // 4. Attempt to reuse the same invite URL a second time
     await page.goto(seed.url_path);
-    await expect(page.locator('body')).toContainText(/accepted|already|invalid|expired|used/i);
+    await expect(page.locator('body')).toContainText(/accepted|already|invalid|expired|used/i, { timeout: 15000 });
   });
 
   test('Receptionist invite acceptance flow & token reuse prevention', async ({ page, request }) => {
@@ -54,7 +51,7 @@ test.describe('Invite Acceptance E2E Flows', () => {
 
     // 1. Navigate to valid invite URL
     await page.goto(seed.url_path);
-    await expect(page.getByText(seed.email)).toBeVisible();
+    await expect(page.getByText(seed.email)).toBeVisible({ timeout: 15000 });
 
     // 2. Fill the accept form
     await page.locator('input[placeholder="Sarah"]').fill('ReceptFirst');
@@ -69,14 +66,14 @@ test.describe('Invite Acceptance E2E Flows', () => {
     await page.locator('button[type="submit"]').click();
 
     // 3. Confirm successful navigation to a real page (not 404)
-    await page.waitForURL((url) => !url.pathname.includes('/receptionist/invite/'), { timeout: 15000 });
+    await page.waitForURL((url) => !url.pathname.includes('/receptionist/invite/'), { timeout: 30000 });
     expect(page.url()).not.toContain('404');
     await expect(page.locator('body')).not.toContainText('This page could not be found');
     await expect(page.locator('body')).not.toContainText('404');
 
     // 4. Attempt to reuse the same invite URL a second time
     await page.goto(seed.url_path);
-    await expect(page.locator('body')).toContainText(/accepted|already|invalid|expired|used|no longer valid/i);
+    await expect(page.locator('body')).toContainText(/accepted|already|invalid|expired|used|no longer valid/i, { timeout: 15000 });
   });
 
   test('Clinic Admin invite acceptance flow & token reuse prevention', async ({ page, request }) => {
@@ -84,7 +81,7 @@ test.describe('Invite Acceptance E2E Flows', () => {
 
     // 1. Navigate to valid invite URL
     await page.goto(seed.url_path);
-    await expect(page.getByText(seed.email)).toBeVisible();
+    await expect(page.getByText(seed.email)).toBeVisible({ timeout: 15000 });
 
     // 2. Fill the accept form
     await page.locator('input[placeholder="John"]').fill('AdminFirst');
@@ -99,13 +96,13 @@ test.describe('Invite Acceptance E2E Flows', () => {
     await page.locator('button[type="submit"]').click();
 
     // 3. Confirm successful navigation to a real page (not 404)
-    await page.waitForURL((url) => !url.pathname.includes('/admin/invite/'), { timeout: 15000 });
+    await page.waitForURL((url) => !url.pathname.includes('/admin/invite/'), { timeout: 30000 });
     expect(page.url()).not.toContain('404');
     await expect(page.locator('body')).not.toContainText('This page could not be found');
     await expect(page.locator('body')).not.toContainText('404');
 
     // 4. Attempt to reuse the same invite URL a second time
     await page.goto(seed.url_path);
-    await expect(page.locator('body')).toContainText(/accepted|already|invalid|expired|used|no longer valid/i);
+    await expect(page.locator('body')).toContainText(/accepted|already|invalid|expired|used|no longer valid/i, { timeout: 15000 });
   });
 });

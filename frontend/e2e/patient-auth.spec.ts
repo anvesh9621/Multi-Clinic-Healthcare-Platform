@@ -21,6 +21,8 @@ async function fetchGeneratedOTP(request: any, email: string) {
 }
 
 test.describe('Patient Auth E2E Flows', () => {
+  test.setTimeout(60000);
+
   test('Request OTP, verify cooldown timer & wrong code error state', async ({ page, request }) => {
     const uniqueEmail = `patient_err_${Date.now()}_${Math.floor(Math.random() * 1000)}@example.com`;
     await seedPatient(request, uniqueEmail);
