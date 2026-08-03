@@ -1,4 +1,6 @@
+import uuid
 from django.db import models
+from django.db.models import Q, CheckConstraint
 from django.conf import settings
 
 class Invoice(models.Model):
@@ -87,3 +89,56 @@ class PlatformSettings(models.Model):
 
     def __str__(self):
         return "Platform Settings"
+
+
+class PaymentIdempotencyKey(models.Model):
+    key = models.CharField(max_length=64, primary_key=True)
+    operation_type = models.CharField(max_length=50)
+    reference_id = models.CharField(max_length=100)
+    razorpay_response = models.JSONField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='pending', choices=[
+        ('pending', 'Pending'), ('completed', 'Completed'), ('failed', 'Failed'),
+    ])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PaymentLedgerEntry(models.Model):
+    """
+    THE SOURCE OF TRUTH for all money movement across both appointment
+    payments and subscription billing. Append-only — application code
+    must never update or delete rows in this table. Exactly one of
+    `invoice` / `subscription_invoice` is set per entry, enforced at the
+    database level.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice = models.ForeignKey('billing.Invoice', on_delete=models.PROTECT, related_name='ledger_entries', null=True, blank=True)
+    subscription_invoice = models.ForeignKey('billing.SubscriptionInvoice', on_delete=models.PROTECT, related_name='ledger_entries', null=True, blank=True)
+    entry_type = models.CharField(max_length=20, choices=[('debit', 'Debit'), ('credit', 'Credit')])
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default='INR')
+    resulting_status = models.CharField(max_length=20)
+    source_event = models.CharField(max_length=50)
+    razorpay_reference = models.CharField(max_length=100, blank=True)
+    idempotency_key = models.ForeignKey(PaymentIdempotencyKey, on_delete=models.PROTECT, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['invoice', 'created_at']),
+            models.Index(fields=['subscription_invoice', 'created_at']),
+        ]
+        constraints = [
+            CheckConstraint(
+                condition=(
+                    Q(invoice__isnull=False, subscription_invoice__isnull=True) |
+                    Q(invoice__isnull=True, subscription_invoice__isnull=False)
+                ),
+                name='ledger_entry_exactly_one_target',
+            )
+        ]
+
+    def __str__(self):
+        target = self.invoice_id or self.subscription_invoice_id
+        return f"{self.entry_type} {self.amount} {self.currency} -> {self.resulting_status} ({target})"
+
