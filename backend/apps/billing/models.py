@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from django.db.models import Q, CheckConstraint
 from django.conf import settings
+from django.utils import timezone
 
 INVOICE_ALLOWED_TRANSITIONS = {
     'draft': ['pending', 'pending_at_clinic'],
@@ -67,10 +68,19 @@ class Invoice(models.Model):
     refunded_at = models.DateTimeField(null=True, blank=True)
     refund_reason = models.TextField(blank=True)
     
+    invoice_number = models.CharField(max_length=50, blank=True, unique=True, null=True)
+    pdf_path = models.CharField(max_length=255, blank=True)
     notes = models.TextField(blank=True)
     last_failure_reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.invoice_number:
+            year = self.created_at.year if self.created_at else timezone.now().year
+            self.invoice_number = f"INV-{year}-{self.id:06d}"
+            super().save(update_fields=['invoice_number'])
 
     def apply_ledger_entry(self, *, entry_type, amount, resulting_status,
                             source_event, razorpay_reference='',

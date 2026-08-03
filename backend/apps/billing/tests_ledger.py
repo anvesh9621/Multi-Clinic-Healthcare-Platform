@@ -427,6 +427,31 @@ class TestInvoiceTransitions:
         assert sub_event.payload['invoice_id'] == str(sub_invoice.id)
         assert sub_event.payload['invoice_type'] == 'subscription'
 
+    def test_generate_appointment_invoice_pdf(self):
+        import os
+        from apps.billing.tasks import generate_appointment_invoice_pdf
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="paid",
+            payment_method="upi"
+        )
+
+        result = generate_appointment_invoice_pdf(invoice.id)
+        assert "Appointment PDF generated" in result
+        
+        updated_invoice = Invoice.objects.get(id=invoice.id)
+        assert updated_invoice.invoice_number.startswith("INV-")
+        assert updated_invoice.pdf_path != ""
+        assert os.path.exists(updated_invoice.pdf_path)
+
+
 
 
 @pytest.mark.django_db(transaction=True)
