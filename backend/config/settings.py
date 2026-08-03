@@ -317,6 +317,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.appointments.tasks.cancel_unpaid_appointments',
         'schedule': crontab(minute='*/5'),  # Every 5 minutes
     },
+    'process-payment-outbox': {
+        'task': 'apps.billing.tasks.process_payment_outbox',
+        'schedule': 30.0,  # Every 30 seconds
+    },
 }
 
 CELERY_TASK_EAGER_PROPAGATES = True

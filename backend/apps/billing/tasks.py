@@ -1,12 +1,17 @@
+import logging
+import os
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
-import os
-from .models import Invoice, SubscriptionInvoice
+from django.core.mail import EmailMessage
+from django.contrib.auth import get_user_model
+from .models import Invoice, SubscriptionInvoice, PaymentOutboxEvent
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+logger = logging.getLogger(__name__)
 
 @shared_task
 def generate_b2b_invoice_pdf(invoice_id):
@@ -215,3 +220,77 @@ def generate_appointment_invoice_pdf(invoice_id):
     invoice.save(update_fields=['pdf_path'])
 
     return f"Appointment PDF generated for invoice {invoice_id} at {file_path}"
+
+
+@shared_task
+def process_payment_outbox():
+    """
+    Polls pending PaymentOutboxEvent rows and dispatches them. This is
+    the relay half of the Outbox pattern — Phase 2.2 guarantees the event
+    was recorded atomically with the payment; this task guarantees it
+    eventually gets acted on, independently and with its own retries.
+    """
+    pending_events = PaymentOutboxEvent.objects.filter(
+        status='pending'
+    ).order_by('created_at')[:50]  # process in batches, don't grab unbounded rows
+
+    for event in pending_events:
+        event.status = 'processing'
+        event.attempts += 1
+        event.save(update_fields=['status', 'attempts'])
+
+        try:
+            if event.event_type == 'send_invoice_email':
+                _handle_send_invoice_email(event.payload)
+            else:
+                raise ValueError(f"Unknown outbox event_type: {event.event_type}")
+
+            event.status = 'completed'
+            event.processed_at = timezone.now()
+            event.save(update_fields=['status', 'processed_at'])
+        except Exception as e:
+            logger.exception(f"Outbox event {event.id} failed (attempt {event.attempts})")
+            event.last_error = str(e)[:500]
+            # after 5 failed attempts, stop retrying automatically and flag for manual review
+            event.status = 'failed' if event.attempts >= 5 else 'pending'
+            event.save(update_fields=['status', 'last_error'])
+
+
+def _handle_send_invoice_email(payload):
+    User = get_user_model()
+    invoice_type = payload.get('invoice_type')
+
+    if invoice_type == 'appointment':
+        invoice = Invoice.objects.select_related('patient__user').get(pk=payload['invoice_id'])
+        if not invoice.pdf_path or not os.path.exists(invoice.pdf_path):
+            generate_appointment_invoice_pdf(invoice.id)
+            invoice.refresh_from_db()
+        pdf_path = invoice.pdf_path
+        recipient_email = invoice.patient.user.email if invoice.patient and invoice.patient.user else None
+        subject = f"Your MediClinic receipt — {invoice.invoice_number or invoice.pk}"
+    elif invoice_type == 'subscription':
+        invoice = SubscriptionInvoice.objects.select_related('clinic').get(pk=payload['invoice_id'])
+        if not invoice.pdf_path or not os.path.exists(invoice.pdf_path):
+            generate_b2b_invoice_pdf(invoice.id)
+            invoice.refresh_from_db()
+        pdf_path = invoice.pdf_path
+        admin_user = User.objects.filter(clinic=invoice.clinic, role='CLINIC_ADMIN').first()
+        recipient_email = admin_user.email if admin_user else None
+        subject = f"Your MediClinic tax invoice — {invoice.invoice_number or invoice.pk}"
+    else:
+        raise ValueError(f"Unknown invoice_type in outbox payload: {invoice_type}")
+
+    if not recipient_email:
+        raise ValueError(f"No recipient email found for outbox invoice {payload.get('invoice_id')}")
+
+    msg = EmailMessage(
+        subject=subject,
+        body="Please find your invoice attached.",
+        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+        to=[recipient_email],
+    )
+    if pdf_path and os.path.exists(pdf_path):
+        msg.attach_file(pdf_path)
+
+    msg.send(fail_silently=False)
+

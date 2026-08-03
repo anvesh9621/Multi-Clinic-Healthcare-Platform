@@ -451,6 +451,63 @@ class TestInvoiceTransitions:
         assert updated_invoice.pdf_path != ""
         assert os.path.exists(updated_invoice.pdf_path)
 
+    def test_process_payment_outbox_success(self):
+        from django.core import mail
+        from apps.billing.tasks import process_payment_outbox
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("600.00"),
+            total_amount=Decimal("600.00"),
+            status="pending"
+        )
+        invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("600.00"),
+            resulting_status="paid",
+            source_event="webhook:payment_paid"
+        )
+
+        assert PaymentOutboxEvent.objects.filter(status="pending").count() == 1
+
+        process_payment_outbox()
+
+        outbox_event = PaymentOutboxEvent.objects.latest('created_at')
+        assert outbox_event.status == "completed"
+        assert outbox_event.processed_at is not None
+        assert len(mail.outbox) == 1
+        assert mail.outbox[0].to == [patient.user.email]
+        assert len(mail.outbox[0].attachments) == 1
+
+    def test_process_payment_outbox_failure_retries(self):
+        from apps.billing.tasks import process_payment_outbox
+
+        event = PaymentOutboxEvent.objects.create(
+            event_type="send_invoice_email",
+            payload={"invoice_id": 9999999, "invoice_type": "appointment"},
+            status="pending"
+        )
+
+        process_payment_outbox()
+        event.refresh_from_db()
+        assert event.attempts == 1
+        assert event.status == "pending"
+        assert "does not exist" in event.last_error.lower() or "not found" in event.last_error.lower()
+
+        # Simulate reaching 4 attempts, then calling process_payment_outbox again
+        event.attempts = 4
+        event.save(update_fields=['attempts'])
+
+        process_payment_outbox()
+        event.refresh_from_db()
+        assert event.attempts == 5
+        assert event.status == "failed"
+
+
 
 
 
