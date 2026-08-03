@@ -228,3 +228,28 @@ class PaymentLedgerEntry(models.Model):
         target = self.invoice_id or self.subscription_invoice_id
         return f"{self.entry_type} {self.amount} {self.currency} -> {self.resulting_status} ({target})"
 
+
+class PaymentOutboxEvent(models.Model):
+    """
+    Written in the SAME transaction as the PaymentLedgerEntry that
+    triggers it (inside apply_ledger_entry). A separate relay task
+    processes these independently of the original payment transaction —
+    this is what guarantees invoice emails don't silently get lost if
+    the email provider or Celery has a hiccup at the exact moment of payment.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_type = models.CharField(max_length=50)
+    payload = models.JSONField()
+    status = models.CharField(max_length=20, default='pending', choices=[
+        ('pending', 'Pending'), ('processing', 'Processing'),
+        ('completed', 'Completed'), ('failed', 'Failed'),
+    ])
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['status', 'created_at'])]
+
+
