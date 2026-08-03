@@ -104,8 +104,13 @@ class BookAppointmentView(APIView):
                 appointment.status = Appointment.StatusChoices.CONFIRMED
                 appointment.payment_flow = 'pay_at_clinic'
                 appointment.save(update_fields=['status', 'payment_flow'])
-                invoice.status = 'pending_at_clinic'
-                invoice.save(update_fields=['status'])
+                invoice.apply_ledger_entry(
+                    entry_type='debit',
+                    amount=invoice.total_amount,
+                    resulting_status='pending_at_clinic',
+                    source_event='view:book_appointment_pay_at_clinic',
+                    user=request.user,
+                )
 
                 return Response({
                     'appointment_id': appointment.id,
@@ -115,7 +120,7 @@ class BookAppointmentView(APIView):
                     'message': (
                         f'Online payment is not available for this clinic. '
                         f'Your appointment is confirmed. Please pay '
-                        f'\u20b9{invoice.total_amount} at the clinic on arrival.'
+                        f'₹{invoice.total_amount} at the clinic on arrival.'
                     )
                 }, status=status.HTTP_201_CREATED)
 
@@ -147,8 +152,17 @@ class BookAppointmentView(APIView):
                 invoice.razorpay_payment_link_url = payment_link.get('long_url', payment_link.get('short_url', ''))
                 invoice.razorpay_payment_link_short_url = payment_link.get('short_url', '')
                 invoice.payment_link_expires_at = expires_at
-                invoice.status = 'pending'
-                invoice.save()
+                invoice.save(update_fields=[
+                    'razorpay_payment_link_id', 'razorpay_payment_link_url',
+                    'razorpay_payment_link_short_url', 'payment_link_expires_at'
+                ])
+                invoice.apply_ledger_entry(
+                    entry_type='debit',
+                    amount=invoice.total_amount,
+                    resulting_status='pending',
+                    source_event='view:book_appointment_pay_now',
+                    user=request.user,
+                )
 
                 appointment.payment_flow = 'pay_now'
                 appointment.save(update_fields=['payment_flow'])
@@ -169,8 +183,13 @@ class BookAppointmentView(APIView):
                 appointment.status = Appointment.StatusChoices.CONFIRMED
                 appointment.payment_flow = 'pay_at_clinic'
                 appointment.save(update_fields=['status', 'payment_flow'])
-                invoice.status = 'pending_at_clinic'
-                invoice.save(update_fields=['status'])
+                invoice.apply_ledger_entry(
+                    entry_type='debit',
+                    amount=invoice.total_amount,
+                    resulting_status='pending_at_clinic',
+                    source_event='view:book_appointment_fallback',
+                    user=request.user,
+                )
 
                 return Response({
                     'appointment_id': appointment.id,
@@ -185,8 +204,13 @@ class BookAppointmentView(APIView):
             appointment.status = Appointment.StatusChoices.CONFIRMED
             appointment.payment_flow = 'pay_at_clinic' if request.user.role == 'PATIENT' else 'not_applicable'
             appointment.save(update_fields=['status', 'payment_flow'])
-            invoice.status = 'pending_at_clinic'
-            invoice.save(update_fields=['status'])
+            invoice.apply_ledger_entry(
+                entry_type='debit',
+                amount=invoice.total_amount,
+                resulting_status='pending_at_clinic',
+                source_event='view:book_appointment_pay_at_clinic',
+                user=request.user,
+            )
 
             # Send notification to patient
             try:

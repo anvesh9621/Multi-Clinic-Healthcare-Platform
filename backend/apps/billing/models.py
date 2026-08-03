@@ -4,7 +4,7 @@ from django.db.models import Q, CheckConstraint
 from django.conf import settings
 
 INVOICE_ALLOWED_TRANSITIONS = {
-    'draft': ['pending'],
+    'draft': ['pending', 'pending_at_clinic'],
     'pending': ['paid', 'expired', 'cancelled', 'pending_at_clinic'],
     'pending_at_clinic': ['paid', 'cancelled'],
     'paid': ['refunded'],

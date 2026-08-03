@@ -40,8 +40,12 @@ def cancel_unpaid_appointments():
                 appt.status = Appointment.StatusChoices.CANCELLED
                 appt.save(update_fields=['status'])
 
-                invoice.status = 'cancelled'
-                invoice.save(update_fields=['status'])
+                invoice.apply_ledger_entry(
+                    entry_type='credit',
+                    amount=invoice.total_amount,
+                    resulting_status='cancelled',
+                    source_event='task:expiry_sweep',
+                )
 
                 log_action(
                     user=None,

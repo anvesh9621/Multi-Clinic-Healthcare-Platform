@@ -201,8 +201,20 @@ class GeneratePaymentLinkView(APIView):
             invoice.razorpay_payment_link_short_url = pl.get('short_url', '')
             invoice.payment_link_status = pl['status']
             invoice.payment_link_expires_at = expires_at
-            invoice.status = 'pending'
-            invoice.save()
+            invoice.save(update_fields=[
+                'razorpay_payment_link_id', 'razorpay_payment_link_url',
+                'razorpay_payment_link_short_url', 'payment_link_status',
+                'payment_link_expires_at'
+            ])
+
+            if invoice.status != 'pending':
+                invoice.apply_ledger_entry(
+                    entry_type='debit',
+                    amount=invoice.total_amount,
+                    resulting_status='pending',
+                    source_event='view:generate_payment_link',
+                    user=request.user,
+                )
 
             return Response({
                 'payment_link_url': invoice.razorpay_payment_link_url,
@@ -254,10 +266,26 @@ class MarkCashPaidView(APIView):
                     logger.error(f"Failed to cancel payment link {invoice.razorpay_payment_link_id}: {e}")
                     # Do NOT block cash recording if cancel fails
 
-            invoice.status = 'paid'
             invoice.payment_method = 'cash'
             invoice.paid_at = timezone.now()
-            invoice.save()
+            invoice.save(update_fields=['payment_method', 'paid_at'])
+
+            if invoice.status == 'draft':
+                invoice.apply_ledger_entry(
+                    entry_type='debit',
+                    amount=invoice.total_amount,
+                    resulting_status='pending',
+                    source_event='view:mark_cash_paid',
+                    user=request.user,
+                )
+
+            invoice.apply_ledger_entry(
+                entry_type='debit',
+                amount=invoice.total_amount,
+                resulting_status='paid',
+                source_event='view:mark_cash_paid',
+                user=request.user,
+            )
 
             if invoice.appointment and invoice.appointment.status == 'SCHEDULED':
                 invoice.appointment.status = 'CONFIRMED'
@@ -352,8 +380,19 @@ class PatientPayInvoiceView(APIView):
             invoice.razorpay_payment_link_url = payment_link.get('long_url', payment_link.get('short_url', ''))
             invoice.razorpay_payment_link_short_url = payment_link.get('short_url', '')
             invoice.payment_link_expires_at = expires_at
-            invoice.status = 'pending'
-            invoice.save()
+            invoice.save(update_fields=[
+                'razorpay_payment_link_id', 'razorpay_payment_link_url',
+                'razorpay_payment_link_short_url', 'payment_link_expires_at'
+            ])
+
+            if invoice.status != 'pending':
+                invoice.apply_ledger_entry(
+                    entry_type='debit',
+                    amount=invoice.total_amount,
+                    resulting_status='pending',
+                    source_event='view:patient_pay',
+                    user=request.user,
+                )
 
             return Response({
                 'payment_link_url': invoice.razorpay_payment_link_url,
@@ -405,11 +444,19 @@ class RefundInvoiceView(APIView):
                 'speed': 'normal',
             })
             with transaction.atomic():
-                invoice.status = 'refunded'
                 invoice.refund_id = refund['id']
                 invoice.refunded_at = timezone.now()
                 invoice.refund_reason = request.data.get('reason', '')
-                invoice.save()
+                invoice.save(update_fields=['refund_id', 'refunded_at', 'refund_reason'])
+
+                invoice.apply_ledger_entry(
+                    entry_type='credit',
+                    amount=invoice.total_amount,
+                    resulting_status='refunded',
+                    source_event='view:refund_invoice',
+                    user=request.user,
+                    razorpay_reference=refund['id'],
+                )
 
                 log_action(
                     user=request.user,
