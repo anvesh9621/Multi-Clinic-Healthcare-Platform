@@ -1,5 +1,10 @@
 from django.db import models
 from django.utils import timezone
+from apps.billing.models import (
+    SubscriptionInvoice,
+    SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS,
+    InvalidStatusTransition,
+)
 
 PLAN_FEATURES = {
     'starter': {

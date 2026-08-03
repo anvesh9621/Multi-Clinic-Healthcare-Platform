@@ -117,3 +117,98 @@ class TestPaymentLedgerEntry:
                 resulting_status="paid",
                 source_event="invalid_event"
             )
+
+from apps.billing.models import (
+    INVOICE_ALLOWED_TRANSITIONS, SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS, InvalidStatusTransition
+)
+
+@pytest.mark.django_db
+class TestInvoiceTransitions:
+    def test_invoice_apply_ledger_entry_valid(self):
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="draft"
+        )
+        
+        # draft -> pending
+        updated = invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("500.00"),
+            resulting_status="pending",
+            source_event="payment_link_created"
+        )
+        assert updated.status == "pending"
+        assert PaymentLedgerEntry.objects.filter(invoice=invoice, resulting_status="pending").exists()
+
+        # pending -> paid
+        updated = invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("500.00"),
+            resulting_status="paid",
+            source_event="razorpay.payment_link.paid"
+        )
+        assert updated.status == "paid"
+        assert PaymentLedgerEntry.objects.filter(invoice=invoice, resulting_status="paid").exists()
+
+    def test_invoice_apply_ledger_entry_invalid_transition(self):
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="draft"
+        )
+        
+        # draft -> paid is invalid (must go draft -> pending -> paid)
+        with pytest.raises(InvalidStatusTransition):
+            invoice.apply_ledger_entry(
+                entry_type="debit",
+                amount=Decimal("500.00"),
+                resulting_status="paid",
+                source_event="direct_pay"
+            )
+
+    def test_subscription_invoice_apply_ledger_entry_valid_and_invalid(self):
+        clinic = ClinicFactory()
+        subscription = SubscriptionFactory(clinic=clinic)
+        sub_invoice = SubscriptionInvoice.objects.create(
+            subscription=subscription,
+            clinic=clinic,
+            invoice_number="MC-2026-777",
+            amount_before_gst=Decimal("1000.00"),
+            cgst=Decimal("90.00"),
+            sgst=Decimal("90.00"),
+            total_amount=Decimal("1180.00"),
+            period_start="2026-08-01T00:00:00Z",
+            period_end="2026-09-01T00:00:00Z",
+            status="pending"
+        )
+
+        # pending -> paid
+        updated = sub_invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("1180.00"),
+            resulting_status="paid",
+            source_event="subscription.charged"
+        )
+        assert updated.status == "paid"
+        assert PaymentLedgerEntry.objects.filter(subscription_invoice=sub_invoice, resulting_status="paid").exists()
+
+        # paid -> expired is invalid
+        with pytest.raises(InvalidStatusTransition):
+            sub_invoice.apply_ledger_entry(
+                entry_type="debit",
+                amount=Decimal("1180.00"),
+                resulting_status="expired",
+                source_event="manual_expire"
+            )
+

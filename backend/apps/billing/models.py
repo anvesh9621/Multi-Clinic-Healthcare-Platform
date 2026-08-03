@@ -3,6 +3,29 @@ from django.db import models
 from django.db.models import Q, CheckConstraint
 from django.conf import settings
 
+INVOICE_ALLOWED_TRANSITIONS = {
+    'draft': ['pending'],
+    'pending': ['paid', 'expired', 'cancelled', 'pending_at_clinic'],
+    'pending_at_clinic': ['paid', 'cancelled'],
+    'paid': ['refunded'],
+    'expired': [],
+    'cancelled': [],
+    'refunded': [],
+}
+
+SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS = {
+    'draft': ['pending'],
+    'pending': ['paid', 'failed', 'cancelled'],
+    'paid': ['refunded'],
+    'failed': ['paid', 'cancelled'],
+    'cancelled': [],
+    'refunded': [],
+}
+
+class InvalidStatusTransition(Exception):
+    pass
+
+
 class Invoice(models.Model):
     clinic = models.ForeignKey('clinics.Clinic', on_delete=models.CASCADE)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE)
@@ -45,8 +68,37 @@ class Invoice(models.Model):
     refund_reason = models.TextField(blank=True)
     
     notes = models.TextField(blank=True)
+    last_failure_reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def apply_ledger_entry(self, *, entry_type, amount, resulting_status,
+                            source_event, razorpay_reference='',
+                            idempotency_key=None, user=None):
+        """
+        The ONLY method that should change Invoice.status. Validates the
+        transition, writes an immutable ledger entry, updates the cached
+        status, and queues an outbox event — all atomically, with the row
+        locked for the duration.
+        """
+        from django.db import transaction
+
+        with transaction.atomic():
+            locked = Invoice.objects.select_for_update().get(pk=self.pk)
+            if resulting_status not in INVOICE_ALLOWED_TRANSITIONS.get(locked.status, []):
+                raise InvalidStatusTransition(
+                    f"Invoice {locked.pk}: {locked.status} -> {resulting_status} is not an allowed transition"
+                )
+            PaymentLedgerEntry.objects.create(
+                invoice=locked, entry_type=entry_type, amount=amount,
+                resulting_status=resulting_status, source_event=source_event,
+                razorpay_reference=razorpay_reference,
+                idempotency_key=idempotency_key, created_by=user,
+            )
+            locked.status = resulting_status
+            locked.save(update_fields=['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status'])
+        return locked
+
 
 class WebhookEvent(models.Model):
     event_id = models.CharField(max_length=100, unique=True)
@@ -75,8 +127,42 @@ class SubscriptionInvoice(models.Model):
     period_start = models.DateTimeField()
     period_end = models.DateTimeField()
     
+    status = models.CharField(max_length=20, default='pending', choices=[
+        ('draft', 'Draft'), ('pending', 'Pending'), ('paid', 'Paid'),
+        ('failed', 'Failed'), ('cancelled', 'Cancelled'), ('refunded', 'Refunded')
+    ])
+    last_failure_reason = models.CharField(max_length=255, blank=True)
+    
     pdf_path = models.CharField(max_length=255, blank=True)
     issued_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def apply_ledger_entry(self, *, entry_type, amount, resulting_status,
+                            source_event, razorpay_reference='',
+                            idempotency_key=None, user=None):
+        """
+        The ONLY method that should change SubscriptionInvoice.status. Validates the
+        transition, writes an immutable ledger entry, updates the cached
+        status — all atomically, with the row locked for the duration.
+        """
+        from django.db import transaction
+
+        with transaction.atomic():
+            locked = SubscriptionInvoice.objects.select_for_update().get(pk=self.pk)
+            if resulting_status not in SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS.get(locked.status, []):
+                raise InvalidStatusTransition(
+                    f"SubscriptionInvoice {locked.pk}: {locked.status} -> {resulting_status} is not an allowed transition"
+                )
+            PaymentLedgerEntry.objects.create(
+                subscription_invoice=locked, entry_type=entry_type, amount=amount,
+                resulting_status=resulting_status, source_event=source_event,
+                razorpay_reference=razorpay_reference,
+                idempotency_key=idempotency_key, created_by=user,
+            )
+            locked.status = resulting_status
+            locked.save(update_fields=['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status'])
+        return locked
+
 
 class PlatformSettings(models.Model):
     """
