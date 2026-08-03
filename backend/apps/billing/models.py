@@ -97,6 +97,15 @@ class Invoice(models.Model):
             )
             locked.status = resulting_status
             locked.save(update_fields=['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status'])
+
+            if resulting_status == 'paid':
+                PaymentOutboxEvent.objects.create(
+                    event_type='send_invoice_email',
+                    payload={
+                        'invoice_id': str(locked.pk),
+                        'invoice_type': 'appointment',
+                    },
+                )
         return locked
 
 
@@ -161,6 +170,15 @@ class SubscriptionInvoice(models.Model):
             )
             locked.status = resulting_status
             locked.save(update_fields=['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status'])
+
+            if resulting_status == 'paid':
+                PaymentOutboxEvent.objects.create(
+                    event_type='send_invoice_email',
+                    payload={
+                        'invoice_id': str(locked.pk),
+                        'invoice_type': 'subscription',
+                    },
+                )
         return locked
 
 

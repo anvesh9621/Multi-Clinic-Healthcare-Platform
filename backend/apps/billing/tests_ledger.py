@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction, connection
 from django.test import TransactionTestCase
 from apps.billing.models import (
-    Invoice, SubscriptionInvoice, PaymentIdempotencyKey, PaymentLedgerEntry,
+    Invoice, SubscriptionInvoice, PaymentIdempotencyKey, PaymentLedgerEntry, PaymentOutboxEvent,
     INVOICE_ALLOWED_TRANSITIONS, SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS, InvalidStatusTransition
 )
 from apps.core.factories import ClinicFactory, PatientFactory, SubscriptionFactory, UserFactory
@@ -354,6 +354,79 @@ class TestInvoiceTransitions:
             )
         assert PaymentLedgerEntry.objects.count() == initial_count + 1
         assert SubscriptionInvoice.objects.get(pk=sub_invoice.pk).status == "paid"
+
+    def test_outbox_event_created_only_on_paid_status(self):
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("400.00"),
+            total_amount=Decimal("400.00"),
+            status="draft"
+        )
+
+        initial_outbox_count = PaymentOutboxEvent.objects.count()
+
+        # draft -> pending: NO outbox event created
+        invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("400.00"),
+            resulting_status="pending",
+            source_event="payment_link_created"
+        )
+        assert PaymentOutboxEvent.objects.count() == initial_outbox_count
+
+        # pending -> paid: Outbox event CREATED
+        invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("400.00"),
+            resulting_status="paid",
+            source_event="payment_paid"
+        )
+        assert PaymentOutboxEvent.objects.count() == initial_outbox_count + 1
+        event = PaymentOutboxEvent.objects.latest('created_at')
+        assert event.event_type == 'send_invoice_email'
+        assert event.payload['invoice_id'] == str(invoice.id)
+        assert event.payload['invoice_type'] == 'appointment'
+        assert event.status == 'pending'
+
+        # paid -> refunded: NO additional outbox event created
+        invoice.apply_ledger_entry(
+            entry_type="credit",
+            amount=Decimal("400.00"),
+            resulting_status="refunded",
+            source_event="refund_processed"
+        )
+        assert PaymentOutboxEvent.objects.count() == initial_outbox_count + 1
+
+        # Test SubscriptionInvoice outbox creation on paid
+        subscription = SubscriptionFactory(clinic=clinic)
+        sub_invoice = SubscriptionInvoice.objects.create(
+            subscription=subscription,
+            clinic=clinic,
+            invoice_number="MC-2026-OUTBOX",
+            amount_before_gst=Decimal("1000.00"),
+            cgst=Decimal("90.00"),
+            sgst=Decimal("90.00"),
+            total_amount=Decimal("1180.00"),
+            period_start="2026-08-01T00:00:00Z",
+            period_end="2026-09-01T00:00:00Z",
+            status="pending"
+        )
+        sub_invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("1180.00"),
+            resulting_status="paid",
+            source_event="subscription.charged"
+        )
+        assert PaymentOutboxEvent.objects.count() == initial_outbox_count + 2
+        sub_event = PaymentOutboxEvent.objects.latest('created_at')
+        assert sub_event.event_type == 'send_invoice_email'
+        assert sub_event.payload['invoice_id'] == str(sub_invoice.id)
+        assert sub_event.payload['invoice_type'] == 'subscription'
+
 
 
 @pytest.mark.django_db(transaction=True)
