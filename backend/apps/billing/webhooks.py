@@ -65,6 +65,8 @@ def razorpay_webhook(request):
             handle_payment_link_paid(data['payload']['payment_link']['entity'], data['payload']['payment']['entity'])
         elif event_type == 'payment.failed':
             handle_payment_failed(data['payload']['payment']['entity'])
+        elif event_type == 'payment.authorized':
+            handle_payment_authorized(data['payload']['payment']['entity'])
     except Exception as e:
         logger.error(f"Error processing webhook event {event_type}: {e}")
         # Return 200 to acknowledge receipt and avoid infinite retries
@@ -256,4 +258,106 @@ def handle_payment_failed(payment_entity):
             )
     except Exception as e:
         logger.error(f"Failed to create payment failure notification: {e}")
+
+
+def handle_payment_authorized(payment_entity):
+    """
+    Handles Razorpay payment.authorized webhook event (late-authorization recovery).
+    If invoice is pending/draft/pending_at_clinic, marks it paid via apply_ledger_entry
+    and sets payment method.
+    If invoice is already paid, logs at debug level and ignores.
+    If invoice is in terminal status (expired/cancelled), logs error requiring manual
+    reconciliation as slot may have been released/rebooked.
+    """
+    notes = payment_entity.get('notes', {}) or {}
+    invoice_id = notes.get('invoice_id') or notes.get('invoice')
+    pl_id = payment_entity.get('payment_link_id')
+
+    invoice = None
+    if invoice_id:
+        try:
+            invoice = Invoice.objects.get(pk=invoice_id)
+        except (Invoice.DoesNotExist, ValueError):
+            pass
+
+    if not invoice and pl_id:
+        try:
+            invoice = Invoice.objects.get(razorpay_payment_link_id=pl_id)
+        except Invoice.DoesNotExist:
+            pass
+
+    if not invoice:
+        logger.error(f"payment.authorized webhook: no matching invoice found for payment {payment_entity.get('id')}")
+        return
+
+    raw_method = payment_entity.get('method', 'other')
+    payment_id = payment_entity.get('id', '')
+
+    if invoice.status in ('pending', 'pending_at_clinic', 'draft'):
+        invoice.payment_link_status = 'paid'
+        if payment_entity.get('created_at'):
+            invoice.paid_at = datetime.fromtimestamp(payment_entity['created_at'], tz=dt_timezone.utc)
+        else:
+            invoice.paid_at = timezone.now()
+        invoice.razorpay_payment_id = payment_id
+        invoice.save(update_fields=['payment_link_status', 'paid_at', 'razorpay_payment_id'])
+
+        invoice.apply_ledger_entry(
+            entry_type='debit',
+            amount=invoice.total_amount,
+            resulting_status='paid',
+            source_event='webhook:payment.authorized',
+            razorpay_reference=payment_id,
+            payment_method=raw_method,
+        )
+
+        if invoice.appointment:
+            appt = invoice.appointment
+            if appt.payment_flow == 'pay_now' and appt.status == 'SCHEDULED':
+                appt.status = 'CONFIRMED'
+                appt.save(update_fields=['status'])
+
+                try:
+                    from apps.notifications.models import Notification
+                    if appt.patient and appt.patient.user:
+                        doctor_name = ''
+                        try:
+                            doctor_name = appt.doctor_clinic.doctor.user.get_full_name()
+                        except Exception:
+                            pass
+                        Notification.objects.create(
+                            recipient=appt.patient.user,
+                            notification_type='APPOINTMENT',
+                            title='Appointment Confirmed',
+                            message=(
+                                f'Your appointment with Dr. {doctor_name} on '
+                                f'{appt.appointment_date} at {appt.start_time} '
+                                f'has been confirmed via authorized payment.'
+                            )
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to send appointment confirmation notification: {e}")
+
+                from apps.audit.services import log_action
+                from apps.audit.models import AuditLog
+                log_action(
+                    user=None,
+                    clinic=appt.clinic,
+                    action_type=AuditLog.ActionChoices.UPDATE,
+                    object_type='Appointment',
+                    object_id=appt.id,
+                    description=f'APPOINTMENT_CONFIRMED_VIA_LATE_AUTHORIZATION: payment {payment_id}'
+                )
+
+    elif invoice.status == 'paid':
+        logger.debug(f"payment.authorized for already-paid invoice {invoice.pk}, ignoring")
+    else:
+        logger.error(
+            f"payment.authorized for invoice {invoice.pk} in terminal "
+            f"status {invoice.status} — manual reconciliation needed, "
+            f"payment may need refunding"
+        )
+        invoice.last_failure_reason = f"Late payment.authorized received while in terminal status {invoice.status} — manual reconciliation required"
+        invoice.save(update_fields=['last_failure_reason'])
+
 

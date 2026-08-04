@@ -563,6 +563,105 @@ class TestInvoiceTransitions:
         assert "Card was declined by issuing bank" in notif.message
         assert notif.notification_type == "SYSTEM"
 
+    def test_handle_payment_authorized_pending_to_paid(self):
+        from apps.billing.webhooks import handle_payment_authorized
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("450.00"),
+            total_amount=Decimal("450.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_test_auth_111"
+        )
+
+        payment_entity = {
+            "id": "pay_auth_999",
+            "payment_link_id": "pl_test_auth_111",
+            "method": "netbanking",
+            "created_at": 1700000000,
+            "notes": {
+                "invoice_id": str(invoice.id)
+            }
+        }
+
+        handle_payment_authorized(payment_entity)
+
+        invoice.refresh_from_db()
+        assert invoice.status == "paid"
+        assert invoice.payment_method == "netbanking"
+        assert invoice.razorpay_payment_id == "pay_auth_999"
+
+    def test_handle_payment_authorized_already_paid_ignored(self):
+        from apps.billing.webhooks import handle_payment_authorized
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("450.00"),
+            total_amount=Decimal("450.00"),
+            status="paid"
+        )
+
+        initial_ledger_count = PaymentLedgerEntry.objects.count()
+
+        payment_entity = {
+            "id": "pay_auth_dup",
+            "method": "upi",
+            "notes": {
+                "invoice_id": str(invoice.id)
+            }
+        }
+
+        handle_payment_authorized(payment_entity)
+
+        invoice.refresh_from_db()
+        assert invoice.status == "paid"
+        assert PaymentLedgerEntry.objects.count() == initial_ledger_count
+
+    def test_handle_payment_authorized_terminal_status_flags_reconciliation(self):
+        from apps.billing.webhooks import handle_payment_authorized
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("450.00"),
+            total_amount=Decimal("450.00"),
+            status="expired"
+        )
+
+        initial_ledger_count = PaymentLedgerEntry.objects.count()
+
+        payment_entity = {
+            "id": "pay_auth_late",
+            "method": "card",
+            "notes": {
+                "invoice_id": str(invoice.id)
+            }
+        }
+
+        handle_payment_authorized(payment_entity)
+
+        invoice.refresh_from_db()
+        # 1. Invoice status remains 'expired' (not changed to paid)
+        assert invoice.status == "expired"
+
+        # 2. NO ledger entry written
+        assert PaymentLedgerEntry.objects.count() == initial_ledger_count
+
+        # 3. Manual reconciliation reason flagged
+        assert "manual reconciliation" in invoice.last_failure_reason.lower()
+
+
 
 
     def test_process_payment_outbox_success(self):
