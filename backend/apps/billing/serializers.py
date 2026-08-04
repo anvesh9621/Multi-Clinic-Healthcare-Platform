@@ -16,7 +16,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     # Writeable fields (subset of what staff may set on create)
     payment_method = serializers.ChoiceField(
-        choices=['pending', 'cash', 'upi', 'card'],
+        choices=Invoice._meta.get_field('payment_method').choices,
         required=False
     )
 

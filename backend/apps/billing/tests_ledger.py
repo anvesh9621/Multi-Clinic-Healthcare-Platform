@@ -451,6 +451,76 @@ class TestInvoiceTransitions:
         assert updated_invoice.pdf_path != ""
         assert os.path.exists(updated_invoice.pdf_path)
 
+    def test_apply_ledger_entry_updates_payment_method(self):
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("300.00"),
+            total_amount=Decimal("300.00"),
+            status="pending"
+        )
+
+        # 1. Valid payment method: 'card'
+        invoice.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("300.00"),
+            resulting_status="paid",
+            source_event="webhook:payment_link.paid",
+            payment_method="card"
+        )
+        invoice.refresh_from_db()
+        assert invoice.payment_method == "card"
+
+        # 2. Unknown payment method fallback to 'other'
+        invoice2 = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("200.00"),
+            total_amount=Decimal("200.00"),
+            status="pending"
+        )
+        invoice2.apply_ledger_entry(
+            entry_type="debit",
+            amount=Decimal("200.00"),
+            resulting_status="paid",
+            source_event="webhook:payment_link.paid",
+            payment_method="crypto"
+        )
+        invoice2.refresh_from_db()
+        assert invoice2.payment_method == "other"
+
+    def test_handle_payment_link_paid_extracts_card_payment_method(self):
+        from apps.billing.webhooks import handle_payment_link_paid
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("400.00"),
+            total_amount=Decimal("400.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_test_card_123"
+        )
+
+        pl_entity = {"id": "pl_test_card_123"}
+        payment_entity = {
+            "id": "pay_test_card_999",
+            "method": "card",
+            "created_at": 1700000000
+        }
+
+        handle_payment_link_paid(pl_entity, payment_entity)
+
+        invoice.refresh_from_db()
+        assert invoice.status == "paid"
+        assert invoice.payment_method == "card"
+        assert invoice.razorpay_payment_id == "pay_test_card_999"
+
+
     def test_process_payment_outbox_success(self):
         from django.core import mail
         from apps.billing.tasks import process_payment_outbox

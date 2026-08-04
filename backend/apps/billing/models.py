@@ -48,10 +48,14 @@ class Invoice(models.Model):
             ('cash', 'Cash'),
             ('upi', 'UPI'),
             ('card', 'Card'),
+            ('netbanking', 'Netbanking'),
+            ('wallet', 'Wallet'),
+            ('bank_transfer', 'Bank Transfer'),
+            ('other', 'Other'),
         ],
         default='pending'
     )
-    
+
     # Razorpay Payment Link fields
     razorpay_payment_link_id = models.CharField(max_length=100, blank=True)
     razorpay_payment_link_url = models.URLField(blank=True)
@@ -84,6 +88,7 @@ class Invoice(models.Model):
 
     def apply_ledger_entry(self, *, entry_type, amount, resulting_status,
                             source_event, razorpay_reference='',
+                            payment_method=None,
                             idempotency_key=None, user=None):
         """
         The ONLY method that should change Invoice.status. Validates the
@@ -106,7 +111,15 @@ class Invoice(models.Model):
                 idempotency_key=idempotency_key, created_by=user,
             )
             locked.status = resulting_status
-            locked.save(update_fields=['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status'])
+            update_fields = ['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status']
+
+            if payment_method:
+                valid_choices = dict(Invoice._meta.get_field('payment_method').choices)
+                pm = str(payment_method).lower().strip()
+                locked.payment_method = pm if pm in valid_choices else 'other'
+                update_fields.append('payment_method')
+
+            locked.save(update_fields=update_fields)
 
             if resulting_status == 'paid':
                 PaymentOutboxEvent.objects.create(

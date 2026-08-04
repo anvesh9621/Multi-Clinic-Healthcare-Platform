@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 from apps.billing.razorpay_client import get_razorpay_client
 from apps.billing.models import WebhookEvent, Invoice, SubscriptionInvoice
 from apps.subscriptions.models import Subscription
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone as dt_timezone
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def handle_subscription_charged(sub_entity, payment_entity):
     try:
         sub = Subscription.objects.get(razorpay_subscription_id=rzp_sub_id)
         sub.status = 'active'
-        sub.current_period_end = timezone.datetime.fromtimestamp(sub_entity['current_end'], tz=timezone.utc)
+        sub.current_period_end = datetime.fromtimestamp(sub_entity['current_end'], tz=dt_timezone.utc)
         sub.grace_period_end = None
         sub.payment_failed_at = None
         sub.save()
@@ -96,7 +96,7 @@ def handle_subscription_charged(sub_entity, payment_entity):
             total_amount=total,
             status='pending',
             razorpay_payment_id=payment_entity['id'],
-            period_start=timezone.datetime.fromtimestamp(sub_entity['current_start'], tz=timezone.utc),
+            period_start=datetime.fromtimestamp(sub_entity['current_start'], tz=dt_timezone.utc),
             period_end=sub.current_period_end,
         )
         inv.apply_ledger_entry(
@@ -138,11 +138,12 @@ def handle_payment_link_paid(pl_entity, payment_entity):
     pl_id = pl_entity['id']
     try:
         invoice = Invoice.objects.get(razorpay_payment_link_id=pl_id)
-        invoice.payment_method = 'upi'
+        raw_method = payment_entity.get('method', 'other')
+
         invoice.payment_link_status = 'paid'
-        invoice.paid_at = timezone.datetime.fromtimestamp(payment_entity['created_at'], tz=timezone.utc)
+        invoice.paid_at = datetime.fromtimestamp(payment_entity['created_at'], tz=dt_timezone.utc)
         invoice.razorpay_payment_id = payment_entity['id']
-        invoice.save(update_fields=['payment_method', 'payment_link_status', 'paid_at', 'razorpay_payment_id'])
+        invoice.save(update_fields=['payment_link_status', 'paid_at', 'razorpay_payment_id'])
 
         invoice.apply_ledger_entry(
             entry_type='debit',
@@ -150,6 +151,7 @@ def handle_payment_link_paid(pl_entity, payment_entity):
             resulting_status='paid',
             source_event='webhook:payment_link.paid',
             razorpay_reference=payment_entity['id'],
+            payment_method=raw_method,
         )
 
         # If this was a pay_now self-booking, confirm the appointment
