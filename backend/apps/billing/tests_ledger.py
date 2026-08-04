@@ -661,6 +661,107 @@ class TestInvoiceTransitions:
         # 3. Manual reconciliation reason flagged
         assert "manual reconciliation" in invoice.last_failure_reason.lower()
 
+    def test_handle_refund_processed_success(self):
+        from apps.billing.webhooks import handle_refund_processed
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="paid",
+            razorpay_payment_id="pay_rzp_to_refund_123"
+        )
+
+        initial_ledger_count = PaymentLedgerEntry.objects.count()
+
+        refund_entity = {
+            "id": "rfnd_rzp_ok_123",
+            "payment_id": "pay_rzp_to_refund_123",
+            "amount": 50000,
+        }
+
+        handle_refund_processed(refund_entity)
+
+        invoice.refresh_from_db()
+        assert invoice.status == "refunded"
+        assert invoice.refund_id == "rfnd_rzp_ok_123"
+        assert PaymentLedgerEntry.objects.count() == initial_ledger_count + 1
+        entry = PaymentLedgerEntry.objects.latest('created_at')
+        assert entry.entry_type == "credit"
+        assert entry.resulting_status == "refunded"
+
+    def test_handle_refund_processed_already_refunded_idempotent(self):
+        from apps.billing.webhooks import handle_refund_processed
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="refunded",
+            razorpay_payment_id="pay_rzp_already_refunded_123"
+        )
+
+        initial_ledger_count = PaymentLedgerEntry.objects.count()
+
+        refund_entity = {
+            "id": "rfnd_rzp_dup_123",
+            "payment_id": "pay_rzp_already_refunded_123",
+            "amount": 50000,
+        }
+
+        handle_refund_processed(refund_entity)
+
+        invoice.refresh_from_db()
+        assert invoice.status == "refunded"
+        assert PaymentLedgerEntry.objects.count() == initial_ledger_count
+
+    def test_handle_refund_failed_records_reason_and_alerts(self):
+        from apps.billing.webhooks import handle_refund_failed
+        from apps.notifications.models import Notification
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="paid",
+            razorpay_payment_id="pay_rzp_refund_fail_123"
+        )
+
+        super_admin = UserFactory(role='SUPER_ADMIN')
+        initial_notif_count = Notification.objects.filter(recipient=super_admin).count()
+
+        refund_entity = {
+            "id": "rfnd_rzp_failed_999",
+            "payment_id": "pay_rzp_refund_fail_123",
+            "error_description": "Insufficient balance in account",
+        }
+
+        handle_refund_failed(refund_entity)
+
+        invoice.refresh_from_db()
+        # 1. Invoice status remains 'paid'
+        assert invoice.status == "paid"
+
+        # 2. Failure reason populated
+        assert "rfnd_rzp_failed_999" in invoice.last_failure_reason
+        assert "Insufficient balance in account" in invoice.last_failure_reason
+
+        # 3. Super admin notified
+        assert Notification.objects.filter(recipient=super_admin).count() == initial_notif_count + 1
+
+
 
 
 
