@@ -520,6 +520,50 @@ class TestInvoiceTransitions:
         assert invoice.payment_method == "card"
         assert invoice.razorpay_payment_id == "pay_test_card_999"
 
+    def test_handle_payment_failed_populates_last_failure_reason_and_notifies(self):
+        from apps.billing.webhooks import handle_payment_failed
+        from apps.notifications.models import Notification
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_test_failed_555"
+        )
+
+        payment_entity = {
+            "id": "pay_failed_123",
+            "payment_link_id": "pl_test_failed_555",
+            "error_description": "Card was declined by issuing bank",
+            "error_reason": "payment_failed",
+            "notes": {
+                "invoice_id": str(invoice.id)
+            }
+        }
+
+        initial_notif_count = Notification.objects.filter(recipient=patient.user).count()
+
+        handle_payment_failed(payment_entity)
+
+        invoice.refresh_from_db()
+        # 1. Reason populated
+        assert invoice.last_failure_reason == "Card was declined by issuing bank"
+
+        # 2. Invoice status NOT cancelled/changed
+        assert invoice.status == "pending"
+
+        # 3. Patient notified with specific failure reason
+        assert Notification.objects.filter(recipient=patient.user).count() == initial_notif_count + 1
+        notif = Notification.objects.filter(recipient=patient.user).latest('created_at')
+        assert "Card was declined by issuing bank" in notif.message
+        assert notif.notification_type == "SYSTEM"
+
+
 
     def test_process_payment_outbox_success(self):
         from django.core import mail

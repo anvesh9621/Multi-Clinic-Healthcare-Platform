@@ -63,6 +63,8 @@ def razorpay_webhook(request):
             handle_subscription_cancelled(data['payload']['subscription']['entity'])
         elif event_type == 'payment_link.paid':
             handle_payment_link_paid(data['payload']['payment_link']['entity'], data['payload']['payment']['entity'])
+        elif event_type == 'payment.failed':
+            handle_payment_failed(data['payload']['payment']['entity'])
     except Exception as e:
         logger.error(f"Error processing webhook event {event_type}: {e}")
         # Return 200 to acknowledge receipt and avoid infinite retries
@@ -196,3 +198,62 @@ def handle_payment_link_paid(pl_entity, payment_entity):
 
     except Invoice.DoesNotExist:
         logger.error(f"Invoice for payment link {pl_id} not found.")
+
+
+def handle_payment_failed(payment_entity):
+    """
+    Handles Razorpay payment.failed webhook event.
+    Updates Invoice.last_failure_reason and notifies the patient with the
+    specific error reason. Deliberately does NOT change Invoice.status or
+    cancel appointment, allowing the patient to retry payment until the
+    expiry sweep runs.
+    """
+    notes = payment_entity.get('notes', {}) or {}
+    invoice_id = notes.get('invoice_id') or notes.get('invoice')
+    pl_id = payment_entity.get('payment_link_id')
+
+    invoice = None
+    if invoice_id:
+        try:
+            invoice = Invoice.objects.get(pk=invoice_id)
+        except (Invoice.DoesNotExist, ValueError):
+            pass
+
+    if not invoice and pl_id:
+        try:
+            invoice = Invoice.objects.get(razorpay_payment_link_id=pl_id)
+        except Invoice.DoesNotExist:
+            pass
+
+    if not invoice:
+        logger.error(f"payment.failed webhook: no matching invoice found for payment {payment_entity.get('id')}")
+        return
+
+    # Extract specific error reason from Razorpay payload
+    error_desc = (
+        payment_entity.get('error_description')
+        or payment_entity.get('error_reason')
+        or 'Payment failed'
+    )
+    invoice.last_failure_reason = str(error_desc)[:255]
+    invoice.save(update_fields=['last_failure_reason'])
+
+    # Send notification to patient with specific reason
+    try:
+        from apps.notifications.models import Notification
+        patient_user = invoice.patient.user if invoice.patient and invoice.patient.user else None
+        if patient_user:
+            Notification.objects.create(
+                recipient=patient_user,
+                notification_type='SYSTEM',
+                title='Payment Attempt Failed',
+                message=(
+                    f"Your payment attempt of ₹{invoice.total_amount} for invoice "
+                    f"{invoice.invoice_number or invoice.pk} failed: {error_desc}. "
+                    f"You may try again using your payment link."
+                ),
+                related_link='/dashboard/patient/invoices'
+            )
+    except Exception as e:
+        logger.error(f"Failed to create payment failure notification: {e}")
+

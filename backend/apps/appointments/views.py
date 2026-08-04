@@ -146,6 +146,10 @@ class BookAppointmentView(APIView):
                     'callback_url': f'{settings.FRONTEND_URL}/book/payment-status?appointment_id={appointment.id}',
                     'callback_method': 'get',
                     'notify': {'sms': False, 'email': False},
+                    'notes': {
+                        'invoice_id': str(invoice.id),
+                        'appointment_id': str(appointment.id),
+                    },
                 })
 
                 invoice.razorpay_payment_link_id = payment_link['id']

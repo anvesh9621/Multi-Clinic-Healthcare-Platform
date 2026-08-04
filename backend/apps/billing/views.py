@@ -182,6 +182,10 @@ class GeneratePaymentLinkView(APIView):
             "notify": {"sms": True, "email": True},
             "reminder_enable": True,
             "expire_by": int(expires_at.timestamp()),
+            "notes": {
+                "invoice_id": str(invoice.id),
+                "clinic_id": str(invoice.clinic.id),
+            },
             "options": {
                 "order": {
                     "transfers": [{
