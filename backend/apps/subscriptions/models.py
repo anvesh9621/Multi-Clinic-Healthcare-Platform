@@ -44,7 +44,7 @@ SUBSCRIPTION_ALLOWED_TRANSITIONS = {
     'trialing': ['created', 'active', 'cancelled'],
     'created': ['active', 'cancelled', 'trialing'],
     'active': ['created', 'active', 'past_due', 'cancelled', 'trialing'],
-    'past_due': ['active', 'halted', 'cancelled', 'trialing'],
+    'past_due': ['past_due', 'active', 'halted', 'cancelled', 'trialing'],
     'halted': ['active', 'cancelled', 'expired', 'trialing'],
     'cancelled': ['created', 'active', 'trialing'],
     'expired': ['created', 'active', 'trialing'],

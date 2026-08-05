@@ -76,6 +76,31 @@ class TestSubscriptionTransitions(TestCase):
         assert self.sub.payment_failed_at == now
         assert self.sub.grace_period_end == grace_end
 
+    def test_past_due_self_transition_succeeds_with_extra_fields(self):
+        self.sub.status = 'past_due'
+        initial_failed_at = timezone.now() - timedelta(days=2)
+        self.sub.payment_failed_at = initial_failed_at
+        self.sub.save()
+
+        new_failed_at = timezone.now()
+        new_grace_end = new_failed_at + timedelta(days=10)
+
+        updated = self.sub.transition_status(
+            'past_due',
+            source_event='test_past_due_reentry',
+            extra_fields={
+                'payment_failed_at': new_failed_at,
+                'grace_period_end': new_grace_end
+            }
+        )
+
+        self.sub.refresh_from_db()
+        assert self.sub.status == 'past_due'
+        assert updated.status == 'past_due'
+        assert self.sub.payment_failed_at == new_failed_at
+        assert self.sub.grace_period_end == new_grace_end
+
+
 
 @pytest.mark.django_db(transaction=True)
 class TestSubscriptionConcurrencySelectForUpdate(TransactionTestCase):
