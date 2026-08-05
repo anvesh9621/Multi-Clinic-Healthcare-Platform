@@ -65,11 +65,15 @@ class CreateSubscriptionView(APIView):
 
         try:
             rzp_sub = client.subscription.create(data=subscription_data)
-            sub.razorpay_subscription_id = rzp_sub['id']
-            sub.razorpay_plan_id = plan_id
-            sub.plan = plan
-            sub.status = 'created'  # Will become active after e-mandate + first charge
-            sub.save()
+            sub = sub.transition_status(
+                'created',
+                source_event='view:create_subscription',
+                extra_fields={
+                    'razorpay_subscription_id': rzp_sub['id'],
+                    'razorpay_plan_id': plan_id,
+                    'plan': plan,
+                }
+            )
 
             # Get the publishable key to send to frontend
             from apps.billing.models import PlatformSettings
@@ -142,8 +146,10 @@ class CancelSubscriptionView(APIView):
         
         try:
             client.subscription.cancel(sub.razorpay_subscription_id, {"cancel_at_cycle_end": 0})
-            sub.status = 'cancelled'
-            sub.save()
+            sub.transition_status(
+                'cancelled',
+                source_event='view:cancel_subscription'
+            )
             return Response({'message': 'Subscription cancelled successfully.'})
         except Exception as e:
             return Response({'error': f"Subscription cancellation failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -195,9 +201,13 @@ class VerifySubscriptionView(APIView):
 
         # Signature valid — activate the subscription
         sub, _ = Subscription.objects.get_or_create(clinic=clinic)
-        sub.razorpay_subscription_id = subscription_id
-        sub.status = 'active'
-        sub.save()
+        sub = sub.transition_status(
+            'active',
+            source_event='view:verify_subscription',
+            extra_fields={
+                'razorpay_subscription_id': subscription_id,
+            }
+        )
 
         logger.info(f"Subscription verified and activated for clinic {clinic.id} (sub_id={subscription_id})")
         return Response({'success': True, 'message': 'Subscription activated successfully.'})

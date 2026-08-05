@@ -235,9 +235,12 @@ class SuperAdminChangePlanView(APIView):
 
         from apps.subscriptions.models import Subscription
         sub, _ = Subscription.objects.get_or_create(clinic=clinic)
-        sub.plan = plan
-        sub.status = 'active' if plan != 'starter' else 'inactive'
-        sub.save()
+        target_status = 'active' if plan != 'starter' else 'trialing'
+        sub = sub.transition_status(
+            target_status,
+            source_event='view:admin_change_plan',
+            extra_fields={'plan': plan}
+        )
 
         log_action(
             user=request.user,

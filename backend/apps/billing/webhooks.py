@@ -83,11 +83,16 @@ def handle_subscription_charged(sub_entity, payment_entity):
     rzp_sub_id = sub_entity['id']
     try:
         sub = Subscription.objects.get(razorpay_subscription_id=rzp_sub_id)
-        sub.status = 'active'
-        sub.current_period_end = datetime.fromtimestamp(sub_entity['current_end'], tz=dt_timezone.utc)
-        sub.grace_period_end = None
-        sub.payment_failed_at = None
-        sub.save()
+        period_end = datetime.fromtimestamp(sub_entity['current_end'], tz=dt_timezone.utc)
+        sub = sub.transition_status(
+            'active',
+            source_event='webhook:subscription.charged',
+            extra_fields={
+                'current_period_end': period_end,
+                'grace_period_end': None,
+                'payment_failed_at': None,
+            }
+        )
         
         # Calculate GST components (18% GST on total)
         total = payment_entity['amount'] / 100.0
@@ -127,10 +132,14 @@ def handle_subscription_halted(sub_entity):
     rzp_sub_id = sub_entity['id']
     try:
         sub = Subscription.objects.get(razorpay_subscription_id=rzp_sub_id)
-        sub.status = 'past_due'
-        sub.payment_failed_at = timezone.now()
-        sub.grace_period_end = timezone.now() + timedelta(days=7)
-        sub.save()
+        sub.transition_status(
+            'past_due',
+            source_event='webhook:subscription.halted',
+            extra_fields={
+                'payment_failed_at': timezone.now(),
+                'grace_period_end': timezone.now() + timedelta(days=7),
+            }
+        )
     except Subscription.DoesNotExist:
         logger.error(f"Subscription {rzp_sub_id} not found.")
 
@@ -138,8 +147,10 @@ def handle_subscription_cancelled(sub_entity):
     rzp_sub_id = sub_entity['id']
     try:
         sub = Subscription.objects.get(razorpay_subscription_id=rzp_sub_id)
-        sub.status = 'cancelled'
-        sub.save()
+        sub.transition_status(
+            'cancelled',
+            source_event='webhook:subscription.cancelled'
+        )
     except Subscription.DoesNotExist:
         logger.error(f"Subscription {rzp_sub_id} not found.")
 
