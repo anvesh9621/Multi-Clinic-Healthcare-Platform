@@ -22,6 +22,7 @@ def cancel_unpaid_appointments():
     from apps.notifications.models import Notification
     from apps.audit.services import log_action
     from apps.audit.models import AuditLog
+    from apps.billing.services import reconcile_invoice_with_razorpay
 
     now = timezone.now()
 
@@ -34,6 +35,18 @@ def cancel_unpaid_appointments():
 
     cancelled_count = 0
     for invoice in expired_invoices:
+        # Defensive check: maybe this was actually paid and the webhook
+        # just hasn't arrived/been processed yet — don't cancel a slot
+        # someone genuinely paid for.
+        was_actually_paid = reconcile_invoice_with_razorpay(invoice)
+        if was_actually_paid:
+            logger.warning(
+                f"Expiry sweep almost cancelled invoice {invoice.pk} but "
+                f"reconciliation caught it was actually paid — this is "
+                f"exactly the race condition this check exists to prevent"
+            )
+            continue  # skip cancellation, it's genuinely paid now
+
         try:
             with transaction.atomic():
                 appt = invoice.appointment

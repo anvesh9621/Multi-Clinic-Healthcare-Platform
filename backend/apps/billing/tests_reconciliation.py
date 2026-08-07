@@ -199,3 +199,57 @@ class TestReconciliationService:
         assert fresh_inv.status == "pending"
         assert stale_inv.status == "paid"
 
+    @patch("apps.billing.services.get_razorpay_client")
+    def test_expiry_sweep_defensive_reconciliation_prevents_cancellation(self, mock_get_client):
+        from datetime import timedelta
+        import datetime
+        from apps.appointments.tasks import cancel_unpaid_appointments
+
+        mock_client = MagicMock()
+        mock_client.payment_link.fetch.return_value = {
+            "id": "pl_expiry_race_123",
+            "status": "paid",
+            "payments": [{"id": "pay_expiry_race_999", "method": "card", "created_at": 1700000000}]
+        }
+        mock_get_client.return_value = mock_client
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+
+        doctor_user = DoctorFactory()
+        doctor = getattr(doctor_user, 'doctor_profile', None) or Doctor.objects.create(user=doctor_user)
+        doctor_clinic = DoctorClinic.objects.create(doctor=doctor, clinic=clinic, consultation_fee=Decimal("500.00"))
+
+        appt = Appointment.objects.create(
+            patient=patient,
+            doctor_clinic=doctor_clinic,
+            clinic=clinic,
+            appointment_date=datetime.date(2026, 8, 15),
+            start_time=datetime.time(10, 0),
+            end_time=datetime.time(10, 30),
+            status="SCHEDULED",
+            payment_flow="pay_now"
+        )
+
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            appointment=appt,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_expiry_race_123",
+            payment_link_expires_at=timezone.now() - timedelta(minutes=5)
+        )
+
+        cancel_unpaid_appointments()
+
+        invoice.refresh_from_db()
+        appt.refresh_from_db()
+
+        # Defensive check caught that payment link was actually paid — prevented auto-cancellation!
+        assert invoice.status == "paid"
+        assert appt.status == "CONFIRMED"
+
+
