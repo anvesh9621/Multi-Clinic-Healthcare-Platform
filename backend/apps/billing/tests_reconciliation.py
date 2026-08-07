@@ -56,6 +56,31 @@ class TestReconciliationService:
         assert invoice.status == "pending"
 
     @patch("apps.billing.services.get_razorpay_client")
+    def test_reconcile_invoice_razorpay_api_exception_handled_gracefully(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.payment_link.fetch.side_effect = Exception("Razorpay API Outage")
+        mock_get_client.return_value = mock_client
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_reconcile_err"
+        )
+
+        # Should handle exception gracefully without crashing, return False, leave invoice pending
+        result = reconcile_invoice_with_razorpay(invoice)
+        assert result is False
+        invoice.refresh_from_db()
+        assert invoice.status == "pending"
+
+
+    @patch("apps.billing.services.get_razorpay_client")
     def test_reconcile_invoice_razorpay_paid_reconciles_and_confirms_appointment(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.payment_link.fetch.return_value = {
