@@ -1,8 +1,10 @@
 import logging
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
+from decimal import Decimal
+from django.db import models
 from apps.billing.razorpay_client import get_razorpay_client
-from apps.billing.models import Invoice, SubscriptionInvoice
+from apps.billing.models import Invoice, SubscriptionInvoice, RefundRequest, PaymentIdempotencyKey
 
 logger = logging.getLogger(__name__)
 
@@ -170,3 +172,122 @@ def reconcile_subscription_invoice_with_razorpay(sub_invoice):
         return False
 
     return False
+
+
+def initiate_refund(invoice, *, amount, reason, requested_by):
+    """
+    Creates a RefundRequest and either auto-approves + processes it
+    immediately, or leaves it pending_approval for a Clinic Admin.
+    """
+    from django.conf import settings
+
+    if invoice.status not in ('paid',):
+        raise ValueError(f"Cannot refund invoice in status {invoice.status}")
+
+    already_refunded = invoice.refund_requests.filter(
+        status__in=['completed', 'processing']
+    ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
+
+    if already_refunded + amount > invoice.total_amount:
+        raise ValueError(
+            f"Refund amount {amount} would exceed remaining refundable "
+            f"balance ({invoice.total_amount - already_refunded})"
+        )
+
+    auto_approve = (
+        getattr(requested_by, 'role', None) == 'CLINIC_ADMIN' or
+        amount <= Decimal(str(settings.REFUND_AUTO_APPROVE_THRESHOLD))
+    )
+
+    refund_request = RefundRequest.objects.create(
+        invoice=invoice,
+        requested_by=requested_by,
+        amount=amount,
+        reason=reason,
+        status='processing' if auto_approve else 'pending_approval',
+        approved_by=requested_by if auto_approve else None,
+    )
+
+    if auto_approve:
+        _process_refund(refund_request)
+
+    return refund_request
+
+
+def approve_refund(refund_request, *, approved_by):
+    if refund_request.status != 'pending_approval':
+        raise ValueError(f"Refund request {refund_request.pk} is not pending approval")
+
+    refund_request.status = 'processing'
+    refund_request.approved_by = approved_by
+    refund_request.save(update_fields=['status', 'approved_by'])
+    _process_refund(refund_request)
+    return refund_request
+
+
+def reject_refund(refund_request, *, rejected_by, rejection_reason=''):
+    if refund_request.status != 'pending_approval':
+        raise ValueError(f"Refund request {refund_request.pk} is not pending approval")
+
+    refund_request.status = 'rejected'
+    refund_request.approved_by = rejected_by
+    refund_request.save(update_fields=['status', 'approved_by'])
+
+    try:
+        from apps.notifications.models import Notification
+        if refund_request.requested_by:
+            reason_msg = f": {rejection_reason}" if rejection_reason else ""
+            Notification.objects.create(
+                recipient=refund_request.requested_by,
+                notification_type='SYSTEM',
+                title='Refund Request Rejected',
+                message=(
+                    f"Your refund request of ₹{refund_request.amount} for invoice "
+                    f"{refund_request.invoice.invoice_number or refund_request.invoice.pk} "
+                    f"was rejected{reason_msg}."
+                ),
+            )
+    except Exception as e:
+        logger.error(f"Failed to create refund rejection notification: {e}")
+
+
+def _process_refund(refund_request):
+    """
+    Makes the actual outbound Razorpay refund call, protected by an
+    idempotency key so a retry (network timeout, duplicate call) never
+    creates two refunds for the same request.
+    """
+    idem_key, created = PaymentIdempotencyKey.objects.get_or_create(
+        key=f"refund-{refund_request.id}",
+        defaults={'operation_type': 'refund', 'reference_id': str(refund_request.id)},
+    )
+    refund_request.idempotency_key = idem_key
+    refund_request.save(update_fields=['idempotency_key'])
+
+    if idem_key.status == 'completed':
+        # already processed under this key — don't call Razorpay again,
+        # this handles the retry-after-timeout case directly
+        return refund_request
+
+    client = get_razorpay_client()
+    try:
+        response = client.payment.refund(
+            refund_request.invoice.razorpay_payment_id,
+            {
+                'amount': int(refund_request.amount * 100),  # paise
+                'notes': {'refund_request_id': str(refund_request.id)},
+            },
+        )
+        refund_request.razorpay_refund_id = response.get('id', '')
+        refund_request.save(update_fields=['razorpay_refund_id'])
+        idem_key.status = 'completed'
+        idem_key.razorpay_response = response
+        idem_key.save(update_fields=['status', 'razorpay_response'])
+    except Exception as e:
+        logger.error(f"Refund API call failed for RefundRequest {refund_request.pk}: {e}")
+        refund_request.status = 'failed'
+        refund_request.save(update_fields=['status'])
+        idem_key.status = 'failed'
+        idem_key.save(update_fields=['status'])
+        raise
+
