@@ -309,6 +309,10 @@ PLATFORM_NAME = 'MediClinic'
 PLATFORM_ADDRESS = os.environ.get('PLATFORM_ADDRESS', default='')
 HSN_SAC_CODE = '998314'  # Software SaaS services
 
+# Refund config
+from decimal import Decimal
+REFUND_AUTO_APPROVE_THRESHOLD = Decimal(os.environ.get('REFUND_AUTO_APPROVE_THRESHOLD', '500.00'))
+
 # ── Celery Beat Schedule ──────────────────────────────────────────────────────
 from celery.schedules import crontab
 

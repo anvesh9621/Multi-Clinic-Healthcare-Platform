@@ -8,7 +8,7 @@ INVOICE_ALLOWED_TRANSITIONS = {
     'draft': ['pending', 'pending_at_clinic'],
     'pending': ['paid', 'expired', 'cancelled', 'pending_at_clinic'],
     'pending_at_clinic': ['paid', 'cancelled'],
-    'paid': ['refunded'],
+    'paid': ['paid', 'refunded'],
     'expired': [],
     'cancelled': [],
     'refunded': [],
@@ -227,6 +227,34 @@ class PaymentIdempotencyKey(models.Model):
         ('pending', 'Pending'), ('completed', 'Completed'), ('failed', 'Failed'),
     ])
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class RefundRequest(models.Model):
+    invoice = models.ForeignKey('Invoice', on_delete=models.CASCADE, related_name='refund_requests')
+    requested_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
+    approved_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_refunds')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    reason = models.TextField()
+    status = models.CharField(max_length=20, default='pending_approval', choices=[
+        ('pending_approval', 'Pending Approval'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('rejected', 'Rejected'),
+    ])
+    razorpay_refund_id = models.CharField(max_length=100, blank=True)
+    idempotency_key = models.ForeignKey('PaymentIdempotencyKey', on_delete=models.PROTECT, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    def total_refunded_for_invoice(self):
+        """Sum of all completed refunds for this invoice, including this one if completed."""
+        from django.db.models import Sum
+        from decimal import Decimal
+        return self.invoice.refund_requests.filter(status='completed').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+
 
 
 class PaymentLedgerEntry(models.Model):
