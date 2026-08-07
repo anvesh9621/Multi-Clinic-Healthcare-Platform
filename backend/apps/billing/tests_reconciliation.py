@@ -150,3 +150,52 @@ class TestReconciliationService:
         assert sub_invoice.status == "paid"
         assert sub.status == "active"
         mock_pdf_delay.assert_called_once_with(sub_invoice.id)
+
+    @patch("apps.billing.services.get_razorpay_client")
+    def test_reconcile_pending_payments_task(self, mock_get_client):
+        from datetime import timedelta
+        from apps.billing.tasks import reconcile_pending_payments
+
+        mock_client = MagicMock()
+        mock_client.payment_link.fetch.return_value = {
+            "id": "pl_stale_paid",
+            "status": "paid",
+            "payments": [{"id": "pay_stale_123", "method": "upi", "created_at": 1700000000}]
+        }
+        mock_get_client.return_value = mock_client
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+
+        # Fresh pending invoice (< 3 mins old) — should NOT be reconciled yet
+        fresh_inv = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("300.00"),
+            total_amount=Decimal("300.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_fresh_123"
+        )
+
+        # Stale pending invoice (> 3 mins old) — SHOULD be reconciled
+        stale_inv = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("400.00"),
+            total_amount=Decimal("400.00"),
+            status="pending",
+            razorpay_payment_link_id="pl_stale_paid"
+        )
+        stale_inv.created_at = timezone.now() - timedelta(minutes=5)
+        stale_inv.save(update_fields=['created_at'])
+
+        caught = reconcile_pending_payments()
+
+        assert caught == 1
+        fresh_inv.refresh_from_db()
+        stale_inv.refresh_from_db()
+
+        assert fresh_inv.status == "pending"
+        assert stale_inv.status == "paid"
+

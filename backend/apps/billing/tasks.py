@@ -294,3 +294,42 @@ def _handle_send_invoice_email(payload):
 
     msg.send(fail_silently=False)
 
+
+@shared_task
+def reconcile_pending_payments():
+    """
+    Runs every 10 minutes. Catches any pending Invoice/SubscriptionInvoice
+    whose webhook was delayed or dropped, independent of the expiry sweep.
+    """
+    from datetime import timedelta
+    from .services import reconcile_invoice_with_razorpay, reconcile_subscription_invoice_with_razorpay
+
+    stale_threshold = timezone.now() - timedelta(minutes=3)
+
+    stale_invoices = Invoice.objects.filter(
+        status='pending',
+        created_at__lt=stale_threshold,
+    )
+    caught_count = 0
+    for invoice in stale_invoices:
+        if reconcile_invoice_with_razorpay(invoice):
+            caught_count += 1
+
+    stale_sub_invoices = SubscriptionInvoice.objects.filter(
+        status='pending',
+        issued_at__lt=stale_threshold,
+    )
+    for sub_invoice in stale_sub_invoices:
+        if reconcile_subscription_invoice_with_razorpay(sub_invoice):
+            caught_count += 1
+
+    if caught_count > 0:
+        logger.warning(
+            f"Reconciliation job caught {caught_count} payment(s) that "
+            f"webhooks missed — if this number is consistently non-zero, "
+            f"investigate webhook delivery reliability, don't just rely "
+            f"on reconciliation as a permanent crutch"
+        )
+    return caught_count
+
+

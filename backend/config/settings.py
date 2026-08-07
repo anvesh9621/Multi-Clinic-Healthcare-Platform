@@ -321,6 +321,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.billing.tasks.process_payment_outbox',
         'schedule': 30.0,  # Every 30 seconds
     },
+    'reconcile-pending-payments': {
+        'task': 'apps.billing.tasks.reconcile_pending_payments',
+        'schedule': 600.0,  # Every 10 minutes (600 seconds)
+    },
 }
 
 CELERY_TASK_EAGER_PROPAGATES = True
