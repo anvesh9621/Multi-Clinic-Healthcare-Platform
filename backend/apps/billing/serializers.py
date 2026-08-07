@@ -1,6 +1,37 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Invoice
+from .models import Invoice, RefundRequest
+
+
+class RefundRequestSerializer(serializers.ModelSerializer):
+    requested_by_email = serializers.EmailField(source='requested_by.email', read_only=True)
+    approved_by_email = serializers.EmailField(source='approved_by.email', read_only=True)
+
+    class Meta:
+        model = RefundRequest
+        fields = [
+            'id',
+            'invoice',
+            'requested_by',
+            'requested_by_email',
+            'approved_by',
+            'approved_by_email',
+            'amount',
+            'reason',
+            'status',
+            'razorpay_refund_id',
+            'created_at',
+            'processed_at',
+        ]
+        read_only_fields = [
+            'id',
+            'requested_by',
+            'approved_by',
+            'status',
+            'razorpay_refund_id',
+            'created_at',
+            'processed_at',
+        ]
 
 
 class InvoiceSerializer(serializers.ModelSerializer):

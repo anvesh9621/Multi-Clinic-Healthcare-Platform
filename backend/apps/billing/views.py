@@ -2,9 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from decimal import Decimal
 from apps.accounts.permissions import IsClinicAdminOrReceptionist, IsClinicAdmin, IsPatient
 from apps.core.tenancy import get_user_clinic
-from .models import Invoice
+from .models import Invoice, RefundRequest
+from .serializers import RefundRequestSerializer
+from .services import initiate_refund, approve_refund, reject_refund
 from apps.billing.razorpay_client import get_razorpay_client
 from apps.notifications.models import Notification
 from apps.audit.services import log_action
@@ -670,4 +673,158 @@ class SuperAdminGenerateSubscriptionLinkView(APIView):
         except Exception as e:
             logger.error(f"Failed to create subscription payment link: {e}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class InitiateRefundView(APIView):
+    """
+    POST /api/billing/refunds/initiate/
+    Allowed: RECEPTIONIST, CLINIC_ADMIN (own clinic), SUPER_ADMIN
+    Body: { "invoice_id": 12, "amount": "300.00", "reason": "Patient requested cancellation" }
+    """
+    permission_classes = [IsAuthenticated, IsClinicAdminOrReceptionist]
+
+    def post(self, request):
+        invoice_id = request.data.get('invoice_id')
+        amount_raw = request.data.get('amount')
+        reason = request.data.get('reason', '')
+
+        if not invoice_id or not amount_raw:
+            return Response(
+                {'error': 'invoice_id and amount are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            amount = Decimal(str(amount_raw))
+            if amount <= 0:
+                raise ValueError("Amount must be positive.")
+        except Exception:
+            return Response(
+                {'error': 'Invalid amount provided.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        clinic = get_user_clinic(request.user)
+        if not clinic and request.user.role != 'SUPER_ADMIN':
+            return Response({'error': 'No clinic associated'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            if request.user.role == 'SUPER_ADMIN':
+                invoice = Invoice.objects.get(id=invoice_id)
+            else:
+                invoice = Invoice.objects.get(id=invoice_id, clinic=clinic)
+        except Invoice.DoesNotExist:
+            return Response({'error': 'Invoice not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            refund_request = initiate_refund(
+                invoice,
+                amount=amount,
+                reason=reason,
+                requested_by=request.user
+            )
+            return Response(
+                RefundRequestSerializer(refund_request).data,
+                status=status.HTTP_201_CREATED
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Initiate refund view failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PendingRefundApprovalsListView(APIView):
+    """
+    GET /api/billing/refunds/pending/
+    Allowed: CLINIC_ADMIN (own clinic), SUPER_ADMIN
+    Lists all pending_approval RefundRequests for the clinic.
+    """
+    permission_classes = [IsAuthenticated, IsClinicAdmin]
+
+    def get(self, request):
+        clinic = get_user_clinic(request.user)
+        if not clinic and request.user.role != 'SUPER_ADMIN':
+            return Response([], status=status.HTTP_200_OK)
+
+        if request.user.role == 'SUPER_ADMIN':
+            qs = RefundRequest.objects.filter(status='pending_approval')
+        else:
+            qs = RefundRequest.objects.filter(invoice__clinic=clinic, status='pending_approval')
+
+        qs = qs.order_by('-created_at').select_related('invoice', 'requested_by', 'approved_by')
+        serializer = RefundRequestSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ApproveRefundView(APIView):
+    """
+    POST /api/billing/refunds/{pk}/approve/
+    Allowed: CLINIC_ADMIN (own clinic explicit check), SUPER_ADMIN
+    """
+    permission_classes = [IsAuthenticated, IsClinicAdmin]
+
+    def post(self, request, pk):
+        try:
+            refund_request = RefundRequest.objects.select_related('invoice__clinic').get(id=pk)
+        except RefundRequest.DoesNotExist:
+            return Response({'error': 'Refund request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        clinic = get_user_clinic(request.user)
+        if request.user.role != 'SUPER_ADMIN':
+            if not clinic or refund_request.invoice.clinic_id != clinic.id:
+                return Response(
+                    {'error': 'You do not have permission to approve refund requests for this clinic.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        try:
+            refund_request = approve_refund(refund_request, approved_by=request.user)
+            return Response(
+                RefundRequestSerializer(refund_request).data,
+                status=status.HTTP_200_OK
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Approve refund view failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RejectRefundView(APIView):
+    """
+    POST /api/billing/refunds/{pk}/reject/
+    Allowed: CLINIC_ADMIN (own clinic explicit check), SUPER_ADMIN
+    Body: { "rejection_reason": "Policy limit exceeded" }
+    """
+    permission_classes = [IsAuthenticated, IsClinicAdmin]
+
+    def post(self, request, pk):
+        try:
+            refund_request = RefundRequest.objects.select_related('invoice__clinic').get(id=pk)
+        except RefundRequest.DoesNotExist:
+            return Response({'error': 'Refund request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        clinic = get_user_clinic(request.user)
+        if request.user.role != 'SUPER_ADMIN':
+            if not clinic or refund_request.invoice.clinic_id != clinic.id:
+                return Response(
+                    {'error': 'You do not have permission to reject refund requests for this clinic.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        rejection_reason = request.data.get('rejection_reason', '')
+        try:
+            reject_refund(refund_request, rejected_by=request.user, rejection_reason=rejection_reason)
+            refund_request.refresh_from_db()
+            return Response(
+                RefundRequestSerializer(refund_request).data,
+                status=status.HTTP_200_OK
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Reject refund view failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
