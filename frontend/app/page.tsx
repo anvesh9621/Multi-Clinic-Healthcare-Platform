@@ -4,10 +4,16 @@ import { HeroSection } from '@/components/landing/HeroSection';
 import { LandingPageSections } from '@/components/landing/LandingPageSections';
 async function getSpecialties(): Promise<string[]> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/public/specialties/`,
-      { next: { revalidate: 60 } }
+      {
+        next: { revalidate: 60 },
+        signal: controller.signal,
+      }
     );
+    clearTimeout(timeoutId);
     if (!res.ok) return [];
     return res.json();
   } catch {
