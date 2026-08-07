@@ -10,6 +10,7 @@ from apps.subscriptions.models import Subscription
 from decimal import Decimal
 from datetime import timedelta, datetime, timezone as dt_timezone
 from django.utils import timezone
+from django.db import models
 
 logger = logging.getLogger(__name__)
 
@@ -312,9 +313,51 @@ def handle_refund_processed(refund_entity):
     Otherwise updates refund_id, refunded_at, and writes a credit ledger entry
     with resulting_status='refunded'.
     """
+def handle_refund_processed(refund_entity):
+    """
+    Handles Razorpay refund.processed webhook event.
+    Extends Phase 3's logic to check for a matching RefundRequest via razorpay_refund_id.
+    If found: marks RefundRequest completed, sums all completed refunds for partial vs full
+    refund check, and applies ledger entry accordingly.
+    If not found: falls back to Invoice-only lookup for dashboard-initiated refunds.
+    """
+    refund_id = refund_entity.get('id', '')
+    from apps.billing.models import RefundRequest
+    refund_request = RefundRequest.objects.filter(razorpay_refund_id=refund_id).first()
+
+    if refund_request:
+        if refund_request.status == 'completed':
+            logger.debug(f"RefundRequest {refund_request.pk} already completed, skipping duplicate webhook")
+            return
+
+        refund_request.status = 'completed'
+        refund_request.processed_at = timezone.now()
+        refund_request.save(update_fields=['status', 'processed_at'])
+
+        invoice = refund_request.invoice
+        total_refunded = invoice.refund_requests.filter(status='completed').aggregate(
+            total=models.Sum('amount')
+        )['total'] or Decimal('0')
+
+        resulting_status = 'refunded' if total_refunded >= invoice.total_amount else 'paid'
+
+        invoice.refund_id = refund_id
+        invoice.refunded_at = timezone.now()
+        invoice.save(update_fields=['refund_id', 'refunded_at'])
+
+        invoice.apply_ledger_entry(
+            entry_type='credit',
+            amount=refund_request.amount,
+            resulting_status=resulting_status,
+            source_event='webhook:refund.processed',
+            razorpay_reference=refund_id,
+        )
+        return
+
+    # Fallback to existing Invoice / SubscriptionInvoice lookup for direct Razorpay dashboard refunds
     payment_id = refund_entity.get('payment_id')
     if not payment_id:
-        logger.error(f"refund.processed webhook: missing payment_id in refund entity {refund_entity.get('id')}")
+        logger.error(f"refund.processed webhook: missing payment_id in refund entity {refund_id}")
         return
 
     invoice = Invoice.objects.filter(razorpay_payment_id=payment_id).first()
@@ -332,7 +375,6 @@ def handle_refund_processed(refund_entity):
     if invoice.status != 'paid':
         logger.warning(f"refund.processed for invoice {invoice.pk} not in 'paid' status (currently {invoice.status})")
 
-    refund_id = refund_entity.get('id', '')
     raw_amount = refund_entity.get('amount', 0)
     refund_amount = Decimal(str(raw_amount)) / Decimal('100') if raw_amount else invoice.total_amount
 
@@ -352,12 +394,67 @@ def handle_refund_processed(refund_entity):
 def handle_refund_failed(refund_entity):
     """
     Handles Razorpay refund.failed webhook event.
-    Records failure reason without changing Invoice.status (remains 'paid').
-    Notifies Super Admin / billing operations.
+    Finds the matching RefundRequest by razorpay_refund_id, sets status='failed' if not terminal,
+    notifies both the requester and Super Admin.
+    Falls back to Invoice-only lookup if no RefundRequest found.
     """
+    refund_id = refund_entity.get('id', '')
+    error_desc = refund_entity.get('error_description') or refund_entity.get('error_reason') or 'Refund failed'
+
+    from apps.billing.models import RefundRequest
+    refund_request = RefundRequest.objects.filter(razorpay_refund_id=refund_id).first()
+
+    if refund_request:
+        if refund_request.status not in ('completed', 'rejected'):
+            refund_request.status = 'failed'
+            refund_request.save(update_fields=['status'])
+
+        invoice = refund_request.invoice
+        invoice.last_failure_reason = str(f"Refund {refund_id} failed: {error_desc}")[:255]
+        invoice.save(update_fields=['last_failure_reason'])
+
+        # Notify requester
+        try:
+            from apps.notifications.models import Notification
+            if refund_request.requested_by:
+                Notification.objects.create(
+                    recipient=refund_request.requested_by,
+                    notification_type='SYSTEM',
+                    title='Refund Failed Alert',
+                    message=(
+                        f"Refund request of ₹{refund_request.amount} for invoice "
+                        f"{invoice.invoice_number or invoice.pk} failed: {error_desc}."
+                    )
+                )
+        except Exception as e:
+            logger.error(f"Failed to notify requester of refund failure: {e}")
+
+        # Also notify Super Admins
+        try:
+            from apps.notifications.models import Notification
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            super_admins = User.objects.filter(role=User.RoleChoices.SUPER_ADMIN)
+            for admin in super_admins:
+                Notification.objects.create(
+                    recipient=admin,
+                    notification_type='SYSTEM',
+                    title='Refund Failed Alert',
+                    message=(
+                        f"Refund request {refund_request.pk} (id: {refund_id}) for invoice {invoice.pk} "
+                        f"(Amount: ₹{refund_request.amount}) failed: {error_desc}. Manual intervention required."
+                    ),
+                    related_link='/dashboard/admin/billing'
+                )
+        except Exception as e:
+            logger.error(f"Failed to create refund failure alert notification for admins: {e}")
+
+        return
+
+    # Fallback to Invoice-only lookup
     payment_id = refund_entity.get('payment_id')
     if not payment_id:
-        logger.error(f"refund.failed webhook: missing payment_id in refund entity {refund_entity.get('id')}")
+        logger.error(f"refund.failed webhook: missing payment_id in refund entity {refund_id}")
         return
 
     invoice = Invoice.objects.filter(razorpay_payment_id=payment_id).first()
@@ -367,9 +464,6 @@ def handle_refund_failed(refund_entity):
     if not invoice:
         logger.error(f"refund.failed webhook: no invoice found for payment {payment_id}")
         return
-
-    refund_id = refund_entity.get('id', '')
-    error_desc = refund_entity.get('error_description') or refund_entity.get('error_reason') or 'Refund failed'
 
     logger.error(f"Refund FAILED for invoice {invoice.pk}, refund_id={refund_id}, error: {error_desc} — needs manual attention")
 

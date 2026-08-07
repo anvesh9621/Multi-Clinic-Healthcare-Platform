@@ -492,3 +492,92 @@ class TestWebhookRoutingAndDedup:
         assert invoice.status == "paid"
         assert invoice.payment_method == "card"  # Must be 'card', NOT hardcoded 'upi'
         assert invoice.razorpay_payment_id == "pay_card_real_555"
+
+    def test_refund_processed_webhook_partial_and_full_refund_request(self):
+        from apps.billing.webhooks import handle_refund_processed
+        from apps.billing.models import RefundRequest
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("1000.00"),
+            total_amount=Decimal("1000.00"),
+            status="paid",
+            razorpay_payment_id="pay_mult_rfnd_1000"
+        )
+
+        req1 = RefundRequest.objects.create(
+            invoice=invoice,
+            requested_by=user,
+            amount=Decimal("400.00"),
+            reason="Partial 1",
+            status="processing",
+            razorpay_refund_id="rfnd_part_1"
+        )
+
+        # 1st partial refund webhook (400 / 1000)
+        handle_refund_processed({"id": "rfnd_part_1", "payment_id": "pay_mult_rfnd_1000"})
+
+        req1.refresh_from_db()
+        invoice.refresh_from_db()
+        assert req1.status == "completed"
+        assert invoice.status == "paid"  # Remaining balance 600 > 0, status remains 'paid'
+
+        req2 = RefundRequest.objects.create(
+            invoice=invoice,
+            requested_by=user,
+            amount=Decimal("600.00"),
+            reason="Partial 2",
+            status="processing",
+            razorpay_refund_id="rfnd_part_2"
+        )
+
+        # 2nd partial refund webhook (600 / 1000, cumulative 1000)
+        handle_refund_processed({"id": "rfnd_part_2", "payment_id": "pay_mult_rfnd_1000"})
+
+        req2.refresh_from_db()
+        invoice.refresh_from_db()
+        assert req2.status == "completed"
+        assert invoice.status == "refunded"  # Full amount refunded, status transitions to 'refunded'
+
+    def test_refund_failed_webhook_with_refund_request(self):
+        from apps.billing.webhooks import handle_refund_failed
+        from apps.billing.models import RefundRequest
+        from apps.notifications.models import Notification
+
+        clinic = ClinicFactory()
+        user = PatientFactory()
+        patient = getattr(user, 'patient_profile', None) or Patient.objects.create(user=user, phone="1234567890")
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("500.00"),
+            total_amount=Decimal("500.00"),
+            status="paid",
+            razorpay_payment_id="pay_rfnd_fail_500"
+        )
+
+        req = RefundRequest.objects.create(
+            invoice=invoice,
+            requested_by=user,
+            amount=Decimal("500.00"),
+            reason="Refund failure test",
+            status="processing",
+            razorpay_refund_id="rfnd_fail_req_999"
+        )
+
+        handle_refund_failed({
+            "id": "rfnd_fail_req_999",
+            "payment_id": "pay_rfnd_fail_500",
+            "error_description": "Bank network timeout"
+        })
+
+        req.refresh_from_db()
+        invoice.refresh_from_db()
+        assert req.status == "failed"
+        assert invoice.status == "paid"
+        assert Notification.objects.filter(recipient=user, title="Refund Failed Alert").exists()
+
