@@ -174,45 +174,8 @@ def handle_payment_link_paid(pl_entity, payment_entity):
             payment_method=raw_method,
         )
 
-        # If this was a pay_now self-booking, confirm the appointment
-        if invoice.appointment:
-            appt = invoice.appointment
-            if appt.payment_flow == 'pay_now' and appt.status == 'SCHEDULED':
-                appt.status = 'CONFIRMED'
-                appt.save(update_fields=['status'])
-
-                # Notify patient of appointment confirmation
-                try:
-                    from apps.notifications.models import Notification
-                    if appt.patient and appt.patient.user:
-                        doctor_name = ''
-                        try:
-                            doctor_name = appt.doctor_clinic.doctor.user.get_full_name()
-                        except Exception:
-                            pass
-                        Notification.objects.create(
-                            recipient=appt.patient.user,
-                            notification_type='APPOINTMENT',
-                            title='Appointment Confirmed',
-                            message=(
-                                f'Your appointment with Dr. {doctor_name} on '
-                                f'{appt.appointment_date} at {appt.start_time} '
-                                f'has been confirmed. Payment of ₹{invoice.total_amount} received.'
-                            )
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to send appointment confirmation notification: {e}")
-
-                from apps.audit.services import log_action
-                from apps.audit.models import AuditLog
-                log_action(
-                    user=None,
-                    clinic=appt.clinic,
-                    action_type=AuditLog.ActionChoices.UPDATE,
-                    object_type='Appointment',
-                    object_id=appt.id,
-                    description=f'APPOINTMENT_CONFIRMED_VIA_PAYMENT: payment {invoice.razorpay_payment_id}'
-                )
+        from apps.billing.services import confirm_appointment_for_invoice
+        confirm_appointment_for_invoice(invoice, payment_reference=payment_entity['id'], source_context="payment")
 
     except Invoice.DoesNotExist:
         logger.error(f"Invoice for payment link {pl_id} not found.")
@@ -327,43 +290,8 @@ def handle_payment_authorized(payment_entity):
             payment_method=raw_method,
         )
 
-        if invoice.appointment:
-            appt = invoice.appointment
-            if appt.payment_flow == 'pay_now' and appt.status == 'SCHEDULED':
-                appt.status = 'CONFIRMED'
-                appt.save(update_fields=['status'])
-
-                try:
-                    from apps.notifications.models import Notification
-                    if appt.patient and appt.patient.user:
-                        doctor_name = ''
-                        try:
-                            doctor_name = appt.doctor_clinic.doctor.user.get_full_name()
-                        except Exception:
-                            pass
-                        Notification.objects.create(
-                            recipient=appt.patient.user,
-                            notification_type='APPOINTMENT',
-                            title='Appointment Confirmed',
-                            message=(
-                                f'Your appointment with Dr. {doctor_name} on '
-                                f'{appt.appointment_date} at {appt.start_time} '
-                                f'has been confirmed via authorized payment.'
-                            )
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to send appointment confirmation notification: {e}")
-
-                from apps.audit.services import log_action
-                from apps.audit.models import AuditLog
-                log_action(
-                    user=None,
-                    clinic=appt.clinic,
-                    action_type=AuditLog.ActionChoices.UPDATE,
-                    object_type='Appointment',
-                    object_id=appt.id,
-                    description=f'APPOINTMENT_CONFIRMED_VIA_LATE_AUTHORIZATION: payment {payment_id}'
-                )
+        from apps.billing.services import confirm_appointment_for_invoice
+        confirm_appointment_for_invoice(invoice, payment_reference=payment_id, source_context="late_authorization")
 
     elif invoice.status == 'paid':
         logger.debug(f"payment.authorized for already-paid invoice {invoice.pk}, ignoring")
