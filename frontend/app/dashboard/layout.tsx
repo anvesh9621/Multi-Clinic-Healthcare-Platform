@@ -57,6 +57,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { label: "My Profile",    href: "/dashboard/doctor/profile",    icon: UserCog },
   ],
   CLINIC_ADMIN: [
+    { label: "Clinic Billing",       href: "/dashboard/receptionist/billing",  icon: Receipt },
     { label: "Manage Doctors",       href: "/dashboard/admin/doctors",       icon: Stethoscope },
     { label: "Manage Receptionists", href: "/dashboard/admin/receptionists", icon: UserCog },
     { label: "Doctor Schedules",     href: "/dashboard/admin/schedules",     icon: Clock },

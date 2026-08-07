@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Plus, Receipt, FileText, Trash2, X, Banknote, QrCode, CheckCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef, useContext } from "react";
+import { Plus, Receipt, FileText, Trash2, X, Banknote, QrCode, CheckCircle, Clock, AlertCircle, Loader2, RotateCcw } from "lucide-react";
 import api from "@/services/api";
+import { AuthContext } from "@/context/AuthContext";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { RequestRefundModal, PendingRefundsList } from "@/components/billing/RefundComponents";
 
 type InvoiceItem = { description: string; amount: string };
 
@@ -40,7 +42,17 @@ function StatusBadge({ status, method }: { status: string; method: string }) {
   return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-gray-100 text-gray-600">{status}</span>;
 }
 
-function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClose: () => void; onUpdate: (inv: Invoice) => void }) {
+function PaymentModal({
+  invoice,
+  onClose,
+  onUpdate,
+  onRequestRefund
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onUpdate: (inv: Invoice) => void;
+  onRequestRefund: (inv: Invoice) => void;
+}) {
   const [mode, setMode] = useState<"choice" | "qr" | "confirming-cash">("choice");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +168,19 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
                 via {invoice.payment_method}
                 {invoice.paid_at ? ` · ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}
               </p>
+              <div className="mt-4 pt-3 border-t border-gray-100 flex justify-center">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    onRequestRefund(invoice);
+                  }}
+                  className="text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 font-bold"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Request Refund
+                </Button>
+              </div>
             </div>
           )}
 
@@ -259,11 +284,13 @@ function PaymentModal({ invoice, onClose, onUpdate }: { invoice: Invoice; onClos
 import { Patient } from "@/types/api";
 
 export default function ReceptionistBilling() {
+  const { user } = useContext(AuthContext);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [refundModalInvoice, setRefundModalInvoice] = useState<Invoice | null>(null);
 
   // Form state
   const [selectedPatient, setSelectedPatient] = useState("");
@@ -334,12 +361,19 @@ export default function ReceptionistBilling() {
           <h1 className="text-3xl font-bold text-ink heading-font flex items-center gap-3">
             <Receipt className="w-6 h-6 text-primary" /> Clinic Billing
           </h1>
-          <p className="text-sm text-muted mt-1">Manage patient invoices and collect payments</p>
+          <p className="text-sm text-muted mt-1">Manage patient invoices, collect payments, and manage refunds</p>
         </div>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" /> Create Invoice
         </Button>
       </div>
+
+      {/* Pending Refund Approvals (Visible to Clinic Admins & Staff) */}
+      {(user?.role === "CLINIC_ADMIN" || user?.role === "RECEPTIONIST" || user?.role === "SUPER_ADMIN") && (
+        <div className="mb-8">
+          <PendingRefundsList />
+        </div>
+      )}
 
       <Table>
         <TableHeader>
@@ -374,8 +408,22 @@ export default function ReceptionistBilling() {
                 <TableCell className="font-bold font-mono">₹{parseFloat(inv.total_amount).toFixed(2)}</TableCell>
                 <TableCell><StatusBadge status={inv.status} method={inv.payment_method} /></TableCell>
                 <TableCell className="text-right">
-                  {inv.status !== "paid" && inv.status !== "cancelled" && inv.status !== "refunded" ? (
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedInvoice(inv)} className="text-primary">
+                  {inv.status === "paid" ? (
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedInvoice(inv)} className="text-muted">
+                        View
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRefundModalInvoice(inv)}
+                        className="text-amber-600 hover:text-amber-700 font-medium"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" /> Refund
+                      </Button>
+                    </div>
+                  ) : inv.status !== "cancelled" && inv.status !== "refunded" ? (
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedInvoice(inv)} className="text-primary font-bold">
                       Collect Payment →
                     </Button>
                   ) : (
@@ -396,6 +444,17 @@ export default function ReceptionistBilling() {
           invoice={selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
           onUpdate={handleInvoiceUpdate}
+          onRequestRefund={(inv) => setRefundModalInvoice(inv)}
+        />
+      )}
+
+      {/* Refund Modal */}
+      {refundModalInvoice && (
+        <RequestRefundModal
+          invoice={refundModalInvoice}
+          isOpen={true}
+          onClose={() => setRefundModalInvoice(null)}
+          onSuccess={fetchData}
         />
       )}
 
@@ -410,8 +469,8 @@ export default function ReceptionistBilling() {
               className="w-full rounded-xl border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white font-medium text-ink"
             >
               <option value="" disabled>Search or select a patient...</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>Patient #{p.id} {p.user?.email ? `(${p.user.email})` : ""}</option>
+              {patients.map((p: any) => (
+                <option key={p.id} value={p.id}>Patient #{p.id} {p.user?.email ? `(${p.user.email})` : p.email ? `(${p.email})` : ""}</option>
               ))}
             </select>
           </div>
@@ -448,3 +507,4 @@ export default function ReceptionistBilling() {
     </div>
   );
 }
+

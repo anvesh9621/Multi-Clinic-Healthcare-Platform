@@ -5,7 +5,7 @@ import api from '@/services/api';
 import {
   Receipt, CreditCard, CheckCircle2, Clock, ChevronRight,
   X, FileText, Calendar, Stethoscope, ArrowLeft, Shield,
-  TrendingUp, DollarSign, ExternalLink, AlertTriangle,
+  TrendingUp, DollarSign, ExternalLink, AlertTriangle, RotateCcw,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -18,17 +18,21 @@ type Invoice = {
   appointment_doctor: string | null;
   total_amount: string;
   amount_paid: string;
-  status: 'PENDING' | 'PAID' | 'FAILED';
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'paid' | 'pending' | 'refunded';
   issued_date: string;
   due_date: string | null;
   items: InvoiceItem[];
 };
 
 // ── Status config ─────────────────────────────────────────────────────────────
-const statusConfig = {
-  PAID:    { label: 'Paid',    bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle2, dot: 'bg-emerald-500' },
-  PENDING: { label: 'Pending', bg: 'bg-amber-100',   text: 'text-amber-700',   icon: Clock,         dot: 'bg-amber-500'   },
-  FAILED:  { label: 'Failed',  bg: 'bg-red-100',     text: 'text-red-700',     icon: X,             dot: 'bg-red-500'     },
+const statusConfig: Record<string, { label: string; bg: string; text: string; icon: any; dot: string }> = {
+  PAID:     { label: 'Paid',     bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle2, dot: 'bg-emerald-500' },
+  paid:     { label: 'Paid',     bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle2, dot: 'bg-emerald-500' },
+  PENDING:  { label: 'Pending',  bg: 'bg-amber-100',   text: 'text-amber-700',   icon: Clock,         dot: 'bg-amber-500'   },
+  pending:  { label: 'Pending',  bg: 'bg-amber-100',   text: 'text-amber-700',   icon: Clock,         dot: 'bg-amber-500'   },
+  FAILED:   { label: 'Failed',   bg: 'bg-red-100',     text: 'text-red-700',     icon: X,             dot: 'bg-red-500'     },
+  REFUNDED: { label: 'Refunded', bg: 'bg-purple-100',  text: 'text-purple-700',  icon: RotateCcw,     dot: 'bg-purple-500'  },
+  refunded: { label: 'Refunded', bg: 'bg-purple-100',  text: 'text-purple-700',  icon: RotateCcw,     dot: 'bg-purple-500'  },
 };
 
 export default function BillingPage() {
