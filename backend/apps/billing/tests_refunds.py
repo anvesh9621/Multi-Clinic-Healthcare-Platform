@@ -1,7 +1,8 @@
 import pytest
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
+from django.db import connection
 from rest_framework.test import APIClient
 from apps.billing.models import Invoice, RefundRequest, PaymentIdempotencyKey
 from apps.billing.services import initiate_refund, approve_refund, reject_refund, _process_refund
@@ -219,3 +220,77 @@ class TestRefundsComprehensive(TestCase):
         assert response.status_code == 403
         req.refresh_from_db()
         assert req.status == "pending_approval"
+
+
+import time
+import threading
+
+@pytest.mark.django_db(transaction=True)
+class TestRefundConcurrency(TransactionTestCase):
+    """
+    Verifies that initiate_refund uses select_for_update() inside transaction.atomic()
+    to serialize concurrent balance checks and prevent over-refunding races.
+    """
+
+    @patch("apps.billing.services.get_razorpay_client")
+    def test_concurrent_initiate_refund_prevents_over_refunding(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.payment.refund.return_value = {"id": "rfnd_concurrent_123"}
+        mock_get_client.return_value = mock_client
+
+        clinic = ClinicFactory()
+        user = UserFactory(clinic=clinic, role='CLINIC_ADMIN')
+        patient_user = PatientFactory()
+        patient = getattr(patient_user, 'patient_profile', None) or Patient.objects.create(user=patient_user, phone="9998887776")
+
+        invoice = Invoice.objects.create(
+            clinic=clinic,
+            patient=patient,
+            amount=Decimal("1000.00"),
+            total_amount=Decimal("1000.00"),
+            status="paid",
+            razorpay_payment_id="pay_race_1000"
+        )
+
+        results = []
+        errors = []
+
+        def thread_task(amount_val):
+            try:
+                req = initiate_refund(
+                    invoice,
+                    amount=Decimal(amount_val),
+                    reason="Concurrent refund race test",
+                    requested_by=user
+                )
+                results.append(req)
+            except ValueError as ve:
+                results.append(str(ve))
+            except Exception as e:
+                if connection.vendor == 'sqlite' and ("locked" in str(e) or "lock" in str(e)):
+                    results.append("sqlite_locked")
+                else:
+                    errors.append(e)
+
+        t1 = threading.Thread(target=thread_task, args=("600.00",))
+        t2 = threading.Thread(target=thread_task, args=("600.00",))
+
+        t1.start()
+        t2.start()
+
+        t1.join(timeout=5)
+        t2.join(timeout=5)
+
+        assert not errors, f"Unexpected errors in threads: {errors}"
+
+        successes = [r for r in results if isinstance(r, RefundRequest)]
+        value_errors = [r for r in results if isinstance(r, str) and "would exceed remaining refundable balance" in r]
+        sqlite_locks = [r for r in results if r == "sqlite_locked"]
+
+        assert len(successes) == 1, f"Expected exactly 1 successful refund, got {len(successes)}"
+        assert len(value_errors) == 1 or len(sqlite_locks) == 1, f"Expected 1 balance error or SQLite lock, got {results}"
+
+        refund_requests = RefundRequest.objects.filter(invoice=invoice)
+        assert refund_requests.count() == 1
+        assert refund_requests.first().amount == Decimal("600.00")
+

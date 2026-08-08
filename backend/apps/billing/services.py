@@ -180,33 +180,37 @@ def initiate_refund(invoice, *, amount, reason, requested_by):
     immediately, or leaves it pending_approval for a Clinic Admin.
     """
     from django.conf import settings
+    from django.db import transaction
 
     if invoice.status not in ('paid',):
         raise ValueError(f"Cannot refund invoice in status {invoice.status}")
 
-    already_refunded = invoice.refund_requests.filter(
-        status__in=['completed', 'processing']
-    ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
+    with transaction.atomic():
+        locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
 
-    if already_refunded + amount > invoice.total_amount:
-        raise ValueError(
-            f"Refund amount {amount} would exceed remaining refundable "
-            f"balance ({invoice.total_amount - already_refunded})"
+        already_refunded = locked_invoice.refund_requests.filter(
+            status__in=['completed', 'processing']
+        ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0')
+
+        if already_refunded + amount > locked_invoice.total_amount:
+            raise ValueError(
+                f"Refund amount {amount} would exceed remaining refundable "
+                f"balance ({locked_invoice.total_amount - already_refunded})"
+            )
+
+        auto_approve = (
+            getattr(requested_by, 'role', None) == 'CLINIC_ADMIN' or
+            amount <= Decimal(str(settings.REFUND_AUTO_APPROVE_THRESHOLD))
         )
 
-    auto_approve = (
-        getattr(requested_by, 'role', None) == 'CLINIC_ADMIN' or
-        amount <= Decimal(str(settings.REFUND_AUTO_APPROVE_THRESHOLD))
-    )
-
-    refund_request = RefundRequest.objects.create(
-        invoice=invoice,
-        requested_by=requested_by,
-        amount=amount,
-        reason=reason,
-        status='processing' if auto_approve else 'pending_approval',
-        approved_by=requested_by if auto_approve else None,
-    )
+        refund_request = RefundRequest.objects.create(
+            invoice=locked_invoice,
+            requested_by=requested_by,
+            amount=amount,
+            reason=reason,
+            status='processing' if auto_approve else 'pending_approval',
+            approved_by=requested_by if auto_approve else None,
+        )
 
     if auto_approve:
         _process_refund(refund_request)
