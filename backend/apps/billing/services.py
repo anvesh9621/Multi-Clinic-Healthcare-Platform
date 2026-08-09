@@ -6,7 +6,7 @@ from django.db import models
 from apps.billing.razorpay_client import get_razorpay_client
 from apps.billing.models import Invoice, SubscriptionInvoice, RefundRequest, PaymentIdempotencyKey
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('payments')
 
 
 def confirm_appointment_for_invoice(invoice, payment_reference="", source_context=""):
@@ -114,7 +114,16 @@ def reconcile_invoice_with_razorpay(invoice):
             razorpay_reference=payment_id,
             payment_method=raw_method,
         )
-        logger.info(f"RECONCILIATION CAUGHT: invoice {invoice.pk} was actually paid, webhook must have been missed/delayed")
+        logger.info(
+            "reconciliation_catch",
+            extra={
+                'invoice_id': str(invoice.pk),
+                'razorpay_status': razorpay_status,
+                'old_status': 'pending',
+                'new_status': 'paid',
+                'source_event': 'reconciliation:payment_link_paid',
+            }
+        )
 
         confirm_appointment_for_invoice(invoice, payment_reference=payment_id, source_context="reconciliation")
         return True
@@ -144,7 +153,16 @@ def reconcile_subscription_invoice_with_razorpay(sub_invoice):
                     source_event='reconciliation:subscription_charged',
                     razorpay_reference=sub_invoice.razorpay_payment_id,
                 )
-                logger.info(f"RECONCILIATION CAUGHT: SubscriptionInvoice {sub_invoice.pk} was actually paid")
+                logger.info(
+                    "reconciliation_catch",
+                    extra={
+                        'subscription_invoice_id': str(sub_invoice.pk),
+                        'razorpay_status': pay_status,
+                        'old_status': 'pending',
+                        'new_status': 'paid',
+                        'source_event': 'reconciliation:subscription_charged',
+                    }
+                )
                 if sub_invoice.subscription:
                     sub_invoice.subscription.transition_status(
                         'active',
@@ -164,7 +182,16 @@ def reconcile_subscription_invoice_with_razorpay(sub_invoice):
                     source_event='reconciliation:subscription_charged',
                     razorpay_reference=sub_details.get('id', ''),
                 )
-                logger.info(f"RECONCILIATION CAUGHT: SubscriptionInvoice {sub_invoice.pk} resolved via active subscription")
+                logger.info(
+                    "reconciliation_catch",
+                    extra={
+                        'subscription_invoice_id': str(sub_invoice.pk),
+                        'razorpay_status': sub_status,
+                        'old_status': 'pending',
+                        'new_status': 'paid',
+                        'source_event': 'reconciliation:subscription_charged',
+                    }
+                )
                 sub_invoice.subscription.transition_status(
                     'active',
                     source_event='reconciliation:subscription_charged'
@@ -222,6 +249,18 @@ def initiate_refund(invoice, *, amount, reason, requested_by):
             approved_by=requested_by if auto_approve else None,
         )
 
+        logger.info(
+            "refund_initiated",
+            extra={
+                'refund_request_id': str(refund_request.pk),
+                'invoice_id': str(locked_invoice.pk),
+                'amount': str(amount),
+                'requested_by_id': str(requested_by.pk) if requested_by else None,
+                'auto_approved': auto_approve,
+                'status': refund_request.status,
+            }
+        )
+
     if auto_approve:
         _process_refund(refund_request)
 
@@ -235,6 +274,17 @@ def approve_refund(refund_request, *, approved_by):
     refund_request.status = 'processing'
     refund_request.approved_by = approved_by
     refund_request.save(update_fields=['status', 'approved_by'])
+
+    logger.info(
+        "refund_approved",
+        extra={
+            'refund_request_id': str(refund_request.pk),
+            'invoice_id': str(refund_request.invoice.pk),
+            'approved_by_id': str(approved_by.pk) if approved_by else None,
+            'amount': str(refund_request.amount),
+        }
+    )
+
     _process_refund(refund_request)
     return refund_request
 
@@ -246,6 +296,16 @@ def reject_refund(refund_request, *, rejected_by, rejection_reason=''):
     refund_request.status = 'rejected'
     refund_request.approved_by = rejected_by
     refund_request.save(update_fields=['status', 'approved_by'])
+
+    logger.info(
+        "refund_rejected",
+        extra={
+            'refund_request_id': str(refund_request.pk),
+            'invoice_id': str(refund_request.invoice.pk),
+            'rejected_by_id': str(rejected_by.pk) if rejected_by else None,
+            'rejection_reason': rejection_reason,
+        }
+    )
 
     try:
         from apps.notifications.models import Notification
@@ -279,8 +339,6 @@ def _process_refund(refund_request):
     refund_request.save(update_fields=['idempotency_key'])
 
     if idem_key.status == 'completed':
-        # already processed under this key — don't call Razorpay again,
-        # this handles the retry-after-timeout case directly
         return refund_request
 
     client = get_razorpay_client()
@@ -297,6 +355,17 @@ def _process_refund(refund_request):
         idem_key.status = 'completed'
         idem_key.razorpay_response = response
         idem_key.save(update_fields=['status', 'razorpay_response'])
+
+        logger.info(
+            "refund_processed",
+            extra={
+                'refund_request_id': str(refund_request.pk),
+                'invoice_id': str(refund_request.invoice.pk),
+                'amount': str(refund_request.amount),
+                'razorpay_refund_id': refund_request.razorpay_refund_id,
+                'status': refund_request.status,
+            }
+        )
     except Exception as e:
         import sentry_sdk
         sentry_sdk.set_context("payment", {

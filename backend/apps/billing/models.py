@@ -1,8 +1,11 @@
 import uuid
+import logging
 from django.db import models
 from django.db.models import Q, CheckConstraint
 from django.conf import settings
 from django.utils import timezone
+
+logger = logging.getLogger('payments')
 
 INVOICE_ALLOWED_TRANSITIONS = {
     'draft': ['pending', 'pending_at_clinic'],
@@ -100,14 +103,15 @@ class Invoice(models.Model):
 
         with transaction.atomic():
             locked = Invoice.objects.select_for_update().get(pk=self.pk)
-            if resulting_status not in INVOICE_ALLOWED_TRANSITIONS.get(locked.status, []):
+            old_status = locked.status
+            if resulting_status not in INVOICE_ALLOWED_TRANSITIONS.get(old_status, []):
                 import sentry_sdk
                 sentry_sdk.set_context("payment", {
                     "invoice_id": str(locked.pk) if locked else str(self.pk),
                     "source_event": source_event,
                 })
                 raise InvalidStatusTransition(
-                    f"Invoice {locked.pk}: {locked.status} -> {resulting_status} is not an allowed transition"
+                    f"Invoice {locked.pk}: {old_status} -> {resulting_status} is not an allowed transition"
                 )
             PaymentLedgerEntry.objects.create(
                 invoice=locked, entry_type=entry_type, amount=amount,
@@ -125,6 +129,17 @@ class Invoice(models.Model):
                 update_fields.append('payment_method')
 
             locked.save(update_fields=update_fields)
+
+            logger.info(
+                "invoice_status_transition",
+                extra={
+                    'invoice_id': str(locked.pk),
+                    'from_status': old_status,
+                    'to_status': resulting_status,
+                    'source_event': source_event,
+                    'amount': str(amount),
+                }
+            )
 
             if resulting_status == 'paid':
                 PaymentOutboxEvent.objects.create(
@@ -186,14 +201,15 @@ class SubscriptionInvoice(models.Model):
 
         with transaction.atomic():
             locked = SubscriptionInvoice.objects.select_for_update().get(pk=self.pk)
-            if resulting_status not in SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS.get(locked.status, []):
+            old_status = locked.status
+            if resulting_status not in SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS.get(old_status, []):
                 import sentry_sdk
                 sentry_sdk.set_context("payment", {
                     "invoice_id": str(locked.pk) if locked else str(self.pk),
                     "source_event": source_event,
                 })
                 raise InvalidStatusTransition(
-                    f"SubscriptionInvoice {locked.pk}: {locked.status} -> {resulting_status} is not an allowed transition"
+                    f"SubscriptionInvoice {locked.pk}: {old_status} -> {resulting_status} is not an allowed transition"
                 )
             PaymentLedgerEntry.objects.create(
                 subscription_invoice=locked, entry_type=entry_type, amount=amount,
@@ -203,6 +219,17 @@ class SubscriptionInvoice(models.Model):
             )
             locked.status = resulting_status
             locked.save(update_fields=['status', 'updated_at'] if hasattr(locked, 'updated_at') else ['status'])
+
+            logger.info(
+                "subscription_invoice_status_transition",
+                extra={
+                    'invoice_id': str(locked.pk),
+                    'from_status': old_status,
+                    'to_status': resulting_status,
+                    'source_event': source_event,
+                    'amount': str(amount),
+                }
+            )
 
             if resulting_status == 'paid':
                 PaymentOutboxEvent.objects.create(

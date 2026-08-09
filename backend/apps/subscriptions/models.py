@@ -38,7 +38,7 @@ PLAN_FEATURES = {
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('payments')
 
 SUBSCRIPTION_ALLOWED_TRANSITIONS = {
     'trialing': ['created', 'active', 'cancelled'],
@@ -123,6 +123,14 @@ class Subscription(models.Model):
                     setattr(locked, field, value)
                     update_fields.append(field)
             locked.save(update_fields=update_fields)
-            logger.info(f"Subscription {locked.pk} transitioned {old_status} -> {new_status} via {source_event}")
+            logger.info(
+                "subscription_status_transition",
+                extra={
+                    'subscription_id': str(locked.pk),
+                    'from_status': old_status,
+                    'to_status': new_status,
+                    'source_event': source_event,
+                }
+            )
         return locked
 

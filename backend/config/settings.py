@@ -343,6 +343,40 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+# ── Logging Configuration ─────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(name)s %(levelname)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'payments_console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json',
+        },
+    },
+    'loggers': {
+        'payments': {
+            'handlers': ['payments_console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+
 CELERY_TASK_EAGER_PROPAGATES = True
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────

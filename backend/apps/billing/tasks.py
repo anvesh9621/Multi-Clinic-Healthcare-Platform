@@ -11,7 +11,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('payments')
 
 @shared_task
 def generate_b2b_invoice_pdf(invoice_id):

@@ -40,10 +40,13 @@ def cancel_unpaid_appointments():
         # someone genuinely paid for.
         was_actually_paid = reconcile_invoice_with_razorpay(invoice)
         if was_actually_paid:
-            logger.warning(
-                f"Expiry sweep almost cancelled invoice {invoice.pk} but "
-                f"reconciliation caught it was actually paid — this is "
-                f"exactly the race condition this check exists to prevent"
+            logger.info(
+                "reconciliation_catch",
+                extra={
+                    'invoice_id': str(invoice.pk),
+                    'source_event': 'task:expiry_sweep',
+                    'reason': 'prevented_accidental_cancellation',
+                }
             )
             continue  # skip cancellation, it's genuinely paid now
 

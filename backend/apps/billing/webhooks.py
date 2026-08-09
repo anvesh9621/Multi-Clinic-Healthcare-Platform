@@ -12,7 +12,7 @@ from datetime import timedelta, datetime, timezone as dt_timezone
 from django.utils import timezone
 from django.db import models
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('payments')
 
 @csrf_exempt
 @require_POST
