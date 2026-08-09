@@ -37,8 +37,9 @@ export default function PlatformSettingsPage() {
           razorpay_key_id: data.razorpay_key_id || "",
           razorpay_key_secret: data.razorpay_key_secret || "",
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching settings:", err);
+        setError(err.response?.data?.error || err.message || "Failed to load platform settings.");
       } finally {
         setLoading(false);
       }

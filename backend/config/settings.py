@@ -67,10 +67,11 @@ if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
 
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
-# CORS_ALLOW_ALL_ORIGINS is intentionally NOT set here.
-# Only explicit origins are allowed to prevent CORS misconfiguration.
 CORS_ALLOWED_ORIGINS = list({
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
     frontend_url,
 })
 # Application definition
