@@ -139,6 +139,37 @@ class SuperAdminStatsView(APIView):
                 "description": log.description
             })
 
+        # Recent 30 days PaymentMetricSnapshot
+        from apps.billing.models import PaymentMetricSnapshot
+        start_30 = today - timedelta(days=30)
+        snapshots_qs = PaymentMetricSnapshot.objects.filter(date__gte=start_30).order_by('date')
+        
+        payment_snapshots = []
+        tot_attempts = 0
+        tot_success = 0
+        tot_reconciliations = 0
+
+        for snap in snapshots_qs:
+            rate = round((snap.successful_payments / snap.total_payment_attempts) * 100, 1) if snap.total_payment_attempts > 0 else 100.0
+            payment_snapshots.append({
+                "id": snap.id,
+                "date": snap.date.strftime("%Y-%m-%d"),
+                "date_formatted": snap.date.strftime("%b %d"),
+                "total_payment_attempts": snap.total_payment_attempts,
+                "successful_payments": snap.successful_payments,
+                "failed_payments": snap.failed_payments,
+                "success_rate": rate,
+                "reconciliation_catches": snap.reconciliation_catches,
+                "refunds_processed": snap.refunds_processed,
+                "refund_total_amount": float(snap.refund_total_amount),
+                "avg_time_to_payment_seconds": snap.avg_time_to_payment_seconds,
+            })
+            tot_attempts += snap.total_payment_attempts
+            tot_success += snap.successful_payments
+            tot_reconciliations += snap.reconciliation_catches
+
+        overall_success_rate = round((tot_success / tot_attempts) * 100, 1) if tot_attempts > 0 else 100.0
+
         return Response({
             "success": True,
             "data": {
@@ -151,5 +182,90 @@ class SuperAdminStatsView(APIView):
                 "clinic_breakdown": clinic_breakdown,
                 "trend_data": trend_data,
                 "recent_logs": recent_logs,
+                "payment_metrics": {
+                    "overall_success_rate": overall_success_rate,
+                    "total_reconciliation_catches": tot_reconciliations,
+                    "snapshots": payment_snapshots,
+                }
             }
         })
+
+
+class PaymentMetricsView(APIView):
+    """
+    SUPER_ADMIN only — returns recent PaymentMetricSnapshot rows (e.g. last 30 days)
+    and aggregate health metrics.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != "SUPER_ADMIN":
+            return Response({"error": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
+
+        from apps.billing.models import PaymentMetricSnapshot
+        from django.utils import timezone
+        from datetime import timedelta
+
+        try:
+            days = int(request.query_params.get('days', 30))
+        except (ValueError, TypeError):
+            days = 30
+
+        start_date = (timezone.now() - timedelta(days=days)).date()
+        snapshots = PaymentMetricSnapshot.objects.filter(date__gte=start_date).order_by('date')
+
+        snapshot_list = []
+        total_attempts = 0
+        total_successful = 0
+        total_failed = 0
+        total_reconciliation_catches = 0
+        total_refunds = 0
+        total_refund_amount = 0.0
+
+        for snap in snapshots:
+            success_rate = (
+                round((snap.successful_payments / snap.total_payment_attempts) * 100, 1)
+                if snap.total_payment_attempts > 0
+                else 100.0
+            )
+            snapshot_list.append({
+                "id": snap.id,
+                "date": snap.date.strftime("%Y-%m-%d"),
+                "date_formatted": snap.date.strftime("%b %d"),
+                "total_payment_attempts": snap.total_payment_attempts,
+                "successful_payments": snap.successful_payments,
+                "failed_payments": snap.failed_payments,
+                "success_rate": success_rate,
+                "avg_time_to_payment_seconds": snap.avg_time_to_payment_seconds,
+                "reconciliation_catches": snap.reconciliation_catches,
+                "refunds_processed": snap.refunds_processed,
+                "refund_total_amount": float(snap.refund_total_amount),
+                "dunning_recoveries": snap.dunning_recoveries,
+            })
+            total_attempts += snap.total_payment_attempts
+            total_successful += snap.successful_payments
+            total_failed += snap.failed_payments
+            total_reconciliation_catches += snap.reconciliation_catches
+            total_refunds += snap.refunds_processed
+            total_refund_amount += float(snap.refund_total_amount)
+
+        overall_success_rate = (
+            round((total_successful / total_attempts) * 100, 1)
+            if total_attempts > 0
+            else 100.0
+        )
+
+        return Response({
+            "success": True,
+            "data": {
+                "days": days,
+                "overall_success_rate": overall_success_rate,
+                "total_attempts": total_attempts,
+                "total_successful": total_successful,
+                "total_failed": total_failed,
+                "total_reconciliation_catches": total_reconciliation_catches,
+                "total_refunds": total_refunds,
+                "total_refund_amount": total_refund_amount,
+                "snapshots": snapshot_list,
+            }
+        })

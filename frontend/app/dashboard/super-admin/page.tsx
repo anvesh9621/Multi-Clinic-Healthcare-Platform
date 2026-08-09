@@ -22,7 +22,10 @@ import {
   Link2,
   Copy,
   ChevronsUp,
-  Check
+  Check,
+  RefreshCw,
+  CreditCard,
+  AlertCircle
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -47,6 +50,26 @@ interface ClinicRow {
   total_patients: number;
 }
 
+interface PaymentSnapshot {
+  id: number;
+  date: string;
+  date_formatted: string;
+  total_payment_attempts: number;
+  successful_payments: number;
+  failed_payments: number;
+  success_rate: number;
+  reconciliation_catches: number;
+  refunds_processed: number;
+  refund_total_amount: number;
+  avg_time_to_payment_seconds: number | null;
+}
+
+interface PaymentMetricsData {
+  overall_success_rate: number;
+  total_reconciliation_catches: number;
+  snapshots: PaymentSnapshot[];
+}
+
 interface SuperAdminData {
   total_clinics: number;
   active_clinics: number;
@@ -57,6 +80,7 @@ interface SuperAdminData {
   clinic_breakdown: ClinicRow[];
   trend_data: any[];
   recent_logs: any[];
+  payment_metrics?: PaymentMetricsData;
 }
 
 const PLAN_BADGE: Record<string, string> = {
@@ -318,6 +342,14 @@ export default function SuperAdminDashboard() {
         >
           Tenants ({data.total_clinics})
         </button>
+        <button
+          onClick={() => setActiveTab("payments")}
+          className={`px-6 py-3 text-sm font-bold border-b-2 transition ${
+            activeTab === "payments" ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          Payment Health
+        </button>
       </div>
 
       {/* OVERVIEW TAB */}
@@ -370,6 +402,130 @@ export default function SuperAdminDashboard() {
               </div>
             </Card>
           </div>
+        </div>
+      )}
+
+      {/* PAYMENT HEALTH TAB */}
+      {activeTab === "payments" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <StatCard
+              label="Payment Success Rate"
+              value={data.payment_metrics?.overall_success_rate ?? 100}
+              format={(v: number) => `${v.toFixed(1)}%`}
+              icon={CheckCircle2}
+              color="bg-emerald-100 text-emerald-800"
+              sub="Successful / Total Attempts"
+            />
+            <StatCard
+              label="Reconciliation Catches"
+              value={data.payment_metrics?.total_reconciliation_catches ?? 0}
+              icon={RefreshCw}
+              color="bg-amber-100 text-amber-800"
+              sub="Key Webhook Reliability Signal"
+            />
+            <StatCard
+              label="Tracked Days"
+              value={data.payment_metrics?.snapshots?.length ?? 0}
+              icon={CreditCard}
+              color="bg-blue-100 text-blue-800"
+              sub="Daily Metric Snapshots"
+            />
+          </div>
+
+          {/* Webhook Health Signal Callout Alert */}
+          <Card className="p-5 bg-amber-50/70 border-amber-200/80 rounded-2xl">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-amber-900 heading-font">
+                  Webhook Reliability Health Signal
+                </h4>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  <strong>Reconciliation Catches</strong> represent payments that were completed on Razorpay but required background job reconciliation because the webhook was missed or delayed. Per platform architecture guidelines, this number <strong>should trend toward zero</strong>. A sustained non-zero trend indicates webhook delivery reliability issues that require active investigation, rather than relying on reconciliation as a permanent crutch.
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Chart */}
+          <Card className="p-6">
+            <h3 className="text-lg font-bold text-ink mb-6 heading-font">
+              Payment Health Trends (Last 30 Days)
+            </h3>
+            {data.payment_metrics?.snapshots && data.payment_metrics.snapshots.length > 0 ? (
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data.payment_metrics.snapshots} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE8" vertical={false} />
+                    <XAxis dataKey="date_formatted" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
+                    <YAxis yAxisId="left" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} unit="%" />
+                    <YAxis yAxisId="right" orientation="right" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: '1px solid #EDEDE8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Line yAxisId="left" type="monotone" dataKey="success_rate" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Success Rate (%)" />
+                    <Line yAxisId="right" type="monotone" dataKey="reconciliation_catches" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Reconciliation Catches" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-muted text-sm py-12 text-center">No payment snapshots recorded yet. Snapshots are automatically calculated daily at 2:00 AM off-peak.</p>
+            )}
+          </Card>
+
+          {/* Table */}
+          <Card className="p-6">
+            <h3 className="text-lg font-bold text-ink mb-4 heading-font">
+              Daily Payment Metric Snapshots
+            </h3>
+            {data.payment_metrics?.snapshots && data.payment_metrics.snapshots.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Attempts</TableHead>
+                    <TableHead className="text-right">Successful</TableHead>
+                    <TableHead className="text-right">Failed</TableHead>
+                    <TableHead className="text-center">Success Rate</TableHead>
+                    <TableHead className="text-center">Reconciliation Catches</TableHead>
+                    <TableHead className="text-right">Refunds</TableHead>
+                    <TableHead className="text-right">Avg Pay Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.payment_metrics.snapshots.map((snap) => (
+                    <TableRow key={snap.id}>
+                      <TableCell className="font-bold text-ink">{snap.date_formatted}</TableCell>
+                      <TableCell className="text-right font-mono">{snap.total_payment_attempts}</TableCell>
+                      <TableCell className="text-right font-mono text-emerald-700 font-bold">{snap.successful_payments}</TableCell>
+                      <TableCell className="text-right font-mono text-rose-600 font-medium">{snap.failed_payments}</TableCell>
+                      <TableCell className="text-center font-bold">
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${snap.success_rate >= 90 ? 'bg-emerald-100 text-emerald-800' : snap.success_rate >= 75 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                          {snap.success_rate}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center font-bold font-mono">
+                        {snap.reconciliation_catches > 0 ? (
+                          <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs">
+                            {snap.reconciliation_catches}
+                          </span>
+                        ) : (
+                          <span className="text-muted font-normal">0</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {snap.refunds_processed > 0 ? `${snap.refunds_processed} (₹${snap.refund_total_amount})` : '0'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted">
+                        {snap.avg_time_to_payment_seconds !== null ? `${snap.avg_time_to_payment_seconds}s` : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-muted text-sm text-center py-6">No snapshot history found.</p>
+            )}
+          </Card>
         </div>
       )}
 
