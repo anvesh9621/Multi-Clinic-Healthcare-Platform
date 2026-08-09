@@ -81,3 +81,40 @@ class TestSubscriptionDunningTask(TestCase):
         assert sub.dunning_stage == 'day_7_final'
         assert sub.status == 'halted'
         assert Notification.objects.filter(recipient=admin_user, title__icontains="Final notice").exists()
+
+    def test_dunning_recovery_logging_and_record_creation(self):
+        from apps.billing.webhooks import handle_subscription_charged
+        from apps.subscriptions.models import DunningRecoveryLog
+
+        now = timezone.now()
+        clinic, admin_user, sub = self._create_clinic_and_subscription(
+            status='past_due',
+            payment_failed_at=now - timedelta(days=4),
+            grace_period_end=now + timedelta(days=3),
+            dunning_stage='day_3'
+        )
+        sub.razorpay_subscription_id = "sub_test123"
+        sub.save()
+
+        sub_entity = {
+            'id': 'sub_test123',
+            'current_end': int((now + timedelta(days=30)).timestamp()),
+            'current_start': int(now.timestamp()),
+        }
+        payment_entity = {
+            'id': 'pay_test123',
+            'amount': 99900,
+        }
+
+        handle_subscription_charged(sub_entity, payment_entity)
+        sub.refresh_from_db()
+
+        assert sub.status == 'active'
+        assert sub.dunning_stage == 'none'
+        assert sub.payment_failed_at is None
+        assert sub.grace_period_end is None
+
+        recovery_log = DunningRecoveryLog.objects.filter(subscription=sub).first()
+        assert recovery_log is not None
+        assert recovery_log.dunning_stage_reached == 'day_3'
+

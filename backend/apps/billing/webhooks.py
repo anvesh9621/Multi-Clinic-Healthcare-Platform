@@ -95,6 +95,10 @@ def handle_subscription_charged(sub_entity, payment_entity):
     try:
         sub = Subscription.objects.get(razorpay_subscription_id=rzp_sub_id)
         period_end = datetime.fromtimestamp(sub_entity['current_end'], tz=dt_timezone.utc)
+        
+        was_in_dunning = sub.status == 'past_due' and sub.dunning_stage != 'none'
+        old_dunning_stage = sub.dunning_stage
+
         sub = sub.transition_status(
             'active',
             source_event='webhook:subscription.charged',
@@ -102,8 +106,21 @@ def handle_subscription_charged(sub_entity, payment_entity):
                 'current_period_end': period_end,
                 'grace_period_end': None,
                 'payment_failed_at': None,
+                'dunning_stage': 'none',
             }
         )
+
+        if was_in_dunning:
+            from apps.subscriptions.models import DunningRecoveryLog
+            logger.info(
+                "dunning_recovery",
+                extra={'subscription_id': str(sub.pk), 'clinic_id': str(sub.clinic_id)}
+            )
+            DunningRecoveryLog.objects.create(
+                subscription=sub,
+                recovered_at=timezone.now(),
+                dunning_stage_reached=old_dunning_stage,
+            )
         
         # Calculate GST components (18% GST on total)
         total = payment_entity['amount'] / 100.0

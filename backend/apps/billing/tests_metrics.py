@@ -165,3 +165,23 @@ class TestDailyPaymentMetrics(TestCase):
 
         assert snapshot.successful_payments == 2
         assert snapshot.reconciliation_catches == 1
+
+    def test_compute_daily_payment_metrics_counts_dunning_recoveries(self):
+        from apps.subscriptions.models import Subscription, DunningRecoveryLog
+
+        now = timezone.now()
+        yesterday_dt = now - timedelta(days=1)
+        yesterday_date = yesterday_dt.date()
+
+        sub, _ = Subscription.objects.get_or_create(clinic=self.clinic)
+        DunningRecoveryLog.objects.create(
+            subscription=sub,
+            recovered_at=yesterday_dt,
+            dunning_stage_reached='day_3',
+        )
+
+        compute_daily_payment_metrics()
+        snapshot = PaymentMetricSnapshot.objects.get(date=yesterday_date)
+
+        assert snapshot.dunning_recoveries == 1
+

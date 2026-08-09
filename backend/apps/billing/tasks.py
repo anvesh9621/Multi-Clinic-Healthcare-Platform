@@ -378,6 +378,11 @@ def compute_daily_payment_metrics():
         created_at__range=(start, end), entry_type='credit'
     )
 
+    from apps.subscriptions.models import DunningRecoveryLog
+    dunning_recoveries = DunningRecoveryLog.objects.filter(
+        recovered_at__range=(start, end)
+    ).count()
+
     snapshot, created = PaymentMetricSnapshot.objects.update_or_create(
         date=yesterday,
         defaults={
@@ -388,7 +393,7 @@ def compute_daily_payment_metrics():
             'reconciliation_catches': reconciliation_catches,
             'refunds_processed': refund_entries.count(),
             'refund_total_amount': refund_entries.aggregate(total=models.Sum('amount'))['total'] or Decimal('0'),
-            'dunning_recoveries': 0,
+            'dunning_recoveries': dunning_recoveries,
         }
     )
     logger.info(
@@ -399,6 +404,7 @@ def compute_daily_payment_metrics():
             'failed_payments': failed_count,
             'reconciliation_catches': reconciliation_catches,
             'refunds_processed': refund_entries.count(),
+            'dunning_recoveries': dunning_recoveries,
         }
     )
     return f"Computed metrics for {yesterday}: {snapshot.successful_payments} successful payments"
