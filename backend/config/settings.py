@@ -341,6 +341,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.billing.tasks.reconcile_pending_payments',
         'schedule': 600.0,  # Every 10 minutes (600 seconds)
     },
+    'compute-daily-payment-metrics': {
+        'task': 'apps.billing.tasks.compute_daily_payment_metrics',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM off-peak
+    },
 }
 
 # ── Logging Configuration ─────────────────────────────────────────────────────

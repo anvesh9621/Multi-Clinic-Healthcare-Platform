@@ -359,3 +359,20 @@ class PaymentOutboxEvent(models.Model):
         indexes = [models.Index(fields=['status', 'created_at'])]
 
 
+class PaymentMetricSnapshot(models.Model):
+    date = models.DateField(unique=True)
+    total_payment_attempts = models.PositiveIntegerField(default=0)
+    successful_payments = models.PositiveIntegerField(default=0)
+    failed_payments = models.PositiveIntegerField(default=0)
+    avg_time_to_payment_seconds = models.PositiveIntegerField(null=True, blank=True)
+    reconciliation_catches = models.PositiveIntegerField(default=0)
+    refunds_processed = models.PositiveIntegerField(default=0)
+    refund_total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    dunning_recoveries = models.PositiveIntegerField(default=0)  # 0 until Phase 8 exists
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Payment Metrics ({self.date}): {self.successful_payments}/{self.total_payment_attempts} successful"
+
+
+

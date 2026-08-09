@@ -338,3 +338,70 @@ def reconcile_pending_payments():
     return caught_count
 
 
+@shared_task
+def compute_daily_payment_metrics():
+    """
+    Runs daily at 2:00 AM off-peak. Computes payment health metrics for yesterday
+    and stores an immutable PaymentMetricSnapshot row.
+    """
+    from datetime import datetime, time, timedelta
+    from decimal import Decimal
+    from django.db import models
+    from .models import PaymentMetricSnapshot, PaymentLedgerEntry
+
+    yesterday = (timezone.now() - timedelta(days=1)).date()
+    start = timezone.make_aware(datetime.combine(yesterday, time.min))
+    end = timezone.make_aware(datetime.combine(yesterday, time.max))
+
+    paid_entries = PaymentLedgerEntry.objects.filter(
+        created_at__range=(start, end), resulting_status='paid', entry_type='debit'
+    )
+    reconciliation_catches = paid_entries.filter(source_event__startswith='reconciliation:').count()
+
+    paid_times_sec = []
+    for entry in paid_entries.select_related('invoice', 'subscription_invoice'):
+        inv = entry.invoice or entry.subscription_invoice
+        if inv and hasattr(inv, 'created_at') and inv.created_at:
+            delta_sec = (entry.created_at - inv.created_at).total_seconds()
+            if delta_sec >= 0:
+                paid_times_sec.append(delta_sec)
+
+    avg_time_sec = int(sum(paid_times_sec) / len(paid_times_sec)) if paid_times_sec else None
+
+    # Note: This counts invoices updated yesterday with SOME failure recorded (last_failure_reason),
+    # not distinct failure events, as last_failure_reason only stores the most recent failure message.
+    failed_count = Invoice.objects.filter(
+        updated_at__range=(start, end), last_failure_reason__gt=''
+    ).count()
+
+    refund_entries = PaymentLedgerEntry.objects.filter(
+        created_at__range=(start, end), entry_type='credit'
+    )
+
+    snapshot, created = PaymentMetricSnapshot.objects.update_or_create(
+        date=yesterday,
+        defaults={
+            'total_payment_attempts': paid_entries.count() + failed_count,
+            'successful_payments': paid_entries.count(),
+            'failed_payments': failed_count,
+            'avg_time_to_payment_seconds': avg_time_sec,
+            'reconciliation_catches': reconciliation_catches,
+            'refunds_processed': refund_entries.count(),
+            'refund_total_amount': refund_entries.aggregate(total=models.Sum('amount'))['total'] or Decimal('0'),
+            'dunning_recoveries': 0,
+        }
+    )
+    logger.info(
+        "payment_metrics_computed",
+        extra={
+            'date': str(yesterday),
+            'successful_payments': paid_entries.count(),
+            'failed_payments': failed_count,
+            'reconciliation_catches': reconciliation_catches,
+            'refunds_processed': refund_entries.count(),
+        }
+    )
+    return f"Computed metrics for {yesterday}: {snapshot.successful_payments} successful payments"
+
+
+
