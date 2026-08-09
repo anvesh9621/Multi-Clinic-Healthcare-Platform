@@ -79,6 +79,10 @@ class Subscription(models.Model):
     # Grace period tracking
     payment_failed_at = models.DateTimeField(null=True, blank=True)
     grace_period_end = models.DateTimeField(null=True, blank=True)  # failed_at + 10 days
+    dunning_stage = models.CharField(max_length=20, default='none', choices=[
+        ('none', 'None'), ('day_1', 'Day 1'), ('day_3', 'Day 3'),
+        ('day_5', 'Day 5'), ('day_7_final', 'Day 7 Final'),
+    ])
     
     # GST
     clinic_gstin = models.CharField(max_length=15, blank=True)
