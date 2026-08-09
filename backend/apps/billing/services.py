@@ -78,6 +78,11 @@ def reconcile_invoice_with_razorpay(invoice):
     try:
         link_status = client.payment_link.fetch(invoice.razorpay_payment_link_id)
     except Exception as e:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": str(invoice.pk) if invoice else None,
+            "source_event": "reconciliation:fetch_payment_link",
+        })
         logger.error(f"Reconciliation: failed to fetch payment link for invoice {invoice.pk}: {e}")
         return False  # can't determine anything, leave as-is, don't guess
 
@@ -168,6 +173,11 @@ def reconcile_subscription_invoice_with_razorpay(sub_invoice):
                 generate_b2b_invoice_pdf.delay(sub_invoice.id)
                 return True
     except Exception as e:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": str(sub_invoice.pk) if sub_invoice else None,
+            "source_event": "reconciliation:fetch_subscription_details",
+        })
         logger.error(f"Reconciliation: failed to fetch subscription details for SubscriptionInvoice {sub_invoice.pk}: {e}")
         return False
 
@@ -288,6 +298,11 @@ def _process_refund(refund_request):
         idem_key.razorpay_response = response
         idem_key.save(update_fields=['status', 'razorpay_response'])
     except Exception as e:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": str(refund_request.invoice.pk) if refund_request and refund_request.invoice else None,
+            "source_event": f"refund:_process_refund:{refund_request.pk}",
+        })
         logger.error(f"Refund API call failed for RefundRequest {refund_request.pk}: {e}")
         refund_request.status = 'failed'
         refund_request.save(update_fields=['status'])

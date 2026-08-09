@@ -101,6 +101,11 @@ class Invoice(models.Model):
         with transaction.atomic():
             locked = Invoice.objects.select_for_update().get(pk=self.pk)
             if resulting_status not in INVOICE_ALLOWED_TRANSITIONS.get(locked.status, []):
+                import sentry_sdk
+                sentry_sdk.set_context("payment", {
+                    "invoice_id": str(locked.pk) if locked else str(self.pk),
+                    "source_event": source_event,
+                })
                 raise InvalidStatusTransition(
                     f"Invoice {locked.pk}: {locked.status} -> {resulting_status} is not an allowed transition"
                 )
@@ -182,6 +187,11 @@ class SubscriptionInvoice(models.Model):
         with transaction.atomic():
             locked = SubscriptionInvoice.objects.select_for_update().get(pk=self.pk)
             if resulting_status not in SUBSCRIPTION_INVOICE_ALLOWED_TRANSITIONS.get(locked.status, []):
+                import sentry_sdk
+                sentry_sdk.set_context("payment", {
+                    "invoice_id": str(locked.pk) if locked else str(self.pk),
+                    "source_event": source_event,
+                })
                 raise InvalidStatusTransition(
                     f"SubscriptionInvoice {locked.pk}: {locked.status} -> {resulting_status} is not an allowed transition"
                 )

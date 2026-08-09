@@ -81,6 +81,9 @@ gunicorn==21.2.0
 whitenoise==6.6.0
 dj-database-url==2.1.0
 
+# ── Monitoring & Error Tracking ───────────────────────────────────────────────
+sentry-sdk>=2.0.0
+
 # ── Social Auth & OAuth ───────────────────────────────────────────────────────
 google-auth>=2.20.0
 

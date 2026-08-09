@@ -249,6 +249,11 @@ def process_payment_outbox():
             event.processed_at = timezone.now()
             event.save(update_fields=['status', 'processed_at'])
         except Exception as e:
+            import sentry_sdk
+            sentry_sdk.set_context("payment", {
+                "invoice_id": str(event.payload.get("invoice_id")) if event and event.payload else None,
+                "source_event": f"outbox:{event.event_type}",
+            })
             logger.exception(f"Outbox event {event.id} failed (attempt {event.attempts})")
             event.last_error = str(e)[:500]
             # after 5 failed attempts, stop retrying automatically and flag for manual review

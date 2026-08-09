@@ -39,6 +39,11 @@ def razorpay_webhook(request):
             settings.RAZORPAY_WEBHOOK_SECRET
         )
     except Exception as e:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": "webhook:verify_signature",
+        })
         logger.error(f"Webhook signature verification failed: {e}")
         return HttpResponse("Invalid signature", status=400)
         
@@ -74,6 +79,11 @@ def razorpay_webhook(request):
         elif event_type == 'refund.failed':
             handle_refund_failed(data['payload']['refund']['entity'])
     except Exception as e:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:{event_type}",
+        })
         logger.error(f"Error processing webhook event {event_type}: {e}")
         # Return 200 to acknowledge receipt and avoid infinite retries
         return HttpResponse(f"Error processing event: {str(e)}", status=200)
@@ -127,6 +137,11 @@ def handle_subscription_charged(sub_entity, payment_entity):
         generate_b2b_invoice_pdf.delay(inv.id)
         
     except Subscription.DoesNotExist:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:subscription_not_found:{rzp_sub_id}",
+        })
         logger.error(f"Subscription {rzp_sub_id} not found.")
 
 def handle_subscription_halted(sub_entity):
@@ -142,6 +157,11 @@ def handle_subscription_halted(sub_entity):
             }
         )
     except Subscription.DoesNotExist:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:subscription_not_found:{rzp_sub_id}",
+        })
         logger.error(f"Subscription {rzp_sub_id} not found.")
 
 def handle_subscription_cancelled(sub_entity):
@@ -153,6 +173,11 @@ def handle_subscription_cancelled(sub_entity):
             source_event='webhook:subscription.cancelled'
         )
     except Subscription.DoesNotExist:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:subscription_not_found:{rzp_sub_id}",
+        })
         logger.error(f"Subscription {rzp_sub_id} not found.")
 
 def handle_payment_link_paid(pl_entity, payment_entity):
@@ -179,6 +204,11 @@ def handle_payment_link_paid(pl_entity, payment_entity):
         confirm_appointment_for_invoice(invoice, payment_reference=payment_entity['id'], source_context="payment")
 
     except Invoice.DoesNotExist:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:payment_link.paid:not_found:{pl_id}",
+        })
         logger.error(f"Invoice for payment link {pl_id} not found.")
 
 
@@ -208,6 +238,11 @@ def handle_payment_failed(payment_entity):
             pass
 
     if not invoice:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:payment.failed:not_found:{payment_entity.get('id')}",
+        })
         logger.error(f"payment.failed webhook: no matching invoice found for payment {payment_entity.get('id')}")
         return
 
@@ -267,6 +302,11 @@ def handle_payment_authorized(payment_entity):
             pass
 
     if not invoice:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:payment.authorized:not_found:{payment_entity.get('id')}",
+        })
         logger.error(f"payment.authorized webhook: no matching invoice found for payment {payment_entity.get('id')}")
         return
 
@@ -297,6 +337,11 @@ def handle_payment_authorized(payment_entity):
     elif invoice.status == 'paid':
         logger.debug(f"payment.authorized for already-paid invoice {invoice.pk}, ignoring")
     else:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": str(invoice.pk) if invoice else None,
+            "source_event": "webhook:payment.authorized:terminal_status",
+        })
         logger.error(
             f"payment.authorized for invoice {invoice.pk} in terminal "
             f"status {invoice.status} — manual reconciliation needed, "
@@ -454,6 +499,11 @@ def handle_refund_failed(refund_entity):
     # Fallback to Invoice-only lookup
     payment_id = refund_entity.get('payment_id')
     if not payment_id:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:refund.failed:missing_payment_id:{refund_id}",
+        })
         logger.error(f"refund.failed webhook: missing payment_id in refund entity {refund_id}")
         return
 
@@ -462,9 +512,19 @@ def handle_refund_failed(refund_entity):
         invoice = SubscriptionInvoice.objects.filter(razorpay_payment_id=payment_id).first()
 
     if not invoice:
+        import sentry_sdk
+        sentry_sdk.set_context("payment", {
+            "invoice_id": None,
+            "source_event": f"webhook:refund.failed:invoice_not_found:{payment_id}",
+        })
         logger.error(f"refund.failed webhook: no invoice found for payment {payment_id}")
         return
 
+    import sentry_sdk
+    sentry_sdk.set_context("payment", {
+        "invoice_id": str(invoice.pk) if invoice else None,
+        "source_event": f"webhook:refund.failed:{refund_id}",
+    })
     logger.error(f"Refund FAILED for invoice {invoice.pk}, refund_id={refund_id}, error: {error_desc} — needs manual attention")
 
     invoice.last_failure_reason = str(f"Refund {refund_id} failed: {error_desc}")[:255]

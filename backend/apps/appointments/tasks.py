@@ -91,6 +91,11 @@ def cancel_unpaid_appointments():
 
             cancelled_count += 1
         except Exception as e:
+            import sentry_sdk
+            sentry_sdk.set_context("payment", {
+                "invoice_id": str(invoice.pk) if invoice else None,
+                "source_event": "task:expiry_sweep",
+            })
             logger.error(f"Failed to auto-cancel appointment for invoice {invoice.id}: {e}")
 
     logger.info(f"cancel_unpaid_appointments: cancelled {cancelled_count} expired appointments")
