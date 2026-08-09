@@ -346,6 +346,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.billing.tasks.compute_daily_payment_metrics',
         'schedule': crontab(hour=2, minute=0),  # Daily at 2:00 AM off-peak
     },
+    'process-subscription-dunning': {
+        'task': 'apps.subscriptions.tasks.process_subscription_dunning',
+        'schedule': crontab(hour=3, minute=0),  # Daily at 3:00 AM off-peak
+    },
 }
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
