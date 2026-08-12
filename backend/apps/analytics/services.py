@@ -1,6 +1,6 @@
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Count
+from django.db.models import Count, Q
 from apps.appointments.models import Appointment
 from apps.patients.models import Patient
 from apps.doctors.models import DoctorClinic
@@ -11,27 +11,12 @@ def get_clinic_dashboard_stats(clinic):
     today = timezone.now().date()
     week_start = today - timedelta(days=7)
 
-    appointments_today = Appointment.objects.filter(
-        clinic=clinic,
-        appointment_date=today
-    ).count()
-
-    appointments_this_week = Appointment.objects.filter(
-        clinic=clinic,
-        appointment_date__gte=week_start
-    ).count()
-
-    completed_today = Appointment.objects.filter(
-        clinic=clinic,
-        appointment_date=today,
-        status="COMPLETED"
-    ).count()
-
-    cancelled_today = Appointment.objects.filter(
-        clinic=clinic,
-        appointment_date=today,
-        status="CANCELLED"
-    ).count()
+    appt_stats = Appointment.objects.filter(clinic=clinic).aggregate(
+        appointments_today=Count("id", filter=Q(appointment_date=today)),
+        appointments_this_week=Count("id", filter=Q(appointment_date__gte=week_start)),
+        completed_today=Count("id", filter=Q(appointment_date=today, status="COMPLETED")),
+        cancelled_today=Count("id", filter=Q(appointment_date=today, status="CANCELLED")),
+    )
 
     total_patients = Patient.objects.filter(
         appointments__clinic=clinic
@@ -42,10 +27,10 @@ def get_clinic_dashboard_stats(clinic):
     ).distinct().count()
 
     return {
-        "appointments_today": appointments_today,
-        "appointments_this_week": appointments_this_week,
-        "completed_today": completed_today,
-        "cancelled_today": cancelled_today,
+        "appointments_today": appt_stats["appointments_today"],
+        "appointments_this_week": appt_stats["appointments_this_week"],
+        "completed_today": appt_stats["completed_today"],
+        "cancelled_today": appt_stats["cancelled_today"],
         "total_patients": total_patients,
         "total_doctors": total_doctors,
     }

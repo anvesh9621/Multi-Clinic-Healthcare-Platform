@@ -56,3 +56,32 @@ class TestPaymentMetricsView(APITestCase):
         assert pm["overall_success_rate"] == 90.0
         assert pm["total_reconciliation_catches"] == 2
 
+
+from apps.core.factories import ClinicFactory
+from apps.analytics.services import get_clinic_dashboard_stats
+
+
+@pytest.mark.django_db
+class TestClinicDashboardStatsQueryCount(APITestCase):
+
+    def test_get_clinic_dashboard_stats_query_count(self):
+        clinic = ClinicFactory()
+        with self.assertNumQueries(3):
+            stats = get_clinic_dashboard_stats(clinic)
+
+        assert set(stats.keys()) == {
+            "appointments_today",
+            "appointments_this_week",
+            "completed_today",
+            "cancelled_today",
+            "total_patients",
+            "total_doctors",
+        }
+        assert stats["appointments_today"] == 0
+        assert stats["appointments_this_week"] == 0
+        assert stats["completed_today"] == 0
+        assert stats["cancelled_today"] == 0
+        assert stats["total_patients"] == 0
+        assert stats["total_doctors"] == 0
+
+
