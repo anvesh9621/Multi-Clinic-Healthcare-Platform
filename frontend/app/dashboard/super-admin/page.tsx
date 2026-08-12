@@ -130,7 +130,7 @@ export default function SuperAdminDashboard() {
     queryKey: ["super-admin", "clinics"],
     queryFn: async () => {
       const res = await apiClient.get("/doctors/clinics/");
-      return res.data as { id: number; name: string }[];
+      return (Array.isArray(res.data) ? res.data : (res.data?.results || [])) as { id: number; name: string }[];
     },
     enabled: isAdminModalOpen && !!user && user.role === "SUPER_ADMIN",
   });

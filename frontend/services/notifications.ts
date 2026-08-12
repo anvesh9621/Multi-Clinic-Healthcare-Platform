@@ -2,8 +2,8 @@ import api from './api';
 import type { Notification } from '@/types/api';
 
 export const fetchNotifications = async (): Promise<Notification[]> => {
-  const response = await api.get<Notification[]>('/notifications/');
-  return response.data;
+  const response = await api.get<any>('/notifications/');
+  return Array.isArray(response.data) ? response.data : (response.data.results || []);
 };
 
 export const markNotificationAsRead = async (id: number): Promise<void> => {

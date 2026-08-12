@@ -36,7 +36,7 @@ export default function InventoryDashboard() {
   const fetchInventory = async () => {
     try {
       const res = await api.get("/inventory/");
-      setItems(res.data);
+      setItems(Array.isArray(res.data) ? res.data : (res.data?.results || []));
     } catch (e) {
       console.error(e);
     } finally {

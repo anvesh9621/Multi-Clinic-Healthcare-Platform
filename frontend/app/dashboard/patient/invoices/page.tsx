@@ -50,7 +50,7 @@ export default function PatientInvoicesPage() {
 
   useEffect(() => {
     api.get("/billing/invoices/")
-      .then(res => setInvoices(res.data))
+      .then(res => setInvoices(Array.isArray(res.data) ? res.data : (res.data?.results || [])))
       .catch(err => {
         console.error("Failed to load invoices", err);
         setError("Failed to load invoices.");

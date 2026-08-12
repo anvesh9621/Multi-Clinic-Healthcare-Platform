@@ -2,8 +2,8 @@ import api from "./api";
 import type { Appointment } from "@/types/api";
 
 export const getAppointments = async (): Promise<Appointment[]> => {
-  const response = await api.get<Appointment[]>("/appointments/");
-  return response.data;
+  const response = await api.get<any>("/appointments/");
+  return Array.isArray(response.data) ? response.data : (response.data.results || []);
 };
 
 export const getAppointmentById = async (id: number): Promise<Appointment> => {

@@ -217,12 +217,17 @@ class SubscriptionInvoiceListView(APIView):
     permission_classes = [IsAuthenticated, IsClinicAdminOnly]
 
     def get(self, request):
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
+
         clinic = get_user_clinic(request.user)
         if not clinic:
             return Response({'error': 'User is not associated with a clinic.'}, status=status.HTTP_403_FORBIDDEN)
             
         from apps.billing.models import SubscriptionInvoice
-        invoices = SubscriptionInvoice.objects.filter(clinic=clinic).order_by('-issued_at')
+        invoices_qs = SubscriptionInvoice.objects.filter(clinic=clinic).order_by('-issued_at')
+        page = paginator.paginate_queryset(invoices_qs, request)
+        invoices = page if page is not None else invoices_qs
         
         data = []
         for inv in invoices:
@@ -236,6 +241,8 @@ class SubscriptionInvoiceListView(APIView):
                 'has_pdf': bool(inv.pdf_path)
             })
             
+        if page is not None:
+            return paginator.get_paginated_response(data)
         return Response(data)
 
 

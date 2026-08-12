@@ -80,10 +80,15 @@ class InvoiceListView(APIView):
 
     def get(self, request):
         user = request.user
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
         if user.role == 'DOCTOR':
-            return Response([], status=status.HTTP_200_OK)
+            return paginator.get_paginated_response([])
 
-        invoices = self.get_queryset(request)
+        invoices_qs = self.get_queryset(request)
+        page = paginator.paginate_queryset(invoices_qs, request)
+        invoices = page if page is not None else invoices_qs
+
         data = []
         for inv in invoices:
             patient_name = ''
@@ -114,6 +119,9 @@ class InvoiceListView(APIView):
                 'minutes_remaining': minutes_remaining,
                 'appointment_id': inv.appointment_id,
             })
+
+        if page is not None:
+            return paginator.get_paginated_response(data)
         return Response(data)
 
 
@@ -743,9 +751,11 @@ class PendingRefundApprovalsListView(APIView):
     permission_classes = [IsAuthenticated, IsClinicAdmin]
 
     def get(self, request):
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
         clinic = get_user_clinic(request.user)
         if not clinic and request.user.role != 'SUPER_ADMIN':
-            return Response([], status=status.HTTP_200_OK)
+            return paginator.get_paginated_response([])
 
         if request.user.role == 'SUPER_ADMIN':
             qs = RefundRequest.objects.filter(status='pending_approval')
@@ -753,6 +763,11 @@ class PendingRefundApprovalsListView(APIView):
             qs = RefundRequest.objects.filter(invoice__clinic=clinic, status='pending_approval')
 
         qs = qs.order_by('-created_at').select_related('invoice', 'requested_by', 'approved_by')
+        page = paginator.paginate_queryset(qs, request)
+        if page is not None:
+            serializer = RefundRequestSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
         serializer = RefundRequestSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

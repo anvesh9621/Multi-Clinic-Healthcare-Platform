@@ -118,7 +118,8 @@ class PatientHistoryViewTests(TestCase):
         self.client.force_authenticate(user=self.doctor_a.doctor.user)
         response = self.client.get(f"/api/records/history/patient/{self.patient_1.id}/")
         self.assertEqual(response.status_code, 200)
-        ids = [r["id"] for r in response.data]
+        items = response.data["results"] if isinstance(response.data, dict) and "results" in response.data else response.data
+        ids = [r["id"] for r in items]
         self.assertIn(self.record_a.id, ids)
         self.assertNotIn(self.record_b.id, ids)
 
@@ -127,7 +128,8 @@ class PatientHistoryViewTests(TestCase):
         self.client.force_authenticate(user=self.patient_1.user)
         response = self.client.get(f"/api/records/history/patient/{self.patient_1.id}/")
         self.assertEqual(response.status_code, 200)
-        for record in response.data:
+        items = response.data["results"] if isinstance(response.data, dict) and "results" in response.data else response.data
+        for record in items:
             self.assertNotIn("private_notes", record)
 
     def test_patient_cannot_access_another_patients_history(self):
@@ -159,4 +161,5 @@ class PatientHistoryViewTests(TestCase):
         self.client.force_authenticate(user=self.doctor_a.doctor.user)
         response = self.client.get(f"/api/records/history/patient/{patient_2.id}/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
+        items = response.data["results"] if isinstance(response.data, dict) and "results" in response.data else response.data
+        self.assertEqual(len(items), 0)

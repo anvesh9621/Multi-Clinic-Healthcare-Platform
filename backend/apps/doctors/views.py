@@ -26,20 +26,32 @@ from apps.audit.models import AuditLog
 
 
 class ClinicListView(APIView):
-    """Public — returns all active clinics for the booking wizard."""
+    """Public — returns active clinics for the booking wizard."""
     permission_classes = [AllowAny]
 
     def get(self, request):
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
         clinics = Clinic.objects.filter(is_active=True).order_by('name')
+        page = paginator.paginate_queryset(clinics, request)
+        if page is not None:
+            serializer = ClinicListSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
         serializer = ClinicListSerializer(clinics, many=True)
         return Response(serializer.data)
 
 
 class DoctorClinicListView(TenantScopedAPIView):
     def get(self, request):
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
         queryset = DoctorClinic.objects.select_related("doctor__user", "clinic")
         if not self.is_platform_wide:
             queryset = queryset.filter(clinic=self.clinic)
+        page = paginator.paginate_queryset(queryset, request)
+        if page is not None:
+            serializer = DoctorClinicSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
         serializer = DoctorClinicSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -263,12 +275,18 @@ class PublicDoctorListView(APIView):
 
     @method_decorator(cache_page(60 * 15))
     def get(self, request):
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
         specialty = request.query_params.get("specialty")
         queryset = Doctor.objects.filter(clinic_associations__is_active=True).distinct()
         
         if specialty:
             queryset = queryset.filter(specialization__iexact=specialty)
             
+        page = paginator.paginate_queryset(queryset, request)
+        if page is not None:
+            serializer = DoctorDetailSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
         serializer = DoctorDetailSerializer(queryset, many=True)
         return Response({"success": True, "data": serializer.data})
 
@@ -282,9 +300,15 @@ class DoctorReviewListCreateView(APIView):
         return [IsAuthenticated()]
 
     def get(self, request, doctor_id):
+        from rest_framework.pagination import PageNumberPagination
         from .models import DoctorReview
         from .serializers import DoctorReviewSerializer
+        paginator = PageNumberPagination()
         reviews = DoctorReview.objects.filter(doctor_id=doctor_id)
+        page = paginator.paginate_queryset(reviews, request)
+        if page is not None:
+            serializer = DoctorReviewSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
         serializer = DoctorReviewSerializer(reviews, many=True)
         return Response(serializer.data)
 

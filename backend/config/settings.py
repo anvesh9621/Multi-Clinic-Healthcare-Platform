@@ -258,6 +258,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
         "login_email": "5/15m",

@@ -162,14 +162,20 @@ class PatientOwnHistoryView(generics.ListAPIView):
         return MedicalRecord.objects.filter(patient_id=patient_id).order_by("-created_at")
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data = serializer.data
+            for item in data:
+                item.pop("private_notes", None)
+            return self.get_paginated_response(data)
+
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
-
-        # Strip private notes — patients must never see private_notes.
         for item in data:
             item.pop("private_notes", None)
-
         return Response(data)
 
 

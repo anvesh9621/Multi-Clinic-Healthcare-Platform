@@ -26,7 +26,8 @@ export const initiateRefund = async (invoiceId: number, amount: string, reason: 
 
 export const getPendingRefundApprovals = async () => {
   const res = await api.get('/billing/refunds/pending/');
-  return (Array.isArray(res.data) ? res.data : []) as RefundRequest[];
+  const items = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+  return items as RefundRequest[];
 };
 
 export const approveRefundRequest = async (refundRequestId: number) => {

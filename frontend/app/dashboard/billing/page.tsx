@@ -45,7 +45,7 @@ export default function BillingPage() {
     queryKey: ['billing', 'invoices'],
     queryFn: async () => {
       const res = await api.get('/billing/invoices/');
-      return Array.isArray(res.data) ? res.data : [];
+      return Array.isArray(res.data) ? res.data : (res.data?.results || []);
     },
     staleTime: 60_000, // treat data as fresh for 60s
   });

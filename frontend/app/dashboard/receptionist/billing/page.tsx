@@ -91,7 +91,8 @@ function PaymentModal({
     pollRef.current = setInterval(async () => {
       try {
         const { data } = await api.get(`/billing/invoices/`);
-        const updated = (data as Invoice[]).find((i: Invoice) => i.id === invId);
+        const items = Array.isArray(data) ? data : (data?.results || []);
+        const updated = (items as Invoice[]).find((i: Invoice) => i.id === invId);
         if (updated && updated.status === "paid") {
           stopPolling();
           onUpdate(updated);
@@ -307,8 +308,8 @@ export default function ReceptionistBilling() {
         api.get("/billing/invoices/"),
         api.get("/patients/")
       ]);
-      setInvoices(invRes.data);
-      setPatients(patRes.data);
+      setInvoices(Array.isArray(invRes.data) ? invRes.data : (invRes.data?.results || []));
+      setPatients(Array.isArray(patRes.data) ? patRes.data : (patRes.data?.results || []));
     } catch (e) {
       console.error("Failed to load billing data", e);
     } finally {

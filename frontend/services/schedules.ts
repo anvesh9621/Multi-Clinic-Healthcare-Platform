@@ -17,8 +17,8 @@ export interface CreateLeavePayload {
 }
 
 export const getSchedules = async (): Promise<DoctorSchedule[]> => {
-  const res = await api.get<DoctorSchedule[]>("/doctors/schedules/");
-  return res.data;
+  const res = await api.get<any>("/doctors/schedules/");
+  return Array.isArray(res.data) ? res.data : (res.data.results || []);
 };
 
 export const createSchedule = async (
@@ -41,8 +41,8 @@ export const deleteSchedule = async (id: number): Promise<void> => {
 };
 
 export const getLeaves = async (): Promise<DoctorLeave[]> => {
-  const res = await api.get<DoctorLeave[]>("/doctors/leaves/");
-  return res.data;
+  const res = await api.get<any>("/doctors/leaves/");
+  return Array.isArray(res.data) ? res.data : (res.data.results || []);
 };
 
 export const createLeave = async (

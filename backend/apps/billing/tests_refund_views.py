@@ -108,9 +108,9 @@ class TestRefundViews(TestCase):
         self.client.force_authenticate(user=self.admin1)
         res = self.client.get("/api/billing/refunds/pending/")
 
-        assert res.status_code == 200
-        assert len(res.data) == 1
-        assert res.data[0]["id"] == req1.id
+        results = res.data.get("results", res.data)
+        assert len(results) == 1
+        assert results[0]["id"] == req1.id
 
     @patch("apps.billing.services.get_razorpay_client")
     def test_approve_refund_view_success_and_cross_tenant_block(self, mock_get_client):

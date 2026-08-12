@@ -87,7 +87,7 @@ export default function AdminDoctorsPage() {
     queryKey: ["admin_invitations"],
     queryFn: async () => {
       const res = await api.get("/doctors/invitations/");
-      return res.data as InvitationEntry[];
+      return (Array.isArray(res.data) ? res.data : res.data?.results || []) as InvitationEntry[];
     },
   });
 
