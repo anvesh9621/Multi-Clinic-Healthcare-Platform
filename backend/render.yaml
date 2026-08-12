@@ -9,7 +9,7 @@ services:
     name: mediclinic-backend
     env: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn config.wsgi:application"
+    startCommand: "gunicorn config.wsgi:application --workers 3 --threads 2 --worker-class gthread --timeout 30 --max-requests 1000 --max-requests-jitter 100"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
