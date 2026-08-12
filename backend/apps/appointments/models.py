@@ -80,6 +80,9 @@ class Appointment(models.Model):
             models.Index(fields=["clinic"]),
             models.Index(fields=["doctor_clinic"]),
             models.Index(fields=["status"]),
+            models.Index(fields=["clinic", "appointment_date"]),
+            models.Index(fields=["clinic", "status"]),
+            models.Index(fields=["doctor_clinic", "appointment_date"]),
         ]
         
         unique_together = ("clinic", "appointment_date", "queue_token")
