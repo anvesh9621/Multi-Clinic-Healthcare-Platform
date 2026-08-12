@@ -295,21 +295,24 @@ class AppointmentListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        base_qs = Appointment.objects.select_related(
+            "patient__user", "doctor_clinic__doctor__user", "clinic"
+        )
 
         if user.role == "SUPER_ADMIN":
-            return Appointment.objects.all()
+            return base_qs.all()
 
         if user.role == "PATIENT":
-            return Appointment.objects.filter(patient__user=user)
+            return base_qs.filter(patient__user=user)
 
         if user.role == "DOCTOR":
-            return Appointment.objects.filter(
+            return base_qs.filter(
                 doctor_clinic__doctor__user=user
             )
 
         if user.role in ["CLINIC_ADMIN", "RECEPTIONIST"]:
             clinic = get_user_clinic(user)
-            return Appointment.objects.filter(clinic=clinic)
+            return base_qs.filter(clinic=clinic)
 
         return Appointment.objects.none()
 

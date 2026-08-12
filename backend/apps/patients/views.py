@@ -138,7 +138,7 @@ class PatientRegistrationView(APIView):
 class PatientListView(ClinicQuerysetMixin, ListAPIView):
     permission_classes = [IsClinicStaff]
     serializer_class = PatientListSerializer
-    queryset = Patient.objects.all().order_by('-created_at')
+    queryset = Patient.objects.all().order_by('-created_at').select_related('user')
     clinic_field = 'user__clinic'
 
     def get_queryset(self):
@@ -163,7 +163,7 @@ class PatientHistoryView(APIView):
 
     def get(self, request, pk):
         try:
-            patient = Patient.objects.get(pk=pk)
+            patient = Patient.objects.select_related('user').get(pk=pk)
         except Patient.DoesNotExist:
             return Response({"error": "Patient not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -174,7 +174,9 @@ class PatientHistoryView(APIView):
 
         patient_serializer = PatientListSerializer(patient)
         
-        appointments = Appointment.objects.filter(patient=patient).order_by('-appointment_date', '-start_time')
+        appointments = Appointment.objects.filter(patient=patient).select_related(
+            "patient__user", "doctor_clinic__doctor__user", "clinic"
+        ).order_by('-appointment_date', '-start_time')
         appointments_serializer = AppointmentListSerializer(appointments, many=True)
 
         return Response({
