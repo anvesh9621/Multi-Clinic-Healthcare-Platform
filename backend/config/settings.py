@@ -204,6 +204,11 @@ if IS_TESTING:
             }
         }
         _apply_sqlite_patches()
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
 elif IS_E2E_SERVER:
     DATABASES = {
         'default': {
@@ -308,6 +313,26 @@ CELERY_TASK_SERIALIZER = 'json'
 
 # In development (DEBUG=True) or when forced, run tasks synchronously — no Redis needed.
 CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', str(DEBUG)).lower() in ('true', '1', 't')
+
+# ── Redis Cache Configuration ──────────────────────────────────────────────────
+if not IS_TESTING:
+    _redis_cache_url = os.environ.get("REDIS_CACHE_URL")
+    if not _redis_cache_url:
+        _celery_broker = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+        if _celery_broker.endswith("/0"):
+            _redis_cache_url = _celery_broker[:-2] + "/1"
+        else:
+            _redis_cache_url = _celery_broker
+
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": _redis_cache_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+        }
+    }
 
 # ── Razorpay ──────────────────────────────────────────────────────────────────
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')

@@ -23,3 +23,8 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         value: "https://your-vercel-app-url.vercel.app" # User needs to update this
+      - key: REDIS_CACHE_URL
+        # MANUAL ACTION REQUIRED ON RENDER DASHBOARD:
+        # Provision a distinct Redis instance/addon on Render Dashboard (or Upstash/Redis Cloud)
+        # and set this environment variable to its connection string (e.g. rediss://...).
+        value: "redis://localhost:6379/1"

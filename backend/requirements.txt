@@ -23,6 +23,7 @@ pillow==12.1.1
 # ── Celery & Redis (Async Tasks / Email Queue) ────────────────────────────────
 celery==5.6.3
 redis==7.4.0
+django-redis>=5.4.0
 kombu==5.6.2
 amqp==5.3.1
 billiard==4.2.4
