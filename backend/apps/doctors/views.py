@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListCreateAPIView, ListAPIView
 from rest_framework import status
+from django.core.cache import cache
 from apps.core.tenancy import ClinicQuerysetMixin, get_user_clinic, TenantScopedAPIView
 
 from .models import DoctorClinic, DoctorSchedule, Doctor, DoctorLeave
@@ -30,15 +31,25 @@ class ClinicListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        cache_key = f"clinic_list:{request.query_params.urlencode()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         from rest_framework.pagination import PageNumberPagination
         paginator = PageNumberPagination()
         clinics = Clinic.objects.filter(is_active=True).order_by('name')
         page = paginator.paginate_queryset(clinics, request)
         if page is not None:
             serializer = ClinicListSerializer(page, many=True)
-            return paginator.get_paginated_response(serializer.data)
+            response = paginator.get_paginated_response(serializer.data)
+            cache.set(cache_key, response.data, timeout=300)
+            return response
+
         serializer = ClinicListSerializer(clinics, many=True)
-        return Response(serializer.data)
+        response_data = serializer.data
+        cache.set(cache_key, response_data, timeout=300)
+        return Response(response_data)
 
 
 class DoctorClinicListView(TenantScopedAPIView):
@@ -255,26 +266,34 @@ class CreateDoctorScheduleView(APIView):
         return Response({"success": True, "schedule_id": schedule.id}, status=status.HTTP_201_CREATED)
 
 
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
-
 class PublicSpecialtyListView(APIView):
     """Public — returns a list of unique specialties that have active doctors."""
     permission_classes = [AllowAny]
 
-    @method_decorator(cache_page(60 * 15))
     def get(self, request):
+        cache_key = f"public_specialties:{request.query_params.urlencode()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         active_doctors = Doctor.objects.filter(clinic_associations__is_active=True)
         specialties = active_doctors.values_list('specialization', flat=True).distinct()
-        return Response([s for s in sorted(list(specialties)) if s])
+        response_data = [s for s in sorted(list(specialties)) if s]
+
+        cache.set(cache_key, response_data, timeout=300)
+        return Response(response_data)
 
 
 class PublicDoctorListView(APIView):
     """Public — returns active doctors filtered by specialty. Includes basic profile details."""
     permission_classes = [AllowAny]
 
-    @method_decorator(cache_page(60 * 15))
     def get(self, request):
+        cache_key = f"public_doctors:{request.query_params.urlencode()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         from rest_framework.pagination import PageNumberPagination
         paginator = PageNumberPagination()
         specialty = request.query_params.get("specialty")
@@ -286,9 +305,14 @@ class PublicDoctorListView(APIView):
         page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = DoctorDetailSerializer(page, many=True)
-            return paginator.get_paginated_response(serializer.data)
+            response = paginator.get_paginated_response(serializer.data)
+            cache.set(cache_key, response.data, timeout=300)
+            return response
+
         serializer = DoctorDetailSerializer(queryset, many=True)
-        return Response({"success": True, "data": serializer.data})
+        response_data = {"success": True, "data": serializer.data}
+        cache.set(cache_key, response_data, timeout=300)
+        return Response(response_data)
 
 
 class DoctorReviewListCreateView(APIView):

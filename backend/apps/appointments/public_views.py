@@ -14,8 +14,7 @@ from apps.doctors.models import DoctorClinic, DoctorSchedule, DoctorLeave, Docto
 from apps.appointments.services import get_available_slots
 
 
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
+from django.core.cache import cache
 
 class PublicClinicListView(APIView):
     """
@@ -25,8 +24,12 @@ class PublicClinicListView(APIView):
     """
     permission_classes = [AllowAny]
 
-    @method_decorator(cache_page(60 * 15))
     def get(self, request):
+        cache_key = f"public_clinics:{request.query_params.urlencode()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         clinics = Clinic.objects.filter(
             is_active=True,
             subscription__status__in=['trialing', 'active', 'past_due']
@@ -65,6 +68,7 @@ class PublicClinicListView(APIView):
                 'specialties': [s for s in specialties if s],
             })
 
+        cache.set(cache_key, result, timeout=300)
         return Response(result)
 
 
@@ -75,8 +79,12 @@ class PublicClinicDoctorsView(APIView):
     """
     permission_classes = [AllowAny]
 
-    @method_decorator(cache_page(60 * 15))
     def get(self, request, clinic_id):
+        cache_key = f"public_clinic_doctors:{clinic_id}:{request.query_params.urlencode()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         clinic = get_object_or_404(Clinic, id=clinic_id, is_active=True)
 
         associations = DoctorClinic.objects.filter(
@@ -114,11 +122,13 @@ class PublicClinicDoctorsView(APIView):
                 'review_count': review_count,
             })
 
-        return Response({
+        response_data = {
             'clinic_id': clinic.id,
             'clinic_name': clinic.name,
             'doctors': result,
-        })
+        }
+        cache.set(cache_key, response_data, timeout=300)
+        return Response(response_data)
 
 
 class PublicAvailableSlotsView(APIView):
