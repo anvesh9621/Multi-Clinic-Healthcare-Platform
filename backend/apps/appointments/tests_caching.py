@@ -44,94 +44,130 @@ class ViewCachingTests(TestCase):
     def tearDown(self):
         cache.clear()
 
-    def test_public_clinic_list_view_caching(self):
+    def test_public_clinic_list_view_caching_and_invalidation(self):
         url = "/api/public/clinics/"
-        response_1 = self.client.get(url)
-        self.assertEqual(response_1.status_code, 200)
+        cache_key = "public_clinics:"
 
-        # Verify key exists in cache
-        cached_data = cache.get("public_clinics:")
-        self.assertIsNotNone(cached_data)
-
-        # Cache hit returns exact same cached content
-        response_2 = self.client.get(url)
-        self.assertEqual(response_2.status_code, 200)
-        self.assertEqual(response_2.data, cached_data)
-
-    def test_public_clinic_doctors_view_caching(self):
-        url = f"/api/public/clinics/{self.clinic.id}/doctors/"
-        response_1 = self.client.get(url)
-        self.assertEqual(response_1.status_code, 200)
-
-        cache_key = f"public_clinic_doctors:{self.clinic.id}:"
-        cached_data = cache.get(cache_key)
-        self.assertIsNotNone(cached_data)
-        self.assertEqual(response_1.data, cached_data)
-
-    def test_public_specialty_list_view_caching(self):
-        url = "/api/public/specialties/"
-        response_1 = self.client.get(url)
-        self.assertEqual(response_1.status_code, 200)
-
-        cached_data = cache.get("public_specialties:")
-        self.assertIsNotNone(cached_data)
-        self.assertIn("Cardiology", cached_data)
-
-    def test_public_doctor_list_view_caching(self):
-        url = "/api/public/doctors/"
-        response_1 = self.client.get(url)
-        self.assertEqual(response_1.status_code, 200)
-
-        cached_data = cache.get("public_doctors:")
-        self.assertIsNotNone(cached_data)
-
-    def test_clinic_list_view_caching(self):
-        url = "/api/doctors/clinics/"
-        response_1 = self.client.get(url)
-        self.assertEqual(response_1.status_code, 200)
-
-        cached_data = cache.get("clinic_list:")
-        self.assertIsNotNone(cached_data)
-
-    def test_clinic_signal_invalidates_cache(self):
-        # Warm cache
-        self.client.get("/api/public/clinics/")
-        self.client.get("/api/doctors/clinics/")
-        self.assertIsNotNone(cache.get("public_clinics:"))
-        self.assertIsNotNone(cache.get("clinic_list:"))
-
-        # Save clinic -> triggers signal
-        self.clinic.name = "Updated Clinic Name"
-        self.clinic.save()
-
-        # Caches should be invalidated
-        self.assertIsNone(cache.get("public_clinics:"))
-        self.assertIsNone(cache.get("clinic_list:"))
-
-    def test_doctor_signal_invalidates_cache(self):
-        # Warm cache
-        self.client.get("/api/public/doctors/")
-        self.client.get("/api/public/specialties/")
-        self.assertIsNotNone(cache.get("public_doctors:"))
-        self.assertIsNotNone(cache.get("public_specialties:"))
-
-        # Save doctor -> triggers signal
-        self.doctor.specialization = "Neurology"
-        self.doctor.save()
-
-        # Caches should be invalidated
-        self.assertIsNone(cache.get("public_doctors:"))
-        self.assertIsNone(cache.get("public_specialties:"))
-
-    def test_doctor_clinic_signal_invalidates_cache(self):
-        url = f"/api/public/clinics/{self.clinic.id}/doctors/"
-        self.client.get(url)
-        cache_key = f"public_clinic_doctors:{self.clinic.id}:"
+        # (a) First request: Cache miss -> runs DB queries
+        with self.assertNumQueries(3):
+            res_1 = self.client.get(url)
+        self.assertEqual(res_1.status_code, 200)
         self.assertIsNotNone(cache.get(cache_key))
 
-        # Save DoctorClinic -> triggers signal
-        self.doctor_clinic.consultation_fee = 200.00
-        self.doctor_clinic.save()
+        # (b) Second request: Cache hit -> EXACTLY 0 DB queries
+        with self.assertNumQueries(0):
+            res_2 = self.client.get(url)
+        self.assertEqual(res_2.status_code, 200)
+        self.assertEqual(res_1.data, res_2.data)
 
-        # Cache should be invalidated
+        # (c) Save Clinic model -> signal invalidates cache -> key is empty
+        self.clinic.name = "Renamed Clinic"
+        self.clinic.save()
         self.assertIsNone(cache.get(cache_key))
+
+        # Third request: Cache miss again -> runs DB queries
+        with self.assertNumQueries(3):
+            res_3 = self.client.get(url)
+        self.assertEqual(res_3.data[0]["name"], "Renamed Clinic")
+
+    def test_public_clinic_doctors_view_caching_and_invalidation(self):
+        url = f"/api/public/clinics/{self.clinic.id}/doctors/"
+        cache_key = f"public_clinic_doctors:{self.clinic.id}:"
+
+        # (a) First request: Cache miss -> runs DB queries
+        with self.assertNumQueries(4):
+            res_1 = self.client.get(url)
+        self.assertEqual(res_1.status_code, 200)
+        self.assertIsNotNone(cache.get(cache_key))
+
+        # (b) Second request: Cache hit -> EXACTLY 0 DB queries
+        with self.assertNumQueries(0):
+            res_2 = self.client.get(url)
+        self.assertEqual(res_2.status_code, 200)
+        self.assertEqual(res_1.data, res_2.data)
+
+        # (c) Save DoctorClinic model -> signal invalidates cache -> key is empty
+        self.doctor_clinic.consultation_fee = 250.00
+        self.doctor_clinic.save()
+        self.assertIsNone(cache.get(cache_key))
+
+        # Third request: Cache miss again -> runs DB queries
+        with self.assertNumQueries(4):
+            res_3 = self.client.get(url)
+        self.assertEqual(res_3.data["doctors"][0]["consultation_fee"], 250.00)
+
+    def test_public_specialty_list_view_caching_and_invalidation(self):
+        url = "/api/public/specialties/"
+        cache_key = "public_specialties:"
+
+        # (a) First request: Cache miss -> runs DB queries
+        with self.assertNumQueries(1):
+            res_1 = self.client.get(url)
+        self.assertEqual(res_1.status_code, 200)
+        self.assertIsNotNone(cache.get(cache_key))
+
+        # (b) Second request: Cache hit -> EXACTLY 0 DB queries
+        with self.assertNumQueries(0):
+            res_2 = self.client.get(url)
+        self.assertEqual(res_2.status_code, 200)
+        self.assertEqual(res_1.data, res_2.data)
+
+        # (c) Save Doctor model -> signal invalidates cache -> key is empty
+        self.doctor.specialization = "Neurology"
+        self.doctor.save()
+        self.assertIsNone(cache.get(cache_key))
+
+        # Third request: Cache miss again -> runs DB queries
+        with self.assertNumQueries(1):
+            res_3 = self.client.get(url)
+        self.assertIn("Neurology", res_3.data)
+
+    def test_public_doctor_list_view_caching_and_invalidation(self):
+        url = "/api/public/doctors/"
+        cache_key = "public_doctors:"
+
+        # (a) First request: Cache miss -> runs DB queries
+        with self.assertNumQueries(7):
+            res_1 = self.client.get(url)
+        self.assertEqual(res_1.status_code, 200)
+        self.assertIsNotNone(cache.get(cache_key))
+
+        # (b) Second request: Cache hit -> EXACTLY 0 DB queries
+        with self.assertNumQueries(0):
+            res_2 = self.client.get(url)
+        self.assertEqual(res_2.status_code, 200)
+        self.assertEqual(res_1.data, res_2.data)
+
+        # (c) Delete Doctor model -> signal invalidates cache -> key is empty
+        self.doctor.delete()
+        self.assertIsNone(cache.get(cache_key))
+
+        # Third request: Cache miss again -> runs DB queries
+        with self.assertNumQueries(1):
+            res_3 = self.client.get(url)
+        self.assertEqual(res_3.data["count"], 0)
+
+    def test_clinic_list_view_caching_and_invalidation(self):
+        url = "/api/doctors/clinics/"
+        cache_key = "clinic_list:"
+
+        # (a) First request: Cache miss -> runs DB queries
+        with self.assertNumQueries(3):
+            res_1 = self.client.get(url)
+        self.assertEqual(res_1.status_code, 200)
+        self.assertIsNotNone(cache.get(cache_key))
+
+        # (b) Second request: Cache hit -> EXACTLY 0 DB queries
+        with self.assertNumQueries(0):
+            res_2 = self.client.get(url)
+        self.assertEqual(res_2.status_code, 200)
+        self.assertEqual(res_1.data, res_2.data)
+
+        # (c) Delete Clinic model -> signal invalidates cache -> key is empty
+        self.clinic.delete()
+        self.assertIsNone(cache.get(cache_key))
+
+        # Third request: Cache miss again -> runs DB queries
+        with self.assertNumQueries(1):
+            res_3 = self.client.get(url)
+        self.assertEqual(res_3.data["count"], 0)
