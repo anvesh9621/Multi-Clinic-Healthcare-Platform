@@ -85,8 +85,8 @@ export default function SubscriptionPage() {
 
   const fetchInvoices = async () => {
     try {
-      const { data } = await api.get<Invoice[]>("/subscriptions/invoices/");
-      setInvoices(data);
+      const { data } = await api.get<any>("/subscriptions/invoices/");
+      setInvoices(Array.isArray(data) ? data : (data?.results || []));
     } catch (err) {
       console.error("Failed to fetch invoices", err);
     }

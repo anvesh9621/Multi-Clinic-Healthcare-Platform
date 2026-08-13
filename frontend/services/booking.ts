@@ -27,17 +27,17 @@ export interface ReceptionistBookingPayload extends BookingPayload {
 }
 
 export const getClinics = async (): Promise<ClinicOption[]> => {
-  const response = await api.get<ClinicOption[]>("/doctors/clinics/");
-  return response.data;
+  const response = await api.get<any>("/doctors/clinics/");
+  return Array.isArray(response.data) ? response.data : (response.data?.results || []);
 };
 
 export const getDoctorsByClinic = async (
   clinicId: number
 ): Promise<BookableDoctorClinic[]> => {
-  const response = await api.get<BookableDoctorClinic[]>(
+  const response = await api.get<any>(
     `/doctors/?clinic_id=${clinicId}`
   );
-  return response.data;
+  return Array.isArray(response.data) ? response.data : (response.data?.results || []);
 };
 
 export const getAvailableSlots = async (
