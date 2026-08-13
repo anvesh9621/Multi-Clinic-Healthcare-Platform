@@ -40,15 +40,16 @@ class ClinicListView(APIView):
         paginator = PageNumberPagination()
         clinics = Clinic.objects.filter(is_active=True).order_by('name')
         page = paginator.paginate_queryset(clinics, request)
+        ttl = 60 if request.query_params else 300
         if page is not None:
             serializer = ClinicListSerializer(page, many=True)
             response = paginator.get_paginated_response(serializer.data)
-            cache.set(cache_key, response.data, timeout=300)
+            cache.set(cache_key, response.data, timeout=ttl)
             return response
 
         serializer = ClinicListSerializer(clinics, many=True)
         response_data = serializer.data
-        cache.set(cache_key, response_data, timeout=300)
+        cache.set(cache_key, response_data, timeout=ttl)
         return Response(response_data)
 
 
@@ -303,15 +304,16 @@ class PublicDoctorListView(APIView):
             queryset = queryset.filter(specialization__iexact=specialty)
             
         page = paginator.paginate_queryset(queryset, request)
+        ttl = 60 if request.query_params else 300
         if page is not None:
             serializer = DoctorDetailSerializer(page, many=True)
             response = paginator.get_paginated_response(serializer.data)
-            cache.set(cache_key, response.data, timeout=300)
+            cache.set(cache_key, response.data, timeout=ttl)
             return response
 
         serializer = DoctorDetailSerializer(queryset, many=True)
         response_data = {"success": True, "data": serializer.data}
-        cache.set(cache_key, response_data, timeout=300)
+        cache.set(cache_key, response_data, timeout=ttl)
         return Response(response_data)
 
 

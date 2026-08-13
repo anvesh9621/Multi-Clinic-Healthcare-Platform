@@ -68,7 +68,8 @@ class PublicClinicListView(APIView):
                 'specialties': [s for s in specialties if s],
             })
 
-        cache.set(cache_key, result, timeout=300)
+        ttl = 60 if request.query_params else 300
+        cache.set(cache_key, result, timeout=ttl)
         return Response(result)
 
 
@@ -127,7 +128,8 @@ class PublicClinicDoctorsView(APIView):
             'clinic_name': clinic.name,
             'doctors': result,
         }
-        cache.set(cache_key, response_data, timeout=300)
+        ttl = 60 if request.query_params else 300
+        cache.set(cache_key, response_data, timeout=ttl)
         return Response(response_data)
 
 

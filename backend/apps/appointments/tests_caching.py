@@ -92,3 +92,46 @@ class ViewCachingTests(TestCase):
 
         cached_data = cache.get("clinic_list:")
         self.assertIsNotNone(cached_data)
+
+    def test_clinic_signal_invalidates_cache(self):
+        # Warm cache
+        self.client.get("/api/public/clinics/")
+        self.client.get("/api/doctors/clinics/")
+        self.assertIsNotNone(cache.get("public_clinics:"))
+        self.assertIsNotNone(cache.get("clinic_list:"))
+
+        # Save clinic -> triggers signal
+        self.clinic.name = "Updated Clinic Name"
+        self.clinic.save()
+
+        # Caches should be invalidated
+        self.assertIsNone(cache.get("public_clinics:"))
+        self.assertIsNone(cache.get("clinic_list:"))
+
+    def test_doctor_signal_invalidates_cache(self):
+        # Warm cache
+        self.client.get("/api/public/doctors/")
+        self.client.get("/api/public/specialties/")
+        self.assertIsNotNone(cache.get("public_doctors:"))
+        self.assertIsNotNone(cache.get("public_specialties:"))
+
+        # Save doctor -> triggers signal
+        self.doctor.specialization = "Neurology"
+        self.doctor.save()
+
+        # Caches should be invalidated
+        self.assertIsNone(cache.get("public_doctors:"))
+        self.assertIsNone(cache.get("public_specialties:"))
+
+    def test_doctor_clinic_signal_invalidates_cache(self):
+        url = f"/api/public/clinics/{self.clinic.id}/doctors/"
+        self.client.get(url)
+        cache_key = f"public_clinic_doctors:{self.clinic.id}:"
+        self.assertIsNotNone(cache.get(cache_key))
+
+        # Save DoctorClinic -> triggers signal
+        self.doctor_clinic.consultation_fee = 200.00
+        self.doctor_clinic.save()
+
+        # Cache should be invalidated
+        self.assertIsNone(cache.get(cache_key))
