@@ -51,5 +51,5 @@ class TenantIsolationTests(TenantIsolationTestCase):
         response = self.client.get("/api/patients/")
 
         self.assertEqual(response.status_code, 200)
-        patient_ids = [p["id"] for p in response.data]
+        patient_ids = [p["id"] for p in response.data["results"]]
         self.assertIn(self.patient_1.id, patient_ids)
