@@ -217,6 +217,11 @@ elif IS_E2E_SERVER:
         }
     }
     _apply_sqlite_patches()
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
 
 
 # Password validation
@@ -315,7 +320,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', str(DEBUG)).lower() in ('true', '1', 't')
 
 # ── Redis Cache Configuration ──────────────────────────────────────────────────
-if not IS_TESTING:
+if not IS_TESTING and not IS_E2E_SERVER:
     _redis_cache_url = os.environ.get("REDIS_CACHE_URL")
     if not _redis_cache_url:
         _celery_broker = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")

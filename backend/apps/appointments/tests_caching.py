@@ -171,3 +171,20 @@ class ViewCachingTests(TestCase):
         with self.assertNumQueries(1):
             res_3 = self.client.get(url)
         self.assertEqual(res_3.data["count"], 0)
+
+    def test_clinic_save_succeeds_even_when_cache_invalidation_fails(self):
+        from unittest.mock import patch, MagicMock
+        import logging
+
+        mock_delete = MagicMock(side_effect=Exception("Redis connection error"))
+        mock_delete_pattern = MagicMock(side_effect=Exception("Redis connection error"))
+
+        with patch.object(cache, "delete", mock_delete), \
+             patch.object(cache, "delete_pattern", mock_delete_pattern, create=True), \
+             self.assertLogs("apps.clinics.signals", level="WARNING") as cm:
+            self.clinic.name = "Resilient Clinic"
+            self.clinic.save()
+            self.clinic.refresh_from_db()
+            self.assertEqual(self.clinic.name, "Resilient Clinic")
+            self.assertTrue(any("Cache invalidation failed" in record.getMessage() for record in cm.records))
+
