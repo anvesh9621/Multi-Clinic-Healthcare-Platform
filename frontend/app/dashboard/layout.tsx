@@ -79,6 +79,31 @@ const ROLE_NAV: Record<string, NavItem[]> = {
   ],
 };
 
+function decodeRoleFromToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const token = localStorage.getItem("access");
+    if (!token) return null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    const decoded = JSON.parse(jsonPayload);
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      return null;
+    }
+    return decoded.role || null;
+  } catch {
+    return null;
+  }
+}
+
 function NavLink({ href, icon: Icon, label, active }: NavItem & { active: boolean }) {
   return (
     <Link
@@ -130,22 +155,34 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
+  const [tokenRole, setTokenRole] = useState<string | null>(() => decodeRoleFromToken());
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [user, loading, router]);
+    const role = decodeRoleFromToken();
+    if (role !== tokenRole) {
+      setTokenRole(role);
+    }
+  }, [tokenRole]);
+
+  const effectiveRole = user?.role || tokenRole;
+
+  useEffect(() => {
+    if (!loading && !user && !effectiveRole) router.push("/login");
+  }, [user, loading, effectiveRole, router]);
 
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  if (loading) return <PageLoader />;
-  if (!user) return null;
+  if (loading && !effectiveRole) return <PageLoader />;
+  if (!loading && !user && !effectiveRole) return null;
+
+  const currentRole = effectiveRole || "PATIENT";
 
   // Patient has their own full-page layout at /dashboard/patient
   // This layout serves staff roles + shared pages like /dashboard/appointments
-  if (user.role === "PATIENT" && pathname?.startsWith("/dashboard/patient")) {
+  if (currentRole === "PATIENT" && pathname?.startsWith("/dashboard/patient")) {
     return <>{children}</>;
   }
 
@@ -154,19 +191,22 @@ export default function DashboardLayout({
     router.push("/");
   };
 
-  const roleNav = ROLE_NAV[user.role] ?? [];
+  const roleNav = ROLE_NAV[currentRole] ?? [];
   const roleLabel: Record<string, string> = {
     CLINIC_ADMIN:  "Admin",
     RECEPTIONIST:  "Reception",
     DOCTOR:        "Clinical",
     PATIENT:       "My Health",
+    SUPER_ADMIN:   "Super Admin",
   };
-  const initials = user.first_name
+  const initials = user?.first_name
     ? `${user.first_name[0]}${user.last_name?.[0] ?? ""}`.toUpperCase()
-    : user.email[0].toUpperCase();
+    : user?.email
+    ? user.email[0].toUpperCase()
+    : currentRole[0];
 
   return (
-    <SubscriptionProvider userRole={user.role}>
+    <SubscriptionProvider userRole={currentRole}>
       <NotificationProvider>
         <div className="flex min-h-screen bg-gray-50 transition-colors duration-300 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
       
@@ -216,7 +256,7 @@ export default function DashboardLayout({
             <>
               <div className="pt-5 pb-2 px-3">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  {roleLabel[user.role] ?? user.role}
+                  {roleLabel[currentRole] ?? currentRole}
                 </p>
               </div>
               {roleNav.map((item) => (
@@ -233,7 +273,7 @@ export default function DashboardLayout({
         {/* User + Logout */}
         <div className="px-3 py-4 border-t border-gray-100 space-y-1 bg-white mt-auto">
           {/* Profile shortcut for patients */}
-          {user.role === "PATIENT" && (
+          {currentRole === "PATIENT" && (
             <Link
               href="/dashboard/patient/profile"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-all text-sm font-medium"
@@ -253,9 +293,9 @@ export default function DashboardLayout({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-gray-900 text-xs font-semibold truncate">
-                {user.first_name ? `${user.first_name} ${user.last_name ?? ""}` : user.email}
+                {user ? (user.first_name ? `${user.first_name} ${user.last_name ?? ""}` : user.email) : "Loading profile..."}
               </p>
-              <p className="text-gray-500 text-[10px] truncate uppercase tracking-wider font-medium">{user.role.replace("_", " ")}</p>
+              <p className="text-gray-500 text-[10px] truncate uppercase tracking-wider font-medium">{currentRole.replace("_", " ")}</p>
             </div>
           </div>
 
@@ -286,7 +326,7 @@ export default function DashboardLayout({
           <NotificationBell />
         </header>
         
-        <SubscriptionBanner userRole={user.role} />
+        <SubscriptionBanner userRole={currentRole} />
         
         <div className="p-6 max-w-7xl mx-auto relative z-10 w-full flex-1 min-h-0">
           <AnimatePresence mode="wait">

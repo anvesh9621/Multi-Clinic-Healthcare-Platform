@@ -2,14 +2,16 @@ import React from 'react';
 import { Navbar } from '@/components/landing/Navbar';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { LandingPageSections } from '@/components/landing/LandingPageSections';
+export const revalidate = 300;
+
 async function getSpecialties(): Promise<string[]> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/public/specialties/`,
       {
-        next: { revalidate: 60 },
+        next: { revalidate: 300 },
         signal: controller.signal,
       }
     );
@@ -20,6 +22,7 @@ async function getSpecialties(): Promise<string[]> {
     return [];
   }
 }
+
 
 
 export default async function LandingPage() {

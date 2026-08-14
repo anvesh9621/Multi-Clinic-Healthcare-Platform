@@ -7,7 +7,7 @@ import { useBooking } from "../layout";
 
 import { useQuery } from "@tanstack/react-query";
 
-interface Clinic {
+export interface Clinic {
   id: number;
   name: string;
   address: string;
@@ -15,19 +15,23 @@ interface Clinic {
   specialties: string[];
 }
 
-export default function ClinicSelector() {
+export default function ClinicSelector({ initialClinics }: { initialClinics?: Clinic[] }) {
   const { updateState, goToStep } = useBooking();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: clinicsData, isLoading: loading } = useQuery({
+  const { data: clinicsData, isLoading: queryLoading } = useQuery({
     queryKey: ["public_clinics"],
     queryFn: async () => {
       const res = await api.get("/public/clinics/");
       return res.data as Clinic[];
     },
+    initialData: initialClinics && initialClinics.length > 0 ? initialClinics : undefined,
+    staleTime: 300_000,
   });
 
-  const clinics = clinicsData || [];
+  const clinics = clinicsData || initialClinics || [];
+  const loading = queryLoading && clinics.length === 0;
+
 
   const handleSelect = (clinic: Clinic) => {
     updateState({ clinicId: clinic.id, clinicName: clinic.name });

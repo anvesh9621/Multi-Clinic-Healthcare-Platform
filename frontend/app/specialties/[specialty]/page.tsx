@@ -4,10 +4,28 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Button } from '@/components/ui/Button';
 import { Star, Clock, MapPin, ChevronLeft } from 'lucide-react';
 
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/public/specialties/`,
+      { next: { revalidate: 300 } }
+    );
+    if (!res.ok) return [];
+    const specialties: string[] = await res.json();
+    return specialties.map((specialty) => ({
+      specialty: encodeURIComponent(specialty),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function getDoctors(specialty: string) {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/public/doctors/?specialty=${encodeURIComponent(specialty)}`, {
-      next: { revalidate: 0 }
+      next: { revalidate: 300 }
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -16,6 +34,7 @@ async function getDoctors(specialty: string) {
     return [];
   }
 }
+
 
 export default async function SpecialtyDoctorsPage({ params }: { params: Promise<{ specialty: string }> }) {
   const { specialty: rawSpecialty } = await params;
