@@ -180,6 +180,8 @@ else:
         }
     }
 
+DATABASE_ROUTERS = ['apps.core.db_router.DatabaseRouter']
+
 # ── Test & E2E Database Configuration ─────────────────────────────────────────
 import sys
 IS_TESTING = 'test' in sys.argv or 'pytest' in sys.modules or any('pytest' in arg for arg in sys.argv)
