@@ -137,6 +137,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # ── Database ──────────────────────────────────────────────────────────────────
+# Architecture Decision (Connection Pooling vs Persistent Connections):
+# CONN_MAX_AGE=600 persistent connections (reused across requests) are currently
+# sufficient for our workload and avoid per-request TCP/TLS handshakes. A native
+# psycopg3 connection pool was evaluated and deferred to prevent driver migration risks
+# (e.g. ExclusionConstraint & Range-field adapter changes with psycopg2-binary).
+# Trigger to revisit: if Phase 6 load testing demonstrates measured connection
+# saturation/wait time bottleneck under high concurrent volume.
+#
 # In production, DATABASE_URL takes precedence.
 # If DATABASE_URL is not set, all DB_* variables must be explicitly configured;
 # DB_PASSWORD has NO fallback — a missing password will raise KeyError at startup.
