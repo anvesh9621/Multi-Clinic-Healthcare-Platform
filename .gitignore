@@ -15,3 +15,8 @@ htmlcov/
 # Databases
 *.sqlite3
 e2e_test_db.sqlite3
+
+# Static & Celerybeat
+staticfiles/
+celerybeat-schedule*
+
