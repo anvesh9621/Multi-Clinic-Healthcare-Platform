@@ -51,3 +51,8 @@ urlpatterns = [
     path("api/inventory/", include("apps.inventory.urls")),
     path("api/subscriptions/", include("apps.subscriptions.urls")),
 ]
+
+from django.conf import settings
+if settings.DEBUG and 'silk' in settings.INSTALLED_APPS:
+    urlpatterns += [path('silk/', include('silk.urls', namespace='silk'))]
+

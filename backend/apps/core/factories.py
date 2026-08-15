@@ -43,7 +43,8 @@ class SubscriptionFactory(factory.django.DjangoModelFactory):
 class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
-        skip_postgeneration_save = True
+        skip_postgeneration_save = False
+
 
     email = Sequence(lambda n: f"user{n}@example.com")
     first_name = Sequence(lambda n: f"FirstName{n}")

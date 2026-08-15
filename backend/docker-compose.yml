@@ -1,4 +1,6 @@
+# Local load-testing infrastructure only — optional throwaway sandbox, not required for normal development.
 services:
+
   postgres:
     image: postgres:16
     environment:

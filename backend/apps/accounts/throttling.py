@@ -1,16 +1,40 @@
+import logging
 import os
 from rest_framework.throttling import SimpleRateThrottle
 from apps.audit.services import log_auth_attempt
+
+logger = logging.getLogger(__name__)
 
 
 class BaseCustomRateThrottle(SimpleRateThrottle):
     """
     Base throttle class that supports custom duration strings like '5/15m', '5/5m', '10/h'.
+    Fails open (allows request through with a warning log) if cache backend is unavailable.
     """
     def allow_request(self, request, view):
         if os.environ.get("E2E_TEST_MODE") == "true":
             return True
-        return super().allow_request(request, view)
+        try:
+            return super().allow_request(request, view)
+        except Exception as exc:
+            logger.warning(
+                "Cache backend unavailable for throttle %s: failing open (%s)",
+                getattr(self, "scope", None) or self.__class__.__name__,
+                exc,
+            )
+            return True
+
+    def wait(self):
+        try:
+            return super().wait()
+        except Exception as exc:
+            logger.warning(
+                "Cache backend unavailable during throttle wait calculation for %s: %s",
+                getattr(self, "scope", None) or self.__class__.__name__,
+                exc,
+            )
+            return None
+
     def parse_rate(self, rate):
         if rate is None:
             return (None, None)

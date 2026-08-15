@@ -23,7 +23,8 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
+
 
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
 if SENTRY_DSN:
@@ -40,6 +41,11 @@ if SENTRY_DSN:
 # SECURITY WARNING: keep the secret key used in production secret!
 _secret_key = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
+
+import sys
+IS_TESTING = 'test' in sys.argv or 'pytest' in sys.modules or any('pytest' in arg for arg in sys.argv)
+IS_E2E_SERVER = os.environ.get("E2E_TEST_MODE") == "true"
+
 
 if not _secret_key:
     if not DEBUG:
@@ -59,9 +65,12 @@ if not _allowed_hosts_env:
             "ALLOWED_HOSTS environment variable is not set. "
             "This is required in production (DEBUG=False)."
         )
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'testserver']
 else:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+    if 'testserver' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('testserver')
+
 
 if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
@@ -115,6 +124,15 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# ── Django Silk (DEBUG-only Profiler) ──────────────────────────────────────────
+# Explicitly forbidden and inactive in production (DEBUG=False). Follows the same
+# strict environment discipline as test fixtures and debug toolbar instrumentation.
+if DEBUG and not IS_TESTING and not IS_E2E_SERVER:
+    INSTALLED_APPS += ['silk']
+    MIDDLEWARE = ['silk.middleware.SilkyMiddleware'] + MIDDLEWARE
+    SILKY_PYTHON_PROFILER = True
+
 
 ROOT_URLCONF = 'config.urls'
 
@@ -284,10 +302,11 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
-        "login_email": "5/15m",
-        "patient_otp": "10/h",
-        "mfa_strict": "5/5m",
+        "login_email": "1000/m" if (DEBUG or IS_TESTING or IS_E2E_SERVER) else "5/15m",
+        "patient_otp": "1000/m" if (DEBUG or IS_TESTING or IS_E2E_SERVER) else "10/h",
+        "mfa_strict": "1000/m" if (DEBUG or IS_TESTING or IS_E2E_SERVER) else "5/5m",
     },
+
 }
 
 SIMPLE_JWT = {
