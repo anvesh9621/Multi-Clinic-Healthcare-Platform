@@ -128,10 +128,15 @@ MIDDLEWARE = [
 # ── Django Silk (DEBUG-only Profiler) ──────────────────────────────────────────
 # Explicitly forbidden and inactive in production (DEBUG=False). Follows the same
 # strict environment discipline as test fixtures and debug toolbar instrumentation.
-if DEBUG and not IS_TESTING and not IS_E2E_SERVER:
+# In local development with remote databases (e.g. Neon), Silk adds 10-20 remote SQL
+# telemetry writes per HTTP request, causing 5-10s latency. It is enabled on-demand
+# via the ENABLE_SILK=true environment variable.
+ENABLE_SILK = os.environ.get('ENABLE_SILK', 'false').lower() in ('true', '1', 'yes')
+if DEBUG and ENABLE_SILK and not IS_TESTING and not IS_E2E_SERVER:
     INSTALLED_APPS += ['silk']
     MIDDLEWARE = ['silk.middleware.SilkyMiddleware'] + MIDDLEWARE
     SILKY_PYTHON_PROFILER = True
+
 
 
 ROOT_URLCONF = 'config.urls'

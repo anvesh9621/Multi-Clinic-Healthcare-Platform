@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api";
 
 export interface SubscriptionStatus {
@@ -28,37 +29,34 @@ export const SubscriptionContext = createContext<SubscriptionContextType>({
 });
 
 export function SubscriptionProvider({ children, userRole }: { children: ReactNode; userRole?: string }) {
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const shouldFetch = Boolean(userRole && ['CLINIC_ADMIN', 'RECEPTIONIST', 'DOCTOR'].includes(userRole));
 
-  const fetchSubscription = async () => {
-    try {
-      setLoading(true);
+  const { data: subscription = null, isLoading, error, refetch } = useQuery<SubscriptionStatus | null>({
+    queryKey: ['subscription-status', userRole],
+    queryFn: async () => {
       const { data } = await api.get<SubscriptionStatus>("/subscriptions/status/");
-      setSubscription(data);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch subscription");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Only fetch for roles that belong to a clinic
-    if (userRole && ['CLINIC_ADMIN', 'RECEPTIONIST', 'DOCTOR'].includes(userRole)) {
-      fetchSubscription();
-    } else {
-      setLoading(false);
-    }
-  }, [userRole]);
+      return data;
+    },
+    enabled: shouldFetch,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
   return (
-    <SubscriptionContext.Provider value={{ subscription, loading, error, fetchSubscription }}>
+    <SubscriptionContext.Provider
+      value={{
+        subscription: shouldFetch ? (subscription ?? null) : null,
+        loading: shouldFetch ? isLoading : false,
+        error: error ? (error as any).message || "Failed to fetch subscription" : null,
+        fetchSubscription: async () => {
+          await refetch();
+        },
+      }}
+    >
       {children}
     </SubscriptionContext.Provider>
   );
 }
 
 export const useSubscription = () => useContext(SubscriptionContext);
+
