@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListAPIView, UpdateAPIView, RetrieveAPIView
 from rest_framework.exceptions import PermissionDenied, NotFound
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from datetime import datetime
 
 from .serializers import (
@@ -48,14 +48,13 @@ class BookAppointmentView(APIView):
         serializer = AppointmentBookingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        data = serializer.validated_data
+        try:
+            doctor_clinic = DoctorClinic.objects.select_related("clinic", "doctor__user").get(id=data["doctor_clinic_id"])
+        except DoctorClinic.DoesNotExist:
+            return Response({"detail": "Selected doctor or clinic was not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        doctor_clinic = DoctorClinic.objects.get(id=data["doctor_clinic_id"])
         clinic = doctor_clinic.clinic
-        patient = Patient.objects.get(user=request.user)
-
-        if doctor_clinic.clinic_id != clinic.id:
-            raise ValueError("Doctor does not belong to this clinic.")
+        patient, _ = Patient.objects.get_or_create(user=request.user)
 
         try:
             appointment = book_appointment(
@@ -403,19 +402,33 @@ class AppointmentStatusUpdateView(UpdateAPIView):
 
 
 class SlotAvailabilityView(APIView):
-    permission_classes = [IsAuthenticated]
+    """
+    Returns available time slots for a doctor at a clinic on a given date.
+    Public and authenticated access allowed.
+    """
+    permission_classes = [AllowAny]
 
     def get(self, request):
         doctor_clinic_id = request.query_params.get("doctor_clinic_id")
         date_str = request.query_params.get("date")
 
         if not doctor_clinic_id or not date_str:
-            raise ValueError("doctor_clinic_id and date are required.")
+            return Response(
+                {"success": False, "error": "doctor_clinic_id and date query parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            dc_id = int(doctor_clinic_id)
+        except (ValueError, TypeError):
+            return Response(
+                {"success": False, "error": "Invalid doctor_clinic_id or date format (expected YYYY-MM-DD)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         slots = get_available_slots(
-            doctor_clinic_id=int(doctor_clinic_id),
+            doctor_clinic_id=dc_id,
             date=date,
         )
 

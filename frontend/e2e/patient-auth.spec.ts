@@ -72,4 +72,56 @@ test.describe('Patient Auth E2E Flows', () => {
     await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/dashboard'), { timeout: 15000 });
     expect(page.url()).not.toContain('/login');
   });
+
+  test('Distinct registration flow with first name and OTP verification', async ({ page, request }) => {
+    const uniqueEmail = `newreg_${Date.now()}_${Math.floor(Math.random() * 1000)}@example.com`;
+
+    // 1. Navigate to register page
+    await page.goto('/register');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Create your account');
+
+    // 2. Verify first name is required
+    await page.locator('input[type="email"]').fill(uniqueEmail);
+    await page.locator('button[type="submit"]').click();
+    // HTML5 validation or component error prevents submit without first name
+
+    // 3. Fill first name, last name, and email
+    await page.locator('input[placeholder="Jane"]').fill('Emma');
+    await page.locator('input[placeholder="Doe"]').fill('Watson');
+    await page.locator('input[type="email"]').fill(uniqueEmail);
+    await page.locator('button[type="submit"]').click();
+
+    // 4. Confirm Step 2 (Verification code screen, no name inputs)
+    await expect(page.locator('input[placeholder="123456"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('input[placeholder="Jane"]')).not.toBeVisible();
+
+    // 5. Retrieve generated OTP via test-get-otp endpoint
+    const otpCode = await fetchGeneratedOTP(request, uniqueEmail);
+    expect(otpCode).toHaveLength(6);
+
+    // 6. Enter correct OTP code & verify
+    await page.locator('input[placeholder="123456"]').fill(otpCode);
+    await page.locator('button[type="submit"]').click();
+
+    // 7. Confirm successful registration and navigation
+    await page.waitForURL((url) => url.pathname === '/' || url.pathname.includes('/dashboard'), { timeout: 15000 });
+    expect(page.url()).not.toContain('/register');
+  });
+
+  test('LOGIN with nonexistent email shows create account CTA link', async ({ page }) => {
+    const nonexistentEmail = `unregistered_${Date.now()}@example.com`;
+
+    await page.goto('/login');
+    await page.locator('input[type="email"]').fill(nonexistentEmail);
+    await page.locator('button[type="submit"]').click();
+
+    // Confirm error alert and CTA link
+    const ctaLink = page.getByRole('link', { name: /no account found\. create an account instead →/i });
+    await expect(ctaLink).toBeVisible({ timeout: 10000 });
+
+    // Click CTA link and confirm navigation to /register with prefilled email
+    await ctaLink.click();
+    await page.waitForURL((url) => url.pathname === '/register');
+    await expect(page.locator('input[type="email"]')).toHaveValue(nonexistentEmail);
+  });
 });

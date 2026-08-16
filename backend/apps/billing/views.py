@@ -843,3 +843,218 @@ class RejectRefundView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+import hmac
+import hashlib
+import uuid
+from rest_framework.permissions import AllowAny
+
+
+class CreateOrderView(APIView):
+    """
+    POST /api/billing/create-order/ (and /api/create-order/)
+    Creates a Razorpay Standard Web Checkout Order.
+    Request body:
+      - amount: int (amount in paise, minimum 100 paise)
+      - currency: str (default 'INR')
+      - receipt: str (optional receipt string)
+      - notes: dict (optional metadata)
+      - invoice_id: int/str (optional invoice ID)
+    Response:
+      - success: bool
+      - order_id: str (Razorpay order ID)
+      - amount: int (amount in paise)
+      - currency: str
+      - key_id: str (Razorpay Public Key ID)
+      - receipt: str
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        raw_amount = request.data.get("amount")
+        if raw_amount is None:
+            return Response(
+                {"success": False, "error": "Amount is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            amount_paise = int(float(raw_amount))
+        except (ValueError, TypeError):
+            return Response(
+                {"success": False, "error": "Invalid amount provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if amount_paise < 100:
+            return Response(
+                {"success": False, "error": "Amount must be at least 100 paise (₹1.00)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        currency = (request.data.get("currency") or "INR").upper()
+        receipt = request.data.get("receipt") or f"rcpt_{uuid.uuid4().hex[:12]}"
+        notes = request.data.get("notes") or {}
+        if not isinstance(notes, dict):
+            notes = {}
+
+        invoice_id = request.data.get("invoice_id")
+        if invoice_id:
+            notes["invoice_id"] = str(invoice_id)
+
+        try:
+            client = get_razorpay_client()
+            order_data = {
+                "amount": amount_paise,
+                "currency": currency,
+                "receipt": str(receipt)[:40],
+                "notes": notes,
+            }
+            order = client.order.create(data=order_data)
+
+            from apps.billing.models import PlatformSettings
+            settings_obj = PlatformSettings.objects.first()
+            key_id = (
+                getattr(settings_obj, "razorpay_key_id", None)
+                or getattr(settings, "RAZORPAY_KEY_ID", "")
+                or getattr(client, "auth", (None, None))[0]
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "order_id": order["id"],
+                    "amount": order["amount"],
+                    "currency": order["currency"],
+                    "receipt": order.get("receipt", receipt),
+                    "key_id": key_id,
+                    "notes": order.get("notes", notes),
+                },
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as val_err:
+            logger.error(f"Razorpay configuration error: {val_err}")
+            return Response(
+                {"success": False, "error": str(val_err)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            logger.error(f"Razorpay order creation failed: {e}", exc_info=True)
+            return Response(
+                {"success": False, "error": f"Failed to create Razorpay order: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class VerifyPaymentView(APIView):
+    """
+    POST /api/billing/verify-payment/ (and /api/verify-payment/)
+    Verifies Razorpay payment signature using HMAC-SHA256.
+    Request body:
+      - razorpay_order_id: str
+      - razorpay_payment_id: str
+      - razorpay_signature: str
+      - invoice_id: int/str (optional)
+    Response:
+      - success: bool
+      - message: str
+      - order_id: str
+      - payment_id: str
+      - invoice_id: int (optional)
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        order_id = request.data.get("razorpay_order_id") or request.data.get("order_id")
+        payment_id = request.data.get("razorpay_payment_id") or request.data.get("payment_id")
+        signature = request.data.get("razorpay_signature") or request.data.get("signature")
+
+        if not order_id or not payment_id or not signature:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Missing required fields: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.billing.models import PlatformSettings
+        settings_obj = PlatformSettings.objects.first()
+        key_secret = (
+            getattr(settings_obj, "razorpay_key_secret", None)
+            or getattr(settings, "RAZORPAY_KEY_SECRET", "")
+        )
+
+        if not key_secret:
+            return Response(
+                {"success": False, "error": "Razorpay secret key is not configured."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Signature verification: HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
+        message = f"{order_id}|{payment_id}".encode("utf-8")
+        generated_signature = hmac.new(
+            key_secret.encode("utf-8"),
+            message,
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(generated_signature, signature):
+            logger.warning(
+                f"Razorpay signature verification failed for order {order_id}, payment {payment_id}."
+            )
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment signature verification failed. Signatures do not match.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invoice_id = request.data.get("invoice_id")
+        invoice = None
+        if invoice_id:
+            try:
+                invoice = Invoice.objects.get(pk=invoice_id)
+            except (Invoice.DoesNotExist, ValueError):
+                pass
+
+        if invoice:
+            with transaction.atomic():
+                invoice.razorpay_payment_id = payment_id
+                invoice.payment_method = "card"
+                invoice.paid_at = timezone.now()
+                invoice.save(update_fields=["razorpay_payment_id", "payment_method", "paid_at"])
+
+                if invoice.status in ("pending", "pending_at_clinic", "draft"):
+                    invoice.apply_ledger_entry(
+                        entry_type="debit",
+                        amount=invoice.total_amount,
+                        resulting_status="paid",
+                        source_event="view:verify_payment",
+                        razorpay_reference=payment_id,
+                        payment_method="online",
+                        user=request.user if request.user and request.user.is_authenticated else None,
+                    )
+
+                if invoice.appointment and invoice.appointment.status == "SCHEDULED":
+                    invoice.appointment.status = "CONFIRMED"
+                    invoice.appointment.save(update_fields=["status"])
+
+            _notify_patient(
+                invoice,
+                title="Payment Confirmed",
+                message=f"Online payment of ₹{invoice.total_amount} was successfully verified.",
+            )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Payment verified successfully.",
+                "order_id": order_id,
+                "payment_id": payment_id,
+                "invoice_id": invoice.id if invoice else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+

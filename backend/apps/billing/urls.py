@@ -12,11 +12,15 @@ from .views import (
     OnboardBankView,
     PlatformSettingsView,
     SuperAdminGenerateSubscriptionLinkView,
+    CreateOrderView,
+    VerifyPaymentView,
 )
 from .webhooks import razorpay_webhook
 
 urlpatterns = [
     path("webhook/", razorpay_webhook),
+    path("create-order/", CreateOrderView.as_view(), name="billing-create-order"),
+    path("verify-payment/", VerifyPaymentView.as_view(), name="billing-verify-payment"),
     path("platform-settings/", PlatformSettingsView.as_view()),
     path("onboard-bank/", OnboardBankView.as_view()),
     path("invoices/", InvoiceListView.as_view()),

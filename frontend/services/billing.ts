@@ -41,3 +41,50 @@ export const rejectRefundRequest = async (refundRequestId: number, rejectionReas
   });
   return res.data as RefundRequest;
 };
+
+// ── Razorpay Standard Web Checkout API ────────────────────────────────────────
+
+export interface CreateOrderPayload {
+  amount: number; // in paise (e.g. 50000 for ₹500.00)
+  currency?: string;
+  receipt?: string;
+  notes?: Record<string, any>;
+  invoice_id?: number | string;
+}
+
+export interface CreateOrderResponse {
+  success: boolean;
+  order_id: string;
+  amount: number;
+  currency: string;
+  key_id?: string;
+  receipt?: string;
+  notes?: Record<string, any>;
+  error?: string;
+}
+
+export interface VerifyPaymentPayload {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  invoice_id?: number | string;
+}
+
+export interface VerifyPaymentResponse {
+  success: boolean;
+  message: string;
+  order_id: string;
+  payment_id: string;
+  invoice_id?: number | null;
+  error?: string;
+}
+
+export const createRazorpayOrder = async (payload: CreateOrderPayload): Promise<CreateOrderResponse> => {
+  const res = await api.post('/billing/create-order/', payload);
+  return res.data;
+};
+
+export const verifyRazorpayPayment = async (payload: VerifyPaymentPayload): Promise<VerifyPaymentResponse> => {
+  const res = await api.post('/billing/verify-payment/', payload);
+  return res.data;
+};

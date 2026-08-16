@@ -14,6 +14,9 @@ export interface BookableDoctorClinic {
   clinic_name: string;
 }
 
+export type Clinic = ClinicOption;
+export type DoctorClinic = BookableDoctorClinic;
+
 export interface BookingPayload {
   doctor_clinic_id: number;
   appointment_date: string;   // "YYYY-MM-DD"

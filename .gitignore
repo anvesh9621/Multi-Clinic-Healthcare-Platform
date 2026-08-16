@@ -3,10 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Test coverage
+# Test coverage & cache
 .coverage
 .coverage.*
 htmlcov/
+.pytest_cache/
 
 # Dump files
 *_dump.txt
@@ -16,7 +17,13 @@ htmlcov/
 *.sqlite3
 e2e_test_db.sqlite3
 
-# Static & Celerybeat
-staticfiles/
+# Celery & runtime
 celerybeat-schedule*
+*.log
+staticfiles/
+media/
 
+# Environment variables
+.env
+.env.*
+!.env.example

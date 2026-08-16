@@ -402,6 +402,20 @@ class PatientOTPVerifyView(APIView):
             return Response({"success": False, "error": msg}, status=status.HTTP_400_BAD_REQUEST)
 
         if purpose == "REGISTER":
+            first_name = request.data.get("first_name", "").strip()
+            if not first_name:
+                log_auth_attempt(
+                    email=email,
+                    ip_address=ip_address,
+                    endpoint="/api/accounts/patient/otp/verify/",
+                    status="FAILED",
+                    reason="First name is required for registration",
+                )
+                return Response(
+                    {"success": False, "error": "First name is required for registration."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             with transaction.atomic():
                 if User.objects.filter(email=email).exists():
                     return Response(
@@ -409,7 +423,6 @@ class PatientOTPVerifyView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                first_name = request.data.get("first_name", "").strip()
                 last_name = request.data.get("last_name", "").strip()
                 phone = request.data.get("phone", "").strip()
 
@@ -426,6 +439,7 @@ class PatientOTPVerifyView(APIView):
                     user=user,
                     defaults={"phone": phone}
                 )
+
 
                 log_action(
                     user=user,

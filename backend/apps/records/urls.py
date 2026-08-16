@@ -47,6 +47,7 @@ urlpatterns = [
     path('templates/<int:pk>/', PrescriptionTemplateDetailView.as_view(), name='template-detail'),
 
     # Patient History Timeline — single URL dispatches to role-appropriate view
+    path('history/patient/me/', PatientOwnHistoryView.as_view(), {'patient_id': 'me'}, name='patient-history-me'),
     path('history/patient/<int:patient_id>/', PatientHistoryDispatchView.as_view(), name='patient-history'),
 
     # Explicit per-role URLs (e.g. for new frontends or direct API consumers)

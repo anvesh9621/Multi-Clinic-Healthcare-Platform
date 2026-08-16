@@ -25,7 +25,10 @@ import {
   Check,
   RefreshCw,
   CreditCard,
-  AlertCircle
+  AlertCircle,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
@@ -50,6 +53,13 @@ interface ClinicRow {
   total_patients: number;
 }
 
+interface PaginatedClinicsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: ClinicRow[];
+}
+
 interface PaymentSnapshot {
   id: number;
   date: string;
@@ -65,27 +75,44 @@ interface PaymentSnapshot {
 }
 
 interface PaymentMetricsData {
+  days: number;
   overall_success_rate: number;
+  total_attempts: number;
+  total_successful: number;
+  total_failed: number;
   total_reconciliation_catches: number;
+  total_refunds: number;
+  total_refund_amount: number;
   snapshots: PaymentSnapshot[];
 }
 
-interface SuperAdminData {
+interface SuperAdminOverviewData {
   total_clinics: number;
   active_clinics: number;
   total_users: number;
   total_appointments: number;
   appointments_today: number;
   total_revenue_paid: number;
-  clinic_breakdown: ClinicRow[];
-  trend_data: any[];
-  recent_logs: any[];
-  payment_metrics?: PaymentMetricsData;
+  trend_data: {
+    date: string;
+    revenue: number;
+    appointments: number;
+  }[];
+  recent_logs: {
+    id: number;
+    timestamp: string;
+    action: string;
+    user: string;
+    clinic: string;
+    description: string;
+  }[];
 }
 
 const PLAN_BADGE: Record<string, string> = {
   BASIC: "bg-warm-surface border border-border text-muted font-bold",
+  STARTER: "bg-warm-surface border border-border text-muted font-bold",
   PRO: "bg-blue-100 border border-blue-200 text-blue-800 font-bold",
+  PROFESSIONAL: "bg-blue-100 border border-blue-200 text-blue-800 font-bold",
   ENTERPRISE: "bg-purple-100 border border-purple-200 text-purple-800 font-bold",
 };
 
@@ -106,28 +133,84 @@ function StatCard({ label, value, icon: Icon, color, sub, format }: any) {
   );
 }
 
+function TabLoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center min-h-[40vh]">
+      <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+function TabErrorDisplay({ message }: { message: string }) {
+  return (
+    <div className="p-8 text-center max-w-xl mx-auto">
+      <Card className="p-8 text-center">
+        <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+        <p className="text-ink font-bold text-lg">{message}</p>
+      </Card>
+    </div>
+  );
+}
+
 export default function SuperAdminDashboard() {
   const { user } = useContext(AuthContext);
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "clinics" | "payments">("overview");
 
-  const { data, isLoading: loading, error: queryError } = useQuery({
+  // Tab 1: Overview Query (Independent)
+  const {
+    data: overviewData,
+    isLoading: overviewLoading,
+    error: overviewQueryError,
+  } = useQuery({
     queryKey: ["super-admin", "overview"],
     queryFn: async () => {
       const res = await apiClient.get("/analytics/super-admin/");
-      return res.data.data as SuperAdminData;
+      return res.data.data as SuperAdminOverviewData;
     },
     enabled: !!user && user.role === "SUPER_ADMIN",
   });
-  
-  const error = queryError ? "Failed to load platform stats." : "";
+
+  // Tab 2: Payments Query (Independent, Lazy loaded on tab activate)
+  const {
+    data: paymentData,
+    isLoading: paymentsLoading,
+    error: paymentsQueryError,
+  } = useQuery({
+    queryKey: ["super-admin", "payments"],
+    queryFn: async () => {
+      const res = await apiClient.get("/analytics/payment-metrics/?days=30");
+      return res.data.data as PaymentMetricsData;
+    },
+    enabled: !!user && user.role === "SUPER_ADMIN" && activeTab === "payments",
+  });
+
+  // Tab 3: Clinics Query (Independent, Paginated & Searchable, Lazy loaded on tab activate)
+  const [clinicPage, setClinicPage] = useState(1);
+  const [clinicSearch, setClinicSearch] = useState("");
+  const [searchInputValue, setSearchInputValue] = useState("");
+
+  const {
+    data: clinicsData,
+    isLoading: clinicsLoading,
+    error: clinicsQueryError,
+  } = useQuery({
+    queryKey: ["super-admin", "tenants", clinicPage, clinicSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("page", String(clinicPage));
+      if (clinicSearch) params.set("search", clinicSearch);
+      const res = await apiClient.get(`/analytics/super-admin/clinics/?${params.toString()}`);
+      return res.data as PaginatedClinicsResponse;
+    },
+    enabled: !!user && user.role === "SUPER_ADMIN" && activeTab === "clinics",
+  });
 
   // Modal State for Clinic Admin
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  
   const { data: clinics = [] } = useQuery({
-    queryKey: ["super-admin", "clinics"],
+    queryKey: ["super-admin", "clinics-dropdown"],
     queryFn: async () => {
       const res = await apiClient.get("/doctors/clinics/");
       return (Array.isArray(res.data) ? res.data : (res.data?.results || [])) as { id: number; name: string }[];
@@ -152,7 +235,6 @@ export default function SuperAdminDashboard() {
 
   // Billing Fallback Actions (Super Admin only)
   const [billingClinic, setBillingClinic] = useState<ClinicRow | null>(null);
-  const [billingActionLoading, setBillingActionLoading] = useState(false);
   const [billingAction, setBillingAction] = useState<"generate" | "change-plan" | null>(null);
   const [billingPlan, setBillingPlan] = useState("professional");
   const [billingLoading, setBillingLoading] = useState(false);
@@ -191,7 +273,7 @@ export default function SuperAdminDashboard() {
       setAdminFormSuccess("Clinic Admin invitation sent successfully! They will receive an email link.");
       setAdminFormData({ email: "", clinic_id: "" });
       setTimeout(() => setIsAdminModalOpen(false), 2000);
-      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["super-admin"] });
     } catch (err: any) {
       const apiErrors = err.response?.data?.errors;
       if (apiErrors?.non_field_errors) setAdminFormError(apiErrors.non_field_errors[0]);
@@ -208,7 +290,7 @@ export default function SuperAdminDashboard() {
       setClinicFormSuccess("Clinic created successfully!");
       setClinicFormData({ name: "", address: "" });
       setTimeout(() => setIsClinicModalOpen(false), 2000);
-      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["super-admin"] });
     } catch (err: any) {
       setClinicFormError(err.response?.data?.errors?.non_field_errors?.[0] || "Failed to create Clinic.");
     } finally { setClinicFormLoading(false); }
@@ -230,7 +312,7 @@ export default function SuperAdminDashboard() {
     if (!confirm(`Are you sure you want to ${currentStatus ? 'suspend' : 'activate'} this clinic?`)) return;
     try {
       await apiClient.patch(`/clinics/${clinicId}/toggle-status/`);
-      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["super-admin"] });
     } catch (err) {
       alert("Failed to toggle clinic status.");
     }
@@ -264,12 +346,18 @@ export default function SuperAdminDashboard() {
       await apiClient.post(`/clinics/super-admin/${billingClinic.id}/change-plan/`, { plan: billingPlan });
       setBillingAction("change-plan");
       setBillingResult(`Plan updated to "${billingPlan}" successfully.`);
-      queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] });
+      queryClient.invalidateQueries({ queryKey: ["super-admin"] });
     } catch (err: any) {
       setBillingError(err.response?.data?.error || "Failed to change plan.");
     } finally {
       setBillingLoading(false);
     }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setClinicPage(1);
+    setClinicSearch(searchInputValue.trim());
   };
 
   const copyToClipboard = (text: string) => {
@@ -279,26 +367,9 @@ export default function SuperAdminDashboard() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="p-8 text-center max-w-xl mx-auto">
-        <Card className="p-8 text-center">
-          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
-          <p className="text-ink font-bold text-lg">{error || "No data available."}</p>
-        </Card>
-      </div>
-    );
-  }
-
   const selectClass = "w-full border border-border rounded-xl px-4 py-2.5 bg-warm-surface text-ink font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition shadow-sm";
+
+  const totalClinicsCount = overviewData?.total_clinics ?? clinicsData?.count ?? 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8 min-h-screen">
@@ -318,7 +389,12 @@ export default function SuperAdminDashboard() {
           <Button onClick={openAdminModal}>
             <UserPlus className="w-4 h-4 mr-1.5" /> Create Admin
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["super-admin", "overview"] })}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["super-admin"] })}
+            title="Refresh Dashboard Data"
+          >
             <Activity className="w-4 h-4 text-muted" />
           </Button>
         </div>
@@ -340,7 +416,7 @@ export default function SuperAdminDashboard() {
             activeTab === "clinics" ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink"
           }`}
         >
-          Tenants ({data.total_clinics})
+          Tenants {totalClinicsCount > 0 ? `(${totalClinicsCount})` : ""}
         </button>
         <button
           onClick={() => setActiveTab("payments")}
@@ -354,251 +430,367 @@ export default function SuperAdminDashboard() {
 
       {/* OVERVIEW TAB */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <StatCard label="MRR (Revenue)" value={data.total_revenue_paid} format={(v: number) => `₹${Math.round(v).toLocaleString()}`} icon={DollarSign} color="bg-emerald-100 text-emerald-800" sub="All-time paid invoices" />
-            <StatCard label="Active Clinics" value={data.active_clinics} icon={Building2} color="bg-primary/10 text-primary" sub={`Out of ${data.total_clinics} total`} />
-            <StatCard label="Total Users" value={data.total_users} icon={Users} color="bg-blue-100 text-blue-800" sub="Doctors, patients, staff" />
-            <StatCard label="Total Appointments" value={data.total_appointments} icon={CalendarCheck} color="bg-amber-100 text-amber-800" sub={`${data.appointments_today} today`} />
-          </div>
+        <>
+          {overviewLoading ? (
+            <TabLoadingSpinner />
+          ) : overviewQueryError || !overviewData ? (
+            <TabErrorDisplay message="Failed to load platform overview stats." />
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <StatCard
+                  label="MRR (Revenue)"
+                  value={overviewData.total_revenue_paid}
+                  format={(v: number) => `₹${Math.round(v).toLocaleString()}`}
+                  icon={DollarSign}
+                  color="bg-emerald-100 text-emerald-800"
+                  sub="All-time paid invoices"
+                />
+                <StatCard
+                  label="Active Clinics"
+                  value={overviewData.active_clinics}
+                  icon={Building2}
+                  color="bg-primary/10 text-primary"
+                  sub={`Out of ${overviewData.total_clinics} total`}
+                />
+                <StatCard
+                  label="Total Users"
+                  value={overviewData.total_users}
+                  icon={Users}
+                  color="bg-blue-100 text-blue-800"
+                  sub="Doctors, patients, staff"
+                />
+                <StatCard
+                  label="Total Appointments"
+                  value={overviewData.total_appointments}
+                  icon={CalendarCheck}
+                  color="bg-amber-100 text-amber-800"
+                  sub={`${overviewData.appointments_today} today`}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 p-6">
-              <h3 className="text-lg font-bold text-ink mb-6 heading-font">7-Day Platform Growth</h3>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.trend_data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE8" vertical={false} />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
-                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: '1px solid #EDEDE8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                    <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Revenue (₹)" />
-                    <Line yAxisId="right" type="monotone" dataKey="appointments" stroke="#0F7B6C" strokeWidth={3} dot={{ r: 4, fill: '#0F7B6C', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Appointments" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2 p-6">
+                  <h3 className="text-lg font-bold text-ink mb-6 heading-font">7-Day Platform Growth</h3>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={overviewData.trend_data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE8" vertical={false} />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
+                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                        <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: '1px solid #EDEDE8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Revenue (₹)" />
+                        <Line yAxisId="right" type="monotone" dataKey="appointments" stroke="#0F7B6C" strokeWidth={3} dot={{ r: 4, fill: '#0F7B6C', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Appointments" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
 
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-ink heading-font">Security Feed</h3>
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                </span>
+                <Card className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-ink heading-font">Security Feed</h3>
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                    </span>
+                  </div>
+                  <div className="space-y-4">
+                    <AnimatePresence mode="popLayout">
+                      {overviewData.recent_logs.map((log) => (
+                        <MotionDivItem key={log.id} className="text-sm border-l-2 border-border pl-3 py-1">
+                          <p className="text-ink font-semibold">{log.user} <span className="text-muted font-normal">in</span> {log.clinic}</p>
+                          <p className="text-muted">{log.description}</p>
+                          <p className="text-xs text-muted mt-1 font-mono">{new Date(log.timestamp).toLocaleString()}</p>
+                        </MotionDivItem>
+                      ))}
+                    </AnimatePresence>
+                    {overviewData.recent_logs.length === 0 && <p className="text-muted text-sm font-medium">No recent activity.</p>}
+                  </div>
+                </Card>
               </div>
-              <div className="space-y-4">
-                <AnimatePresence mode="popLayout">
-                  {data.recent_logs.map((log: any) => (
-                    <MotionDivItem key={log.id} className="text-sm border-l-2 border-border pl-3 py-1">
-                      <p className="text-ink font-semibold">{log.user} <span className="text-muted font-normal">in</span> {log.clinic}</p>
-                      <p className="text-muted">{log.description}</p>
-                      <p className="text-xs text-muted mt-1 font-mono">{new Date(log.timestamp).toLocaleString()}</p>
-                    </MotionDivItem>
-                  ))}
-                </AnimatePresence>
-                {data.recent_logs.length === 0 && <p className="text-muted text-sm font-medium">No recent activity.</p>}
-              </div>
-            </Card>
-          </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* PAYMENT HEALTH TAB */}
       {activeTab === "payments" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <StatCard
-              label="Payment Success Rate"
-              value={data.payment_metrics?.overall_success_rate ?? 100}
-              format={(v: number) => `${v.toFixed(1)}%`}
-              icon={CheckCircle2}
-              color="bg-emerald-100 text-emerald-800"
-              sub="Successful / Total Attempts"
-            />
-            <StatCard
-              label="Reconciliation Catches"
-              value={data.payment_metrics?.total_reconciliation_catches ?? 0}
-              icon={RefreshCw}
-              color="bg-amber-100 text-amber-800"
-              sub="Key Webhook Reliability Signal"
-            />
-            <StatCard
-              label="Tracked Days"
-              value={data.payment_metrics?.snapshots?.length ?? 0}
-              icon={CreditCard}
-              color="bg-blue-100 text-blue-800"
-              sub="Daily Metric Snapshots"
-            />
+        <>
+          {paymentsLoading ? (
+            <TabLoadingSpinner />
+          ) : paymentsQueryError || !paymentData ? (
+            <TabErrorDisplay message="Failed to load payment health metrics." />
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <StatCard
+                  label="Payment Success Rate"
+                  value={paymentData.overall_success_rate ?? 100}
+                  format={(v: number) => `${v.toFixed(1)}%`}
+                  icon={CheckCircle2}
+                  color="bg-emerald-100 text-emerald-800"
+                  sub="Successful / Total Attempts"
+                />
+                <StatCard
+                  label="Reconciliation Catches"
+                  value={paymentData.total_reconciliation_catches ?? 0}
+                  icon={RefreshCw}
+                  color="bg-amber-100 text-amber-800"
+                  sub="Key Webhook Reliability Signal"
+                />
+                <StatCard
+                  label="Tracked Days"
+                  value={paymentData.snapshots?.length ?? 0}
+                  icon={CreditCard}
+                  color="bg-blue-100 text-blue-800"
+                  sub="Daily Metric Snapshots"
+                />
+              </div>
+
+              {/* Webhook Health Signal Callout Alert */}
+              <Card className="p-5 bg-amber-50/70 border-amber-200/80 rounded-2xl">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-900 heading-font">
+                      Webhook Reliability Health Signal
+                    </h4>
+                    <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                      <strong>Reconciliation Catches</strong> represent payments that were completed on Razorpay but required background job reconciliation because the webhook was missed or delayed. Per platform architecture guidelines, this number <strong>should trend toward zero</strong>. A sustained non-zero trend indicates webhook delivery reliability issues that require active investigation, rather than relying on reconciliation as a permanent crutch.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Chart */}
+              <Card className="p-6">
+                <h3 className="text-lg font-bold text-ink mb-6 heading-font">
+                  Payment Health Trends (Last 30 Days)
+                </h3>
+                {paymentData.snapshots && paymentData.snapshots.length > 0 ? (
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={paymentData.snapshots} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE8" vertical={false} />
+                        <XAxis dataKey="date_formatted" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
+                        <YAxis yAxisId="left" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} unit="%" />
+                        <YAxis yAxisId="right" orientation="right" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
+                        <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: '1px solid #EDEDE8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Line yAxisId="left" type="monotone" dataKey="success_rate" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Success Rate (%)" />
+                        <Line yAxisId="right" type="monotone" dataKey="reconciliation_catches" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Reconciliation Catches" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-muted text-sm py-12 text-center">No payment snapshots recorded yet. Snapshots are automatically calculated daily at 2:00 AM off-peak.</p>
+                )}
+              </Card>
+
+              {/* Table */}
+              <Card className="p-6">
+                <h3 className="text-lg font-bold text-ink mb-4 heading-font">
+                  Daily Payment Metric Snapshots
+                </h3>
+                {paymentData.snapshots && paymentData.snapshots.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Attempts</TableHead>
+                        <TableHead className="text-right">Successful</TableHead>
+                        <TableHead className="text-right">Failed</TableHead>
+                        <TableHead className="text-center">Success Rate</TableHead>
+                        <TableHead className="text-center">Reconciliation Catches</TableHead>
+                        <TableHead className="text-right">Refunds</TableHead>
+                        <TableHead className="text-right">Avg Pay Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paymentData.snapshots.map((snap) => (
+                        <TableRow key={snap.id}>
+                          <TableCell className="font-bold text-ink">{snap.date_formatted}</TableCell>
+                          <TableCell className="text-right font-mono">{snap.total_payment_attempts}</TableCell>
+                          <TableCell className="text-right font-mono text-emerald-700 font-bold">{snap.successful_payments}</TableCell>
+                          <TableCell className="text-right font-mono text-rose-600 font-medium">{snap.failed_payments}</TableCell>
+                          <TableCell className="text-center font-bold">
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${snap.success_rate >= 90 ? 'bg-emerald-100 text-emerald-800' : snap.success_rate >= 75 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                              {snap.success_rate}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center font-bold font-mono">
+                            {snap.reconciliation_catches > 0 ? (
+                              <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs">
+                                {snap.reconciliation_catches}
+                              </span>
+                            ) : (
+                              <span className="text-muted font-normal">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs">
+                            {snap.refunds_processed > 0 ? `${snap.refunds_processed} (₹${snap.refund_total_amount})` : '0'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs text-muted">
+                            {snap.avg_time_to_payment_seconds !== null ? `${snap.avg_time_to_payment_seconds}s` : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-muted text-sm text-center py-6">No snapshot history found.</p>
+                )}
+              </Card>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* CLINICS TAB */}
+      {activeTab === "clinics" && (
+        <div className="space-y-4">
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Input
+                  type="text"
+                  placeholder="Search tenants by name..."
+                  value={searchInputValue}
+                  onChange={(e) => setSearchInputValue(e.target.value)}
+                  className="pl-9 text-sm"
+                />
+              </div>
+              <Button type="submit" variant="secondary" size="sm">Search</Button>
+              {clinicSearch && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchInputValue("");
+                    setClinicSearch("");
+                    setClinicPage(1);
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </form>
+
+            <div className="text-xs text-muted font-medium self-end sm:self-center">
+              {clinicsData ? `Total Tenants: ${clinicsData.count}` : ""}
+            </div>
           </div>
 
-          {/* Webhook Health Signal Callout Alert */}
-          <Card className="p-5 bg-amber-50/70 border-amber-200/80 rounded-2xl">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-bold text-amber-900 heading-font">
-                  Webhook Reliability Health Signal
-                </h4>
-                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                  <strong>Reconciliation Catches</strong> represent payments that were completed on Razorpay but required background job reconciliation because the webhook was missed or delayed. Per platform architecture guidelines, this number <strong>should trend toward zero</strong>. A sustained non-zero trend indicates webhook delivery reliability issues that require active investigation, rather than relying on reconciliation as a permanent crutch.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Chart */}
-          <Card className="p-6">
-            <h3 className="text-lg font-bold text-ink mb-6 heading-font">
-              Payment Health Trends (Last 30 Days)
-            </h3>
-            {data.payment_metrics?.snapshots && data.payment_metrics.snapshots.length > 0 ? (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.payment_metrics.snapshots} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE8" vertical={false} />
-                    <XAxis dataKey="date_formatted" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
-                    <YAxis yAxisId="left" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} unit="%" />
-                    <YAxis yAxisId="right" orientation="right" allowDecimals={false} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} />
-                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '12px', border: '1px solid #EDEDE8', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                    <Line yAxisId="left" type="monotone" dataKey="success_rate" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Success Rate (%)" />
-                    <Line yAxisId="right" type="monotone" dataKey="reconciliation_catches" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} name="Reconciliation Catches" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <p className="text-muted text-sm py-12 text-center">No payment snapshots recorded yet. Snapshots are automatically calculated daily at 2:00 AM off-peak.</p>
-            )}
-          </Card>
-
-          {/* Table */}
-          <Card className="p-6">
-            <h3 className="text-lg font-bold text-ink mb-4 heading-font">
-              Daily Payment Metric Snapshots
-            </h3>
-            {data.payment_metrics?.snapshots && data.payment_metrics.snapshots.length > 0 ? (
+          {clinicsLoading ? (
+            <TabLoadingSpinner />
+          ) : clinicsQueryError || !clinicsData ? (
+            <TabErrorDisplay message="Failed to load clinic tenants." />
+          ) : clinicsData.results.length === 0 ? (
+            <Card className="p-8 text-center">
+              <Building2 className="w-8 h-8 text-muted mx-auto mb-2" />
+              <p className="text-muted text-sm font-medium">No tenants found matching your criteria.</p>
+            </Card>
+          ) : (
+            <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Attempts</TableHead>
-                    <TableHead className="text-right">Successful</TableHead>
-                    <TableHead className="text-right">Failed</TableHead>
-                    <TableHead className="text-center">Success Rate</TableHead>
-                    <TableHead className="text-center">Reconciliation Catches</TableHead>
-                    <TableHead className="text-right">Refunds</TableHead>
-                    <TableHead className="text-right">Avg Pay Time</TableHead>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead className="text-center">Doctors / Patients</TableHead>
+                    <TableHead className="text-right">Appts (Today)</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.payment_metrics.snapshots.map((snap) => (
-                    <TableRow key={snap.id}>
-                      <TableCell className="font-bold text-ink">{snap.date_formatted}</TableCell>
-                      <TableCell className="text-right font-mono">{snap.total_payment_attempts}</TableCell>
-                      <TableCell className="text-right font-mono text-emerald-700 font-bold">{snap.successful_payments}</TableCell>
-                      <TableCell className="text-right font-mono text-rose-600 font-medium">{snap.failed_payments}</TableCell>
-                      <TableCell className="text-center font-bold">
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${snap.success_rate >= 90 ? 'bg-emerald-100 text-emerald-800' : snap.success_rate >= 75 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
-                          {snap.success_rate}%
+                  {clinicsData.results.map((clinic) => (
+                    <TableRow key={clinic.id}>
+                      <TableCell className="font-bold text-ink">{clinic.name}</TableCell>
+                      <TableCell>
+                        <span className={`px-2.5 py-1 rounded-full text-xs uppercase tracking-wider ${PLAN_BADGE[clinic.plan] || "bg-warm-surface border border-border text-muted font-bold"}`}>
+                          {clinic.plan}
                         </span>
                       </TableCell>
-                      <TableCell className="text-center font-bold font-mono">
-                        {snap.reconciliation_catches > 0 ? (
-                          <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs">
-                            {snap.reconciliation_catches}
+                      <TableCell className="text-center text-muted font-semibold">{clinic.total_doctors} / {clinic.total_patients}</TableCell>
+                      <TableCell className="text-right text-muted font-medium font-mono">
+                        {clinic.total_appointments} <span className="text-emerald-700 font-bold">({clinic.appointments_today})</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {clinic.is_active ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-bold bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Active
                           </span>
                         ) : (
-                          <span className="text-muted font-normal">0</span>
+                          <span className="inline-flex items-center gap-1 text-rose-800 text-xs font-bold bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-full">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Suspended
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {snap.refunds_processed > 0 ? `${snap.refunds_processed} (₹${snap.refund_total_amount})` : '0'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted">
-                        {snap.avg_time_to_payment_seconds !== null ? `${snap.avg_time_to_payment_seconds}s` : 'N/A'}
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleImpersonate(clinic.id)}
+                          className="text-primary hover:text-primary-dark"
+                          title="Login as Admin"
+                        >
+                          <LogIn className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleStatus(clinic.id, clinic.is_active)}
+                          className={clinic.is_active ? 'text-rose-600 hover:text-rose-800' : 'text-emerald-600 hover:text-emerald-800'}
+                          title={clinic.is_active ? "Suspend Clinic" : "Activate Clinic"}
+                        >
+                          {clinic.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openBillingModal(clinic)}
+                          className="text-accent hover:text-accent/80"
+                          title="Billing Actions"
+                        >
+                          <Link2 className="w-4 h-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            ) : (
-              <p className="text-muted text-sm text-center py-6">No snapshot history found.</p>
-            )}
-          </Card>
-        </div>
-      )}
 
-      {/* CLINICS TAB */}
-      {activeTab === "clinics" && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tenant</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead className="text-center">Doctors / Patients</TableHead>
-              <TableHead className="text-right">Appts (Today)</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.clinic_breakdown.map((clinic) => (
-              <TableRow key={clinic.id}>
-                <TableCell className="font-bold text-ink">{clinic.name}</TableCell>
-                <TableCell>
-                  <span className={`px-2.5 py-1 rounded-full text-xs uppercase tracking-wider ${PLAN_BADGE[clinic.plan] || "bg-warm-surface border border-border text-muted font-bold"}`}>
-                    {clinic.plan}
-                  </span>
-                </TableCell>
-                <TableCell className="text-center text-muted font-semibold">{clinic.total_doctors} / {clinic.total_patients}</TableCell>
-                <TableCell className="text-right text-muted font-medium font-mono">
-                  {clinic.total_appointments} <span className="text-emerald-700 font-bold">({clinic.appointments_today})</span>
-                </TableCell>
-                <TableCell className="text-center">
-                  {clinic.is_active ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-bold bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Active
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-rose-800 text-xs font-bold bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-full">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Suspended
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right space-x-1">
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <p className="text-xs text-muted font-medium">
+                  Page {clinicPage} of {Math.max(1, Math.ceil(clinicsData.count / 10))} ({clinicsData.count} total)
+                </p>
+                <div className="flex items-center gap-2">
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleImpersonate(clinic.id)}
-                    className="text-primary hover:text-primary-dark"
-                    title="Login as Admin"
+                    variant="outline"
+                    size="sm"
+                    disabled={!clinicsData.previous || clinicPage <= 1}
+                    onClick={() => setClinicPage((p) => Math.max(1, p - 1))}
                   >
-                    <LogIn className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4 mr-1" /> Previous
                   </Button>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleToggleStatus(clinic.id, clinic.is_active)}
-                    className={clinic.is_active ? 'text-rose-600 hover:text-rose-800' : 'text-emerald-600 hover:text-emerald-800'}
-                    title={clinic.is_active ? "Suspend Clinic" : "Activate Clinic"}
+                    variant="outline"
+                    size="sm"
+                    disabled={!clinicsData.next}
+                    onClick={() => setClinicPage((p) => p + 1)}
                   >
-                    {clinic.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                    Next <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openBillingModal(clinic)}
-                    className="text-accent hover:text-accent/80"
-                    title="Billing Actions"
-                  >
-                    <Link2 className="w-4 h-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* Create Clinic Modal */}

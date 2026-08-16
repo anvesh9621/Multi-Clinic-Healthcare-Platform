@@ -364,6 +364,9 @@ if not IS_TESTING and not IS_E2E_SERVER:
             "LOCATION": _redis_cache_url,
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "IGNORE_EXCEPTIONS": True,
+                "SOCKET_CONNECT_TIMEOUT": 0.5,
+                "SOCKET_TIMEOUT": 0.5,
             },
         }
     }

@@ -42,11 +42,12 @@ export function SkeletonStat() {
 
 /** A table row skeleton */
 export function SkeletonRow({ cols = 4 }: { cols?: number }) {
+  const widths = ["75%", "60%", "85%", "70%"];
   return (
     <tr>
       {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-4 py-4 border-b border-border">
-          <Skeleton className="h-4" style={{ width: `${60 + Math.random() * 30}%` }} />
+          <Skeleton className="h-4" style={{ width: widths[i % widths.length] }} />
         </td>
       ))}
     </tr>

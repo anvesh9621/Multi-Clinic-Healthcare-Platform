@@ -1,21 +1,26 @@
+import logging
+from datetime import timedelta
+from django.utils import timezone
+from django.core.cache import cache
+from django.db.models import Sum, Count, Q
+from django.db.models.functions import TruncDate
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 
 from apps.accounts.permissions import IsClinicAdminOrReceptionist
-from .services import get_clinic_dashboard_stats
-from .services import get_doctor_workload
-from .services import get_appointment_trend
+from .services import get_clinic_dashboard_stats, get_doctor_workload, get_appointment_trend
+
+logger = logging.getLogger(__name__)
+
 
 class ClinicDashboardView(APIView):
-
     permission_classes = [IsAuthenticated, IsClinicAdminOrReceptionist]
 
     def get(self, request):
-
         clinic = request.user.clinic
-
         if clinic is None:
             return Response(
                 {
@@ -26,42 +31,32 @@ class ClinicDashboardView(APIView):
             )
 
         stats = get_clinic_dashboard_stats(clinic)
-
         return Response(
             {
                 "success": True,
                 "data": stats
             }
         )
-    
+
 
 class DoctorWorkloadView(APIView):
-
     permission_classes = [IsAuthenticated, IsClinicAdminOrReceptionist]
 
     def get(self, request):
-
         clinic = request.user.clinic
-
         workload = get_doctor_workload(clinic)
-
         return Response({
             "success": True,
             "data": workload
         })
 
 
-
 class AppointmentTrendView(APIView):
-
     permission_classes = [IsAuthenticated, IsClinicAdminOrReceptionist]
 
     def get(self, request):
-
         clinic = request.user.clinic
-
         data = get_appointment_trend(clinic)
-
         return Response({
             "success": True,
             "data": data
@@ -70,23 +65,35 @@ class AppointmentTrendView(APIView):
 
 class SuperAdminStatsView(APIView):
     """
-    SUPER_ADMIN only — returns platform-wide metrics across all clinics.
+    SUPER_ADMIN only — returns platform-wide overview metrics across all clinics.
+    Cached in Redis with short TTL (60s) and fail-open resilience.
     """
     permission_classes = [IsAuthenticated]
+
+    CACHE_KEY = "super_admin_overview_stats"
+    CACHE_TTL = 60  # 60 seconds
 
     def get(self, request):
         if request.user.role != "SUPER_ADMIN":
             return Response({"error": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
 
+        # Check Redis cache with fail-open safety
+        try:
+            cached_data = cache.get(self.CACHE_KEY)
+            if cached_data is not None:
+                return Response({"success": True, "data": cached_data})
+        except Exception as exc:
+            logger.warning("Failed to get cache for %s: %s", self.CACHE_KEY, exc)
+
         from apps.clinics.models import Clinic
         from apps.accounts.models import User
         from apps.appointments.models import Appointment
         from apps.billing.models import Invoice
-        from django.db.models import Sum
-        from django.utils import timezone
+        from apps.audit.models import AuditLog
 
         today = timezone.now().date()
 
+        # Top-line metrics (O(1) aggregations)
         total_clinics = Clinic.objects.count()
         active_clinics = Clinic.objects.filter(is_active=True).count()
         total_users = User.objects.count()
@@ -96,38 +103,38 @@ class SuperAdminStatsView(APIView):
             status="PAID"
         ).aggregate(total=Sum("total_amount"))["total"] or 0
 
-        # Per-clinic breakdown
-        clinic_breakdown = []
-        for clinic in Clinic.objects.filter(is_active=True).order_by("name"):
-            clinic_breakdown.append({
-                "id": clinic.id,
-                "name": clinic.name,
-                "plan": (clinic.subscription.plan if hasattr(clinic, "subscription") and clinic.subscription else "starter").upper(),
-                "is_active": clinic.is_active,
-                "total_appointments": Appointment.objects.filter(clinic=clinic).count(),
-                "appointments_today": Appointment.objects.filter(clinic=clinic, appointment_date=today).count(),
-                "total_doctors": clinic.doctor_associations.filter(is_active=True).count(),
-                "total_patients": clinic.appointments.values("patient").distinct().count(),
-            })
+        # 7-day trend (2 queries total via TruncDate grouping instead of 14 per-day queries)
+        start_7_days = today - timedelta(days=6)
 
-        from apps.audit.models import AuditLog
-        from datetime import timedelta
+        rev_by_date = {
+            row["day"]: row["total"] or 0
+            for row in Invoice.objects.filter(
+                status="PAID", created_at__date__gte=start_7_days, created_at__date__lte=today
+            )
+            .annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(total=Sum("total_amount"))
+        }
 
-        # 7-day trend
+        appts_by_date = {
+            row["appointment_date"]: row["count"]
+            for row in Appointment.objects.filter(
+                appointment_date__gte=start_7_days, appointment_date__lte=today
+            )
+            .values("appointment_date")
+            .annotate(count=Count("id"))
+        }
+
         trend_data = []
         for i in range(6, -1, -1):
             d = today - timedelta(days=i)
-            day_rev = Invoice.objects.filter(
-                status="PAID", created_at__date=d
-            ).aggregate(total=Sum("total_amount"))["total"] or 0
-            day_appts = Appointment.objects.filter(appointment_date=d).count()
             trend_data.append({
                 "date": d.strftime("%b %d"),
-                "revenue": float(day_rev),
-                "appointments": day_appts
+                "revenue": float(rev_by_date.get(d, 0)),
+                "appointments": appts_by_date.get(d, 0)
             })
 
-        # Recent 10 audit logs
+        # Recent 10 audit logs (1 query with select_related)
         recent_logs = []
         for log in AuditLog.objects.select_related("user", "clinic").order_by("-timestamp")[:10]:
             recent_logs.append({
@@ -139,56 +146,91 @@ class SuperAdminStatsView(APIView):
                 "description": log.description
             })
 
-        # Recent 30 days PaymentMetricSnapshot
-        from apps.billing.models import PaymentMetricSnapshot
-        start_30 = today - timedelta(days=30)
-        snapshots_qs = PaymentMetricSnapshot.objects.filter(date__gte=start_30).order_by('date')
-        
-        payment_snapshots = []
-        tot_attempts = 0
-        tot_success = 0
-        tot_reconciliations = 0
+        data = {
+            "total_clinics": total_clinics,
+            "active_clinics": active_clinics,
+            "total_users": total_users,
+            "total_appointments": total_appointments,
+            "appointments_today": appointments_today,
+            "total_revenue_paid": float(total_revenue),
+            "trend_data": trend_data,
+            "recent_logs": recent_logs,
+        }
 
-        for snap in snapshots_qs:
-            rate = round((snap.successful_payments / snap.total_payment_attempts) * 100, 1) if snap.total_payment_attempts > 0 else 100.0
-            payment_snapshots.append({
-                "id": snap.id,
-                "date": snap.date.strftime("%Y-%m-%d"),
-                "date_formatted": snap.date.strftime("%b %d"),
-                "total_payment_attempts": snap.total_payment_attempts,
-                "successful_payments": snap.successful_payments,
-                "failed_payments": snap.failed_payments,
-                "success_rate": rate,
-                "reconciliation_catches": snap.reconciliation_catches,
-                "refunds_processed": snap.refunds_processed,
-                "refund_total_amount": float(snap.refund_total_amount),
-                "avg_time_to_payment_seconds": snap.avg_time_to_payment_seconds,
-            })
-            tot_attempts += snap.total_payment_attempts
-            tot_success += snap.successful_payments
-            tot_reconciliations += snap.reconciliation_catches
-
-        overall_success_rate = round((tot_success / tot_attempts) * 100, 1) if tot_attempts > 0 else 100.0
+        # Set Redis cache with fail-open safety
+        try:
+            cache.set(self.CACHE_KEY, data, self.CACHE_TTL)
+        except Exception as exc:
+            logger.warning("Failed to set cache for %s: %s", self.CACHE_KEY, exc)
 
         return Response({
             "success": True,
-            "data": {
-                "total_clinics": total_clinics,
-                "active_clinics": active_clinics,
-                "total_users": total_users,
-                "total_appointments": total_appointments,
-                "appointments_today": appointments_today,
-                "total_revenue_paid": float(total_revenue),
-                "clinic_breakdown": clinic_breakdown,
-                "trend_data": trend_data,
-                "recent_logs": recent_logs,
-                "payment_metrics": {
-                    "overall_success_rate": overall_success_rate,
-                    "total_reconciliation_catches": tot_reconciliations,
-                    "snapshots": payment_snapshots,
-                }
-            }
+            "data": data
         })
+
+
+class SuperAdminClinicsPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+
+class SuperAdminClinicsView(APIView):
+    """
+    SUPER_ADMIN only — paginated breakdown of clinics with annotated stats.
+    Eliminates N+1 query storm by computing all stats in a single annotated query with select_related.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != "SUPER_ADMIN":
+            return Response({"error": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
+
+        from apps.clinics.models import Clinic
+
+        today = timezone.now().date()
+        search = request.query_params.get("search", "").strip()
+
+        qs = (
+            Clinic.objects.all()
+            .select_related("subscription")
+            .annotate(
+                annotated_total_appointments=Count("appointments", distinct=True),
+                annotated_appointments_today=Count(
+                    "appointments",
+                    filter=Q(appointments__appointment_date=today),
+                    distinct=True,
+                ),
+                annotated_total_doctors=Count(
+                    "doctor_associations",
+                    filter=Q(doctor_associations__is_active=True),
+                    distinct=True,
+                ),
+                annotated_total_patients=Count("appointments__patient", distinct=True),
+            )
+            .order_by("name")
+        )
+
+        if search:
+            qs = qs.filter(name__icontains=search)
+
+        paginator = SuperAdminClinicsPagination()
+        page = paginator.paginate_queryset(qs, request, view=self)
+
+        clinic_list = []
+        for clinic in page:
+            clinic_list.append({
+                "id": clinic.id,
+                "name": clinic.name,
+                "plan": (clinic.subscription.plan if hasattr(clinic, "subscription") and clinic.subscription else "starter").upper(),
+                "is_active": clinic.is_active,
+                "total_appointments": clinic.annotated_total_appointments,
+                "appointments_today": clinic.annotated_appointments_today,
+                "total_doctors": clinic.annotated_total_doctors,
+                "total_patients": clinic.annotated_total_patients,
+            })
+
+        return paginator.get_paginated_response(clinic_list)
 
 
 class PaymentMetricsView(APIView):
@@ -203,7 +245,6 @@ class PaymentMetricsView(APIView):
             return Response({"error": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
 
         from apps.billing.models import PaymentMetricSnapshot
-        from django.utils import timezone
         from datetime import timedelta
 
         try:
@@ -268,4 +309,4 @@ class PaymentMetricsView(APIView):
                 "total_refund_amount": total_refund_amount,
                 "snapshots": snapshot_list,
             }
-        })
+        })

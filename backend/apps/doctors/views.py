@@ -24,6 +24,24 @@ from apps.clinics.models import Clinic
 from apps.accounts.permissions import IsClinicAdmin, IsDoctor
 from apps.audit.services import log_action
 from apps.audit.models import AuditLog
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_cache_get(key):
+    try:
+        return cache.get(key)
+    except Exception as e:
+        logger.warning(f"Cache get failed for key {key}: {e}")
+        return None
+
+
+def _safe_cache_set(key, value, timeout=300):
+    try:
+        cache.set(key, value, timeout=timeout)
+    except Exception as e:
+        logger.warning(f"Cache set failed for key {key}: {e}")
 
 
 class ClinicListView(APIView):
@@ -32,34 +50,81 @@ class ClinicListView(APIView):
 
     def get(self, request):
         cache_key = f"clinic_list:{request.query_params.urlencode()}"
-        cached = cache.get(cache_key)
+        cached = _safe_cache_get(cache_key)
         if cached is not None:
             return Response(cached)
 
+        from django.db.models import Count, Q
         from rest_framework.pagination import PageNumberPagination
+
         paginator = PageNumberPagination()
-        clinics = Clinic.objects.filter(is_active=True).order_by('name')
+        clinics = (
+            Clinic.objects.filter(is_active=True)
+            .annotate(
+                doctor_count=Count(
+                    "doctor_associations",
+                    filter=Q(doctor_associations__is_active=True),
+                    distinct=True,
+                )
+            )
+            .order_by("name")
+        )
+
         page = paginator.paginate_queryset(clinics, request)
         ttl = 60 if request.query_params else 300
         if page is not None:
             serializer = ClinicListSerializer(page, many=True)
             response = paginator.get_paginated_response(serializer.data)
-            cache.set(cache_key, response.data, timeout=ttl)
+            _safe_cache_set(cache_key, response.data, timeout=ttl)
             return response
 
         serializer = ClinicListSerializer(clinics, many=True)
         response_data = serializer.data
-        cache.set(cache_key, response_data, timeout=ttl)
+        _safe_cache_set(cache_key, response_data, timeout=ttl)
         return Response(response_data)
 
 
-class DoctorClinicListView(TenantScopedAPIView):
+from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+
+
+class DoctorClinicListView(APIView):
+    """
+    List doctors associated with clinics.
+    Role-based access:
+      - CLINIC_ADMIN / RECEPTIONIST: strictly scoped to own clinic (tenancy isolation).
+      - DOCTOR: strictly scoped to own clinic associations.
+      - SUPER_ADMIN: platform-wide, or filtered by ?clinic_id=.
+      - PATIENT / Public: filtered by ?clinic_id= if provided, or all active links.
+    """
+    permission_classes = [AllowAny]
+
     def get(self, request):
         from rest_framework.pagination import PageNumberPagination
         paginator = PageNumberPagination()
-        queryset = DoctorClinic.objects.select_related("doctor__user", "clinic")
-        if not self.is_platform_wide:
-            queryset = queryset.filter(clinic=self.clinic)
+        queryset = (
+            DoctorClinic.objects.select_related("doctor__user", "clinic")
+            .filter(is_active=True, clinic__is_active=True)
+            .order_by("id")
+        )
+
+        user = request.user if request.user and request.user.is_authenticated else None
+        clinic_id_param = request.query_params.get("clinic_id")
+
+        if user and user.role in ("CLINIC_ADMIN", "RECEPTIONIST"):
+            user_clinic = get_user_clinic(user)
+            if not user_clinic:
+                raise DRFPermissionDenied("No clinic associated with this account.")
+            queryset = queryset.filter(clinic=user_clinic)
+        elif user and user.role == "DOCTOR":
+            queryset = queryset.filter(doctor__user=user)
+        elif clinic_id_param:
+            queryset = queryset.filter(clinic_id=clinic_id_param)
+        elif user and user.role == "SUPER_ADMIN":
+            pass  # platform-wide
+        else:
+            # Patients / public without clinic_id
+            pass
+
         page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = DoctorClinicSerializer(page, many=True)
@@ -273,7 +338,7 @@ class PublicSpecialtyListView(APIView):
 
     def get(self, request):
         cache_key = f"public_specialties:{request.query_params.urlencode()}"
-        cached = cache.get(cache_key)
+        cached = _safe_cache_get(cache_key)
         if cached is not None:
             return Response(cached)
 
@@ -281,7 +346,7 @@ class PublicSpecialtyListView(APIView):
         specialties = active_doctors.values_list('specialization', flat=True).distinct()
         response_data = [s for s in sorted(list(specialties)) if s]
 
-        cache.set(cache_key, response_data, timeout=300)
+        _safe_cache_set(cache_key, response_data, timeout=300)
         return Response(response_data)
 
 
@@ -291,7 +356,7 @@ class PublicDoctorListView(APIView):
 
     def get(self, request):
         cache_key = f"public_doctors:{request.query_params.urlencode()}"
-        cached = cache.get(cache_key)
+        cached = _safe_cache_get(cache_key)
         if cached is not None:
             return Response(cached)
 
@@ -308,12 +373,12 @@ class PublicDoctorListView(APIView):
         if page is not None:
             serializer = DoctorDetailSerializer(page, many=True)
             response = paginator.get_paginated_response(serializer.data)
-            cache.set(cache_key, response.data, timeout=ttl)
+            _safe_cache_set(cache_key, response.data, timeout=ttl)
             return response
 
         serializer = DoctorDetailSerializer(queryset, many=True)
         response_data = {"success": True, "data": serializer.data}
-        cache.set(cache_key, response_data, timeout=ttl)
+        _safe_cache_set(cache_key, response_data, timeout=ttl)
         return Response(response_data)
 
 

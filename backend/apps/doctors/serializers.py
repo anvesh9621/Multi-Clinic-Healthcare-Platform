@@ -13,7 +13,9 @@ class ClinicListSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'address', 'is_active', 'doctor_count', 'latitude', 'longitude']
 
     def get_doctor_count(self, obj):
-        return DoctorClinic.objects.filter(clinic=obj).count()
+        if hasattr(obj, 'doctor_count'):
+            return obj.doctor_count
+        return DoctorClinic.objects.filter(clinic=obj, is_active=True).count()
 
 
 class DoctorClinicSerializer(serializers.ModelSerializer):

@@ -145,18 +145,27 @@ class PatientOwnHistoryView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        patient_id = self.kwargs["patient_id"]
+        patient_id = self.kwargs.get("patient_id")
         user = self.request.user
 
         if user.role != "PATIENT":
             # This view is patients-only; staff should use DoctorPatientHistoryView.
             raise PermissionDenied("This endpoint is for patients only.")
 
+        # If 'me' or omitted, query for the logged in patient's profile
+        if str(patient_id).lower() == "me" or patient_id is None:
+            try:
+                patient = user.patient_profile
+            except (AttributeError, Exception):
+                from apps.patients.models import Patient
+                patient, _ = Patient.objects.get_or_create(user=user)
+            return MedicalRecord.objects.filter(patient=patient).order_by("-created_at")
+
         # Ownership guard: a patient can only request their own history.
         try:
             if user.patient_profile.id != int(patient_id):
                 raise PermissionDenied("You can only view your own history.")
-        except AttributeError:
+        except (AttributeError, Exception):
             raise PermissionDenied("No patient profile associated with this account.")
 
         return MedicalRecord.objects.filter(patient_id=patient_id).order_by("-created_at")

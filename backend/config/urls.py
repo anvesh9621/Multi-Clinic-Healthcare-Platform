@@ -20,6 +20,8 @@ from apps.core.views import (
 )
 
 
+from apps.billing.views import CreateOrderView, VerifyPaymentView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/test-seed-invitation/", TestSeedInvitationView.as_view(), name="test-seed-invitation"),
@@ -27,6 +29,8 @@ urlpatterns = [
     path("api/test-seed-patient/", TestSeedPatientView.as_view(), name="test-seed-patient"),
     path("api/test-seed-staff/", TestSeedStaffView.as_view(), name="test-seed-staff"),
     path("api/test-generate-totp/", TestGenerateTOTPView.as_view(), name="test-generate-totp"),
+    path("api/create-order/", CreateOrderView.as_view(), name="root-create-order"),
+    path("api/verify-payment/", VerifyPaymentView.as_view(), name="root-verify-payment"),
 
     # Appointment APIs
     path("api/accounts/", include("apps.accounts.urls")),

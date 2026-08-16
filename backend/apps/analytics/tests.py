@@ -46,15 +46,23 @@ class TestPaymentMetricsView(APITestCase):
         assert snap_item["successful_payments"] == 9
         assert snap_item["reconciliation_catches"] == 2
 
-    def test_super_admin_stats_view_includes_payment_metrics(self):
+    def test_super_admin_stats_view_overview_shape_and_endpoint_separation(self):
         self.client.force_authenticate(user=self.super_admin)
         response = self.client.get("/api/analytics/super-admin/")
         assert response.status_code == 200
         data = response.data.get("data", {})
-        assert "payment_metrics" in data
-        pm = data["payment_metrics"]
-        assert pm["overall_success_rate"] == 90.0
-        assert pm["total_reconciliation_catches"] == 2
+        # Overview fields present
+        assert "total_clinics" in data
+        assert "active_clinics" in data
+        assert "total_users" in data
+        assert "total_appointments" in data
+        assert "appointments_today" in data
+        assert "total_revenue_paid" in data
+        assert "trend_data" in data
+        assert "recent_logs" in data
+        # Monolithic fields removed from overview endpoint
+        assert "payment_metrics" not in data
+        assert "clinic_breakdown" not in data
 
 
 from apps.core.factories import ClinicFactory

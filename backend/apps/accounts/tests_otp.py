@@ -189,6 +189,27 @@ class PatientOTPVerifyTests(APITestCase):
         user = User.objects.get(email=self.new_email)
         self.assertFalse(user.has_usable_password())
 
+    def test_register_rejected_with_blank_first_name(self):
+        """REGISTER is rejected with 400 when first_name is blank, and does not create user."""
+        EmailOTP.objects.create(
+            user_email="noname@example.com",
+            code="123456",
+            purpose="REGISTER",
+            expires_at=self.now + timedelta(minutes=10)
+        )
+        payload = {
+            "email": "noname@example.com",
+            "code": "123456",
+            "purpose": "REGISTER",
+            "first_name": "   ",
+            "last_name": "Patient"
+        }
+        response = self.client.post(self.verify_url, payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("First name is required", response.data["error"])
+        self.assertFalse(User.objects.filter(email="noname@example.com").exists())
+
+
     def test_successful_login_issues_jwt(self):
         """Successful LOGIN issues valid access and refresh JWT tokens."""
         EmailOTP.objects.create(

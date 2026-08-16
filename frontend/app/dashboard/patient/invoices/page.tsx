@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/services/api";
-import { Receipt, Loader2, CreditCard, ArrowRight, AlertCircle } from "lucide-react";
+import { Receipt, Loader2, CreditCard, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { RazorpayCheckoutButton } from "@/components/billing/RazorpayCheckoutButton";
 
 type Invoice = {
   id: number;
@@ -44,34 +45,28 @@ function InvoiceStatusBadge({ status, method }: { status: string; method: string
 export default function PatientInvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [payingId, setPayingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
+  const fetchInvoices = () => {
     api.get("/billing/invoices/")
-      .then(res => setInvoices(Array.isArray(res.data) ? res.data : (res.data?.results || [])))
-      .catch(err => {
+      .then((res) => setInvoices(Array.isArray(res.data) ? res.data : res.data?.results || []))
+      .catch((err) => {
         console.error("Failed to load invoices", err);
         setError("Failed to load invoices.");
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchInvoices();
   }, []);
 
-  const handlePayOnline = async (invoice: Invoice) => {
-    setPayingId(invoice.id);
-    setError(null);
-    try {
-      const { data } = await api.post(`/billing/invoices/${invoice.id}/pay/`);
-      if (invoice.appointment_id) {
-        sessionStorage.setItem("pending_appointment_id", String(invoice.appointment_id));
-      }
-      window.location.href = data.payment_link_url || data.short_url;
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Could not generate payment link. Please try again.");
-    } finally {
-      setPayingId(null);
-    }
+  const handlePaymentSuccess = (invoiceId: number, paymentId: string) => {
+    setSuccessMessage(`Payment for Invoice #${invoiceId} confirmed! Payment ID: ${paymentId}`);
+    fetchInvoices();
+    setTimeout(() => setSuccessMessage(null), 6000);
   };
 
   if (loading) {
@@ -86,10 +81,17 @@ export default function PatientInvoicesPage() {
     <div className="max-w-3xl mx-auto py-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink flex items-center gap-3 heading-font">
-          <Receipt className="w-6 h-6 text-primary" /> My Invoices
+          <Receipt className="w-6 h-6 text-primary" /> My Invoices & Payments
         </h1>
-        <p className="text-sm text-muted mt-1">Your consultation billing history</p>
+        <p className="text-sm text-muted mt-1">Your consultation billing and payment history</p>
       </div>
+
+      {successMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex gap-2 items-center text-sm font-medium">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          {successMessage}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex gap-2 items-center text-sm">
@@ -99,52 +101,57 @@ export default function PatientInvoicesPage() {
       )}
 
       {invoices.length === 0 ? (
-        <Card className="p-16 text-center">
+        <Card className="p-16 text-center border-border">
           <CreditCard className="w-12 h-12 text-muted mx-auto mb-3" />
           <p className="font-semibold text-ink">No invoices yet</p>
           <p className="text-sm text-muted mt-1">Your payment history will appear here after consultations.</p>
         </Card>
       ) : (
         <div className="space-y-3">
-          {invoices.map(inv => {
-            const isPayable = ["pending", "pending_at_clinic"].includes(inv.status);
+          {invoices.map((inv) => {
+            const isPayable = ["pending", "pending_at_clinic", "draft"].includes(inv.status);
+            const amountInPaise = Math.round(parseFloat(inv.total_amount || "0") * 100);
+
             return (
-              <Card key={inv.id} hoverable className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-ink text-sm">INV-{inv.id.toString().padStart(4, "0")}</span>
-                    <InvoiceStatusBadge status={inv.status} method={inv.payment_method} />
+              <Card key={inv.id} hoverable className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-border">
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="w-5 h-5 text-primary" />
                   </div>
-                  <p className="text-xs text-muted mt-1">
-                    {new Date(inv.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                  </p>
-                  {inv.paid_at && (
-                    <p className="text-xs text-emerald-600 mt-0.5">
-                      Paid on {new Date(inv.paid_at).toLocaleDateString("en-IN")}
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-ink text-sm">
+                        INV-{inv.id.toString().padStart(4, "0")}
+                      </span>
+                      <InvoiceStatusBadge status={inv.status} method={inv.payment_method} />
+                    </div>
+                    <p className="text-xs text-muted">
+                      Created on {new Date(inv.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
-                  )}
+                    {inv.paid_at && (
+                      <p className="text-xs text-emerald-700 font-medium">
+                        Paid on {new Date(inv.paid_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="text-right flex-shrink-0">
-                  <p className="font-black text-lg text-ink font-mono">₹{parseFloat(inv.total_amount).toFixed(2)}</p>
-                  {isPayable && (
-                    <Button
-                      variant="ghost"
+                <div className="text-right flex flex-col sm:items-end gap-2 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
+                  <p className="font-bold text-xl text-ink font-mono">
+                    ₹{parseFloat(inv.total_amount).toFixed(2)}
+                  </p>
+                  {isPayable && amountInPaise >= 100 && (
+                    <RazorpayCheckoutButton
+                      amountInPaise={amountInPaise}
+                      currency="INR"
+                      invoiceId={inv.id}
+                      description={`Invoice #${inv.id} Payment`}
+                      buttonText="Pay with Razorpay"
                       size="sm"
-                      onClick={() => handlePayOnline(inv)}
-                      disabled={payingId === inv.id}
-                      className="mt-1.5 text-primary hover:text-primary-dark"
-                    >
-                      {payingId === inv.id ? (
-                        <><Loader2 className="w-4 h-4 animate-spin mr-1" />Processing...</>
-                      ) : (
-                        <>Pay online now <ArrowRight className="w-4 h-4 ml-1" /></>
-                      )}
-                    </Button>
+                      onSuccess={(res) => handlePaymentSuccess(inv.id, res.payment_id)}
+                      onError={(err) => setError(err)}
+                    />
                   )}
                 </div>
               </Card>

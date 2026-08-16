@@ -150,9 +150,8 @@ class ViewCachingTests(TestCase):
     def test_clinic_list_view_caching_and_invalidation(self):
         url = "/api/doctors/clinics/"
         cache_key = "clinic_list:"
-
-        # (a) First request: Cache miss -> runs DB queries
-        with self.assertNumQueries(3):
+        # (a) First request: Cache miss -> runs DB queries (1 count + 1 annotated page)
+        with self.assertNumQueries(2):
             res_1 = self.client.get(url)
         self.assertEqual(res_1.status_code, 200)
         self.assertIsNotNone(cache.get(cache_key))

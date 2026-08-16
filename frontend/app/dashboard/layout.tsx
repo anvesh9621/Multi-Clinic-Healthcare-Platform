@@ -155,28 +155,33 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
-  const [tokenRole, setTokenRole] = useState<string | null>(() => decodeRoleFromToken());
+  const [mounted, setMounted] = useState(false);
+  const [tokenRole, setTokenRole] = useState<string | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     const role = decodeRoleFromToken();
-    if (role !== tokenRole) {
-      setTokenRole(role);
-    }
-  }, [tokenRole]);
+    setTokenRole(role);
+  }, []);
 
   const effectiveRole = user?.role || tokenRole;
 
   useEffect(() => {
-    if (!loading && !user && !effectiveRole) router.push("/login");
-  }, [user, loading, effectiveRole, router]);
+    if (mounted && !loading && !user && !effectiveRole) {
+      router.push("/login");
+    }
+  }, [mounted, user, loading, effectiveRole, router]);
 
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  if (loading && !effectiveRole) return <PageLoader />;
-  if (!loading && !user && !effectiveRole) return null;
+  if (!mounted || (loading && !effectiveRole)) {
+    return <PageLoader />;
+  }
+
+  if (!user && !effectiveRole) return null;
 
   const currentRole = effectiveRole || "PATIENT";
 

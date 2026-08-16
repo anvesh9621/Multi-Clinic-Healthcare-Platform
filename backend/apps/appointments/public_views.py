@@ -14,7 +14,26 @@ from apps.doctors.models import DoctorClinic, DoctorSchedule, DoctorLeave, Docto
 from apps.appointments.services import get_available_slots
 
 
+import logging
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_cache_get(key):
+    try:
+        return cache.get(key)
+    except Exception as e:
+        logger.warning(f"Cache get failed for key {key}: {e}")
+        return None
+
+
+def _safe_cache_set(key, value, timeout=300):
+    try:
+        cache.set(key, value, timeout=timeout)
+    except Exception as e:
+        logger.warning(f"Cache set failed for key {key}: {e}")
+
 
 class PublicClinicListView(APIView):
     """
@@ -26,7 +45,7 @@ class PublicClinicListView(APIView):
 
     def get(self, request):
         cache_key = f"public_clinics:{request.query_params.urlencode()}"
-        cached = cache.get(cache_key)
+        cached = _safe_cache_get(cache_key)
         if cached is not None:
             return Response(cached)
 
@@ -69,7 +88,7 @@ class PublicClinicListView(APIView):
             })
 
         ttl = 60 if request.query_params else 300
-        cache.set(cache_key, result, timeout=ttl)
+        _safe_cache_set(cache_key, result, timeout=ttl)
         return Response(result)
 
 
@@ -82,7 +101,7 @@ class PublicClinicDoctorsView(APIView):
 
     def get(self, request, clinic_id):
         cache_key = f"public_clinic_doctors:{clinic_id}:{request.query_params.urlencode()}"
-        cached = cache.get(cache_key)
+        cached = _safe_cache_get(cache_key)
         if cached is not None:
             return Response(cached)
 
@@ -129,7 +148,7 @@ class PublicClinicDoctorsView(APIView):
             'doctors': result,
         }
         ttl = 60 if request.query_params else 300
-        cache.set(cache_key, response_data, timeout=ttl)
+        _safe_cache_set(cache_key, response_data, timeout=ttl)
         return Response(response_data)
 
 

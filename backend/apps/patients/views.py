@@ -30,7 +30,10 @@ class PatientProfileView(APIView):
     def get_patient(self, user):
         try:
             return user.patient_profile
-        except Patient.DoesNotExist:
+        except (Patient.DoesNotExist, AttributeError):
+            if getattr(user, "role", None) == "PATIENT":
+                patient, _ = Patient.objects.get_or_create(user=user)
+                return patient
             return None
 
     def get(self, request):
