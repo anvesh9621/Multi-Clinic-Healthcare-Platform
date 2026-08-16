@@ -22,6 +22,9 @@ class RazorpayStandardCheckoutTests(TestCase):
         self.key_id = "rzp_test_TQ9TQdaGO2avyV"
         self.key_secret = "VsyUBiHt0b9KxVKnkf6gWpnc"
 
+        settings.RAZORPAY_KEY_ID = self.key_id
+        settings.RAZORPAY_KEY_SECRET = self.key_secret
+
     @patch("apps.billing.views.get_razorpay_client")
     def test_create_order_success(self, mock_get_client):
         mock_client = MagicMock()
@@ -132,3 +135,106 @@ class RazorpayStandardCheckoutTests(TestCase):
             invoice.refresh_from_db()
             self.assertEqual(invoice.status, "paid")
             self.assertEqual(invoice.razorpay_payment_id, payment_id)
+
+
+@pytest.mark.django_db
+class TestRazorpaySecretResolutionChain(TestCase):
+    """
+    Directly exercises each tier of the Razorpay key resolution fallback chain in isolation:
+    Tier 1: PlatformSettings database model
+    Tier 2: settings.RAZORPAY_KEY_SECRET / settings.RAZORPAY_KEY_ID
+    Tier 3: get_razorpay_client().auth
+    Tier 4: Missing configuration returns clean 500 error
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.order_id = "order_chain_123"
+        self.payment_id = "pay_chain_456"
+        self.message = f"{self.order_id}|{self.payment_id}".encode("utf-8")
+
+    def test_tier_1_resolves_from_platform_settings(self):
+        from apps.billing.models import PlatformSettings
+        PlatformSettings.objects.all().delete()
+        PlatformSettings.objects.create(
+            razorpay_key_id="tier1_key_id",
+            razorpay_key_secret="tier1_key_secret",
+        )
+        settings.RAZORPAY_KEY_SECRET = "tier2_should_not_be_used"
+
+        signature = hmac.new(
+            b"tier1_key_secret",
+            self.message,
+            hashlib.sha256,
+        ).hexdigest()
+
+        response = self.client.post("/api/billing/verify-payment/", {
+            "razorpay_order_id": self.order_id,
+            "razorpay_payment_id": self.payment_id,
+            "razorpay_signature": signature,
+        }, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+
+    def test_tier_2_resolves_from_django_settings_when_platform_settings_empty(self):
+        from apps.billing.models import PlatformSettings
+        PlatformSettings.objects.all().delete()
+        settings.RAZORPAY_KEY_SECRET = "tier2_key_secret"
+
+        signature = hmac.new(
+            b"tier2_key_secret",
+            self.message,
+            hashlib.sha256,
+        ).hexdigest()
+
+        response = self.client.post("/api/billing/verify-payment/", {
+            "razorpay_order_id": self.order_id,
+            "razorpay_payment_id": self.payment_id,
+            "razorpay_signature": signature,
+        }, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+
+    @patch("apps.billing.views.get_razorpay_client")
+    def test_tier_3_resolves_from_client_auth_when_settings_empty(self, mock_client_factory):
+        from apps.billing.models import PlatformSettings
+        PlatformSettings.objects.all().delete()
+        settings.RAZORPAY_KEY_SECRET = ""
+
+        mock_client = MagicMock()
+        mock_client.auth = ("tier3_key_id", "tier3_key_secret")
+        mock_client_factory.return_value = mock_client
+
+        signature = hmac.new(
+            b"tier3_key_secret",
+            self.message,
+            hashlib.sha256,
+        ).hexdigest()
+
+        response = self.client.post("/api/billing/verify-payment/", {
+            "razorpay_order_id": self.order_id,
+            "razorpay_payment_id": self.payment_id,
+            "razorpay_signature": signature,
+        }, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data.get("success"))
+
+    def test_tier_4_returns_500_when_all_tiers_unconfigured(self):
+        from apps.billing.models import PlatformSettings
+        PlatformSettings.objects.all().delete()
+        settings.RAZORPAY_KEY_SECRET = ""
+
+        signature = "any_signature"
+
+        response = self.client.post("/api/billing/verify-payment/", {
+            "razorpay_order_id": self.order_id,
+            "razorpay_payment_id": self.payment_id,
+            "razorpay_signature": signature,
+        }, format="json")
+
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(response.data.get("success"))
+        self.assertIn("not configured", response.data.get("error", "").lower())
+

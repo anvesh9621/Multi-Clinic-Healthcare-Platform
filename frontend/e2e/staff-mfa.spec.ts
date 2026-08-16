@@ -87,7 +87,9 @@ test.describe('Staff MFA Enrollment & Login E2E Flows', () => {
       localStorage.clear();
       sessionStorage.clear();
     });
-    await page.goto('/login');
+    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 5000 }).catch(async () => {
+      await page.goto('/login');
+    });
 
     await page.getByRole('button', { name: /log in with password instead/i }).click();
     await page.locator('input[type="email"]').fill(staffEmail);

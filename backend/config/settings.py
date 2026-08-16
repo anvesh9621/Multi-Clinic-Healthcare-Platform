@@ -377,9 +377,10 @@ if not IS_TESTING and not IS_E2E_SERVER:
     }
 
 # ── Razorpay ──────────────────────────────────────────────────────────────────
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
-RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET')
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID') or ('rzp_test_key' if (IS_TESTING or DEBUG) else None)
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET') or ('rzp_test_secret' if (IS_TESTING or DEBUG) else None)
+RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET') or ('rzp_test_webhook_secret' if (IS_TESTING or DEBUG) else None)
+
 
 # Plan IDs (create these in Razorpay dashboard first)
 RAZORPAY_PLAN_IDS = {

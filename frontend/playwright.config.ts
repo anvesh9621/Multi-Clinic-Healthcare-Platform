@@ -19,9 +19,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'cross-env E2E_TEST_MODE=true npm run dev',
+    command: process.env.CI
+      ? 'cross-env E2E_TEST_MODE=true npm run start'
+      : 'cross-env E2E_TEST_MODE=true npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
 });
+

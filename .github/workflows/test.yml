@@ -49,6 +49,9 @@ jobs:
           DB_NAME: test_mediclinic
           DB_USER: postgres
           DB_PASSWORD: postgres
+          RAZORPAY_KEY_ID: rzp_test_ci_key
+          RAZORPAY_KEY_SECRET: rzp_test_ci_secret
+          RAZORPAY_WEBHOOK_SECRET: rzp_test_ci_webhook_secret
         run: pytest -v --cov=apps --cov-report=term-missing
 
   frontend-test:
@@ -81,6 +84,8 @@ jobs:
         env:
           E2E_TEST_MODE: "true"
           DEBUG: "true"
+          RAZORPAY_KEY_ID: rzp_test_ci_key
+          RAZORPAY_KEY_SECRET: rzp_test_ci_secret
         run: |
           cd backend
           python manage.py migrate
@@ -95,6 +100,12 @@ jobs:
         working-directory: frontend
         run: npm run test
 
+      - name: Build Next.js Frontend for E2E
+        working-directory: frontend
+        env:
+          E2E_TEST_MODE: "true"
+        run: npm run build
+
       - name: Install Playwright Browsers & OS Dependencies
         working-directory: frontend
         run: npx playwright install --with-deps
@@ -103,4 +114,6 @@ jobs:
         working-directory: frontend
         env:
           E2E_TEST_MODE: "true"
+          CI: "true"
         run: npm run test:e2e
+
