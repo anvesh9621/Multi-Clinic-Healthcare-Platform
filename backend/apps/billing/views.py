@@ -980,11 +980,20 @@ class VerifyPaymentView(APIView):
         from apps.billing.models import PlatformSettings
         settings_obj = PlatformSettings.objects.first()
         key_secret = (
-            getattr(settings_obj, "razorpay_key_secret", None)
-            or getattr(settings, "RAZORPAY_KEY_SECRET", "")
+            (settings_obj and settings_obj.razorpay_key_secret)
+            or getattr(settings, "RAZORPAY_KEY_SECRET", None)
+            or ""
         )
 
         if not key_secret:
+            try:
+                client = get_razorpay_client()
+                key_secret = getattr(client, "auth", (None, None))[1]
+            except Exception:
+                pass
+
+        if not key_secret:
+            logger.error("Razorpay verification failed: secret key is not configured.")
             return Response(
                 {"success": False, "error": "Razorpay secret key is not configured."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -993,12 +1002,12 @@ class VerifyPaymentView(APIView):
         # Signature verification: HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
         message = f"{order_id}|{payment_id}".encode("utf-8")
         generated_signature = hmac.new(
-            key_secret.encode("utf-8"),
+            str(key_secret).encode("utf-8"),
             message,
             hashlib.sha256,
         ).hexdigest()
 
-        if not hmac.compare_digest(generated_signature, signature):
+        if not hmac.compare_digest(generated_signature, str(signature)):
             logger.warning(
                 f"Razorpay signature verification failed for order {order_id}, payment {payment_id}."
             )
@@ -1019,32 +1028,38 @@ class VerifyPaymentView(APIView):
                 pass
 
         if invoice:
-            with transaction.atomic():
-                invoice.razorpay_payment_id = payment_id
-                invoice.payment_method = "card"
-                invoice.paid_at = timezone.now()
-                invoice.save(update_fields=["razorpay_payment_id", "payment_method", "paid_at"])
+            try:
+                with transaction.atomic():
+                    invoice.razorpay_payment_id = payment_id
+                    invoice.payment_method = "card"
+                    invoice.paid_at = timezone.now()
+                    invoice.save(update_fields=["razorpay_payment_id", "payment_method", "paid_at"])
 
-                if invoice.status in ("pending", "pending_at_clinic", "draft"):
-                    invoice.apply_ledger_entry(
-                        entry_type="debit",
-                        amount=invoice.total_amount,
-                        resulting_status="paid",
-                        source_event="view:verify_payment",
-                        razorpay_reference=payment_id,
-                        payment_method="online",
-                        user=request.user if request.user and request.user.is_authenticated else None,
+                    if invoice.status in ("pending", "pending_at_clinic", "draft"):
+                        invoice.apply_ledger_entry(
+                            entry_type="debit",
+                            amount=invoice.total_amount,
+                            resulting_status="paid",
+                            source_event="view:verify_payment",
+                            razorpay_reference=payment_id,
+                            payment_method="online",
+                            user=request.user if request.user and request.user.is_authenticated else None,
+                        )
+
+                    if invoice.appointment and invoice.appointment.status == "SCHEDULED":
+                        invoice.appointment.status = "CONFIRMED"
+                        invoice.appointment.save(update_fields=["status"])
+
+                try:
+                    _notify_patient(
+                        invoice,
+                        title="Payment Confirmed",
+                        message=f"Online payment of ₹{invoice.total_amount} was successfully verified.",
                     )
-
-                if invoice.appointment and invoice.appointment.status == "SCHEDULED":
-                    invoice.appointment.status = "CONFIRMED"
-                    invoice.appointment.save(update_fields=["status"])
-
-            _notify_patient(
-                invoice,
-                title="Payment Confirmed",
-                message=f"Online payment of ₹{invoice.total_amount} was successfully verified.",
-            )
+                except Exception as notify_err:
+                    logger.warning(f"Failed to notify patient after payment verification: {notify_err}")
+            except Exception as inv_err:
+                logger.error(f"Error updating invoice {invoice_id} after verification: {inv_err}", exc_info=True)
 
         return Response(
             {

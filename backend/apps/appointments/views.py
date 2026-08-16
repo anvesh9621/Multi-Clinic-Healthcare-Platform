@@ -48,6 +48,8 @@ class BookAppointmentView(APIView):
         serializer = AppointmentBookingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        data = serializer.validated_data
+
         try:
             doctor_clinic = DoctorClinic.objects.select_related("clinic", "doctor__user").get(id=data["doctor_clinic_id"])
         except DoctorClinic.DoesNotExist:

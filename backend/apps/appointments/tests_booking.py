@@ -86,3 +86,57 @@ class AppointmentBookingPostgresTests(TestCase):
         )
         self.assertIsNotNone(appt2.id)
         self.assertNotEqual(appt1.id, appt2.id)
+
+
+@pytest.mark.django_db
+@pytest.mark.postgres_required
+class BookAppointmentViewTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.clinic = ClinicFactory()
+        self.doctor_clinic = create_doctor_clinic_with_full_week_schedule(clinic=self.clinic)
+        self.patient = PatientProfileFactory()
+
+        today = timezone.localdate()
+        days_ahead = 0 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        self.appointment_date = today + timedelta(days=days_ahead)
+        self.start_time = time(10, 0)
+        self.end_time = time(10, 30)
+
+    def test_patient_can_book_appointment_successfully(self):
+        self.client.force_authenticate(user=self.patient.user)
+        payload = {
+            "doctor_clinic_id": self.doctor_clinic.id,
+            "appointment_date": str(self.appointment_date),
+            "start_time": self.start_time.strftime("%H:%M"),
+            "end_time": self.end_time.strftime("%H:%M"),
+            "reason": "Consultation test",
+            "payment_method": "pay_at_clinic",
+        }
+        response = self.client.post("/api/appointments/book/", payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("appointment_id", response.data)
+        self.assertEqual(response.data["status"], "CONFIRMED")
+        self.assertFalse(response.data["payment_required"])
+
+        # Check appointment exists in database
+        appointment = Appointment.objects.get(id=response.data["appointment_id"])
+        self.assertEqual(appointment.patient, self.patient)
+        self.assertEqual(appointment.doctor_clinic, self.doctor_clinic)
+        self.assertEqual(appointment.reason, "Consultation test")
+
+    def test_booking_nonexistent_doctor_returns_404(self):
+        self.client.force_authenticate(user=self.patient.user)
+        payload = {
+            "doctor_clinic_id": 999999,
+            "appointment_date": str(self.appointment_date),
+            "start_time": self.start_time.strftime("%H:%M"),
+            "end_time": self.end_time.strftime("%H:%M"),
+            "reason": "Nonexistent doctor",
+        }
+        response = self.client.post("/api/appointments/book/", payload, format="json")
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("detail", response.data)
+
