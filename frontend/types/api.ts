@@ -270,12 +270,14 @@ export interface PrescriptionTemplate {
 /** Shape returned by DoctorScheduleSerializer */
 export interface DoctorSchedule {
   id: number;
-  /** write-only on create, but present in read responses via related serializer */
   doctor_clinic_id: number;
+  doctor_name?: string;
+  doctor_email?: string;
+  clinic_name?: string;
   /** 0 = Monday … 6 = Sunday */
   day_of_week: number;
-  start_time: string;           // "HH:MM:SS"
-  end_time: string;             // "HH:MM:SS"
+  start_time: string;           // "HH:MM:SS" or "HH:MM"
+  end_time: string;             // "HH:MM:SS" or "HH:MM"
   slot_duration: number;        // minutes
 }
 

@@ -118,21 +118,108 @@ class DoctorProfileUpdateSerializer(serializers.Serializer):
 
 
 class DoctorScheduleSerializer(serializers.ModelSerializer):
-    doctor_clinic_id = serializers.IntegerField(write_only=True)
+    doctor_clinic_id = serializers.IntegerField(required=False)
+    doctor_name = serializers.CharField(source="doctor_clinic.doctor.user.get_full_name", read_only=True)
+    doctor_email = serializers.CharField(source="doctor_clinic.doctor.user.email", read_only=True)
+    clinic_name = serializers.CharField(source="doctor_clinic.clinic.name", read_only=True)
 
     class Meta:
         model = DoctorSchedule
-        fields = ["id", "doctor_clinic_id", "day_of_week", "start_time", "end_time", "slot_duration"]
+        fields = [
+            "id",
+            "doctor_clinic_id",
+            "doctor_name",
+            "doctor_email",
+            "clinic_name",
+            "day_of_week",
+            "start_time",
+            "end_time",
+            "slot_duration",
+        ]
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["doctor_clinic_id"] = instance.doctor_clinic_id
+        return ret
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = request.user if request else None
+
+        # Resolve doctor_clinic
+        doctor_clinic_id = attrs.get("doctor_clinic_id")
+        if self.instance is not None:
+            doctor_clinic = self.instance.doctor_clinic
+            if doctor_clinic_id and doctor_clinic_id != doctor_clinic.id:
+                try:
+                    doctor_clinic = DoctorClinic.objects.select_related("clinic", "doctor__user").get(id=doctor_clinic_id)
+                except DoctorClinic.DoesNotExist:
+                    raise serializers.ValidationError({"doctor_clinic_id": "Doctor clinic association not found."})
+        else:
+            if not doctor_clinic_id:
+                raise serializers.ValidationError({"doctor_clinic_id": "This field is required."})
+            try:
+                doctor_clinic = DoctorClinic.objects.select_related("clinic", "doctor__user").get(id=doctor_clinic_id)
+            except DoctorClinic.DoesNotExist:
+                raise serializers.ValidationError({"doctor_clinic_id": "Doctor clinic association not found."})
+
+        # Tenant isolation on create / update:
+        if user and getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
+            from apps.core.tenancy import get_user_clinic
+            user_clinic = get_user_clinic(user)
+            if doctor_clinic.clinic != user_clinic:
+                raise serializers.ValidationError({"doctor_clinic_id": "Doctor does not belong to your clinic."})
+        elif user and getattr(user, "role", None) == "DOCTOR":
+            if doctor_clinic.doctor.user != user:
+                raise serializers.ValidationError({"doctor_clinic_id": "You can only manage your own schedule."})
+
+        # Time validation:
+        start_time = attrs.get("start_time", getattr(self.instance, "start_time", None))
+        end_time = attrs.get("end_time", getattr(self.instance, "end_time", None))
+        day_of_week = attrs.get("day_of_week", getattr(self.instance, "day_of_week", None))
+
+        if start_time and end_time:
+            if start_time >= end_time:
+                raise serializers.ValidationError({"end_time": "End time must be after start time."})
+
+            # Overlap check:
+            # Overlap exists if: existing.start_time < new.end_time AND existing.end_time > new.start_time
+            overlap_qs = DoctorSchedule.objects.filter(
+                doctor_clinic=doctor_clinic,
+                day_of_week=day_of_week,
+                start_time__lt=end_time,
+                end_time__gt=start_time,
+            )
+            if self.instance:
+                overlap_qs = overlap_qs.exclude(pk=self.instance.pk)
+
+            if overlap_qs.exists():
+                raise serializers.ValidationError({
+                    "detail": "This schedule block overlaps with an existing schedule for this doctor on this day."
+                })
+
+        attrs["_resolved_doctor_clinic"] = doctor_clinic
+        return attrs
 
     def create(self, validated_data):
-        doctor_clinic = DoctorClinic.objects.get(id=validated_data["doctor_clinic_id"])
+        doctor_clinic = validated_data.pop("_resolved_doctor_clinic", None)
+        validated_data.pop("doctor_clinic_id", None)
+        if not doctor_clinic:
+            doctor_clinic = DoctorClinic.objects.get(id=validated_data.get("doctor_clinic_id"))
         return DoctorSchedule.objects.create(
             doctor_clinic=doctor_clinic,
-            day_of_week=validated_data["day_of_week"],
-            start_time=validated_data["start_time"],
-            end_time=validated_data["end_time"],
-            slot_duration=validated_data["slot_duration"]
+            **validated_data
         )
+
+    def update(self, instance, validated_data):
+        doctor_clinic = validated_data.pop("_resolved_doctor_clinic", None)
+        validated_data.pop("doctor_clinic_id", None)
+        if doctor_clinic:
+            instance.doctor_clinic = doctor_clinic
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class DoctorLeaveSerializer(serializers.ModelSerializer):

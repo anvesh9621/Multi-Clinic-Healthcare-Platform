@@ -16,8 +16,20 @@ export interface CreateLeavePayload {
   reason?: string;
 }
 
-export const getSchedules = async (): Promise<DoctorSchedule[]> => {
-  const res = await api.get<any>("/doctors/schedules/");
+export const getSchedules = async (params?: {
+  doctor_clinic_id?: number;
+  day_of_week?: number;
+}): Promise<DoctorSchedule[]> => {
+  const queryParams = new URLSearchParams();
+  if (params?.doctor_clinic_id !== undefined && params.doctor_clinic_id !== null) {
+    queryParams.set("doctor_clinic_id", String(params.doctor_clinic_id));
+  }
+  if (params?.day_of_week !== undefined && params.day_of_week !== null) {
+    queryParams.set("day_of_week", String(params.day_of_week));
+  }
+  const queryString = queryParams.toString();
+  const url = queryString ? `/doctors/schedules/?${queryString}` : "/doctors/schedules/";
+  const res = await api.get<any>(url);
   return Array.isArray(res.data) ? res.data : (res.data.results || []);
 };
 

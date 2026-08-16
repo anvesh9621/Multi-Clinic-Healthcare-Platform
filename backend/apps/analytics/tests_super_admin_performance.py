@@ -80,7 +80,8 @@ class SuperAdminPerformanceTests(TestCase):
 
     def test_super_admin_clinics_view_query_count_ceiling(self):
         """
-        Verify that SuperAdminClinicsView executes in <= 4 queries for paginated annotated clinic breakdown.
+        Verify that SuperAdminClinicsView executes in <= 4 queries for paginated annotated clinic breakdown
+        and accurately computes numerical aggregates.
         """
         with CaptureQueriesContext(connection) as ctx:
             response = self.client.get("/api/analytics/super-admin/clinics/")
@@ -99,6 +100,74 @@ class SuperAdminPerformanceTests(TestCase):
         self.assertIn("appointments_today", first)
         self.assertIn("total_doctors", first)
         self.assertIn("total_patients", first)
+
+        # Explicit numerical assertions against known setUp() data per clinic:
+        # 1 active DoctorClinic, 2 patients, 4 appointments total (2 today, 2 yesterday)
+        self.assertEqual(first["total_appointments"], 4)
+        self.assertEqual(first["appointments_today"], 2)
+        self.assertEqual(first["total_doctors"], 1)
+        self.assertEqual(first["total_patients"], 2)
+
+    def test_super_admin_clinics_view_multi_doctor_no_fanout(self):
+        """
+        Verify that multi-Count(distinct=True) annotation across reverse relations (appointments and doctor_associations)
+        does NOT cause cartesian join fan-out or multiply numbers when a clinic has multiple doctors and appointments.
+        """
+        today = date.today()
+        # Create a dedicated clinic with 2 active doctors, 2 patients, and 4 appointments
+        multi_doc_clinic = ClinicFactory(is_active=True, name="Multi Doctor Fanout Test Clinic")
+        doc1 = DoctorClinicFactory(clinic=multi_doc_clinic, is_active=True)
+        doc2 = DoctorClinicFactory(clinic=multi_doc_clinic, is_active=True)
+
+        patient1 = PatientProfileFactory()
+        patient2 = PatientProfileFactory()
+
+        # Doctor 1: 1 appointment today (patient1), 1 appointment yesterday (patient2)
+        AppointmentFactory(
+            clinic=multi_doc_clinic,
+            doctor_clinic=doc1,
+            patient=patient1,
+            appointment_date=today,
+        )
+        AppointmentFactory(
+            clinic=multi_doc_clinic,
+            doctor_clinic=doc1,
+            patient=patient2,
+            appointment_date=today - timedelta(days=1),
+        )
+
+        # Doctor 2: 1 appointment today (patient2), 1 appointment yesterday (patient1)
+        AppointmentFactory(
+            clinic=multi_doc_clinic,
+            doctor_clinic=doc2,
+            patient=patient2,
+            appointment_date=today,
+        )
+        AppointmentFactory(
+            clinic=multi_doc_clinic,
+            doctor_clinic=doc2,
+            patient=patient1,
+            appointment_date=today - timedelta(days=1),
+        )
+
+        response = self.client.get(f"/api/analytics/super-admin/clinics/?search={multi_doc_clinic.name}")
+        self.assertEqual(response.status_code, 200)
+
+        data = response.data
+        self.assertEqual(data["count"], 1)
+        clinic_data = data["results"][0]
+
+        print(f"\n[FANOUT TEST] Multi-doctor clinic stats:")
+        print(f"  total_doctors: {clinic_data['total_doctors']} (expected 2)")
+        print(f"  total_appointments: {clinic_data['total_appointments']} (expected 4)")
+        print(f"  appointments_today: {clinic_data['appointments_today']} (expected 2)")
+        print(f"  total_patients: {clinic_data['total_patients']} (expected 2)")
+
+        # Verify accurate counts without multiplication from join fan-out:
+        self.assertEqual(clinic_data["total_doctors"], 2)
+        self.assertEqual(clinic_data["total_appointments"], 4)
+        self.assertEqual(clinic_data["appointments_today"], 2)
+        self.assertEqual(clinic_data["total_patients"], 2)
 
     def test_super_admin_overview_caching_and_invalidation(self):
         """

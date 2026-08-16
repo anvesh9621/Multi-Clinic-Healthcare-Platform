@@ -139,17 +139,37 @@ class DoctorScheduleListCreateView(ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = DoctorSchedule.objects.select_related(
+            "doctor_clinic__doctor__user",
+            "doctor_clinic__clinic",
+        )
         if getattr(user, "role", None) == "DOCTOR":
-            return DoctorSchedule.objects.filter(doctor_clinic__doctor__user=user)
-        if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
+            queryset = queryset.filter(doctor_clinic__doctor__user=user)
+        elif getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
             clinic = get_user_clinic(user)
-            return DoctorSchedule.objects.filter(doctor_clinic__clinic=clinic)
-        if getattr(user, "role", None) == "SUPER_ADMIN":
-            return DoctorSchedule.objects.all()
-        return DoctorSchedule.objects.none()
+            queryset = queryset.filter(doctor_clinic__clinic=clinic)
+        elif getattr(user, "role", None) == "SUPER_ADMIN":
+            pass
+        else:
+            return DoctorSchedule.objects.none()
+
+        # Query param filtering
+        doctor_clinic_id = self.request.query_params.get("doctor_clinic_id") or self.request.query_params.get("doctor_clinic")
+        if doctor_clinic_id:
+            queryset = queryset.filter(doctor_clinic_id=doctor_clinic_id)
+
+        day_of_week = self.request.query_params.get("day_of_week")
+        if day_of_week is not None and day_of_week != "":
+            try:
+                queryset = queryset.filter(day_of_week=int(day_of_week))
+            except (ValueError, TypeError):
+                pass
+
+        return queryset.order_by("day_of_week", "start_time")
 
 
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
+
 
 class DoctorScheduleDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
@@ -157,13 +177,17 @@ class DoctorScheduleDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = DoctorSchedule.objects.select_related(
+            "doctor_clinic__doctor__user",
+            "doctor_clinic__clinic",
+        )
         if getattr(user, "role", None) == "DOCTOR":
-            return DoctorSchedule.objects.filter(doctor_clinic__doctor__user=user)
+            return queryset.filter(doctor_clinic__doctor__user=user)
         if getattr(user, "role", None) in ["CLINIC_ADMIN", "RECEPTIONIST"]:
             clinic = get_user_clinic(user)
-            return DoctorSchedule.objects.filter(doctor_clinic__clinic=clinic)
+            return queryset.filter(doctor_clinic__clinic=clinic)
         if getattr(user, "role", None) == "SUPER_ADMIN":
-            return DoctorSchedule.objects.all()
+            return queryset
         return DoctorSchedule.objects.none()
 
 
