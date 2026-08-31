@@ -10,8 +10,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Design_Tokens-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Razorpay](https://img.shields.io/badge/Razorpay-Route_%26_Checkout-0C2340?style=flat-square&logo=razorpay&logoColor=white)](https://razorpay.com/)
-[![Stripe](https://img.shields.io/badge/Stripe-SaaS_Subscriptions-635BFF?style=flat-square&logo=stripe&logoColor=white)](https://stripe.com/)
+[![Razorpay](https://img.shields.io/badge/Razorpay-Route_%26_Subscriptions-0C2340?style=flat-square&logo=razorpay&logoColor=white)](https://razorpay.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
 [System Architecture](#system-architecture) &bull; [Domain Models & Features](#domain-models--feature-breakdown) &bull; [Security & Authentication](#security--authentication-architecture) &bull; [Design System](#design-system--frontend-architecture) &bull; [API Specification](#api-specification) &bull; [Testing Strategy](#testing-strategy) &bull; [Getting Started](#getting-started) &bull; [Environment Configuration](#environment-configuration)
@@ -24,7 +23,12 @@
 
 MediClinic is an enterprise-grade, multi-tenant Electronic Health Record (EHR) and clinic management platform. It standardizes and automates clinic workflows end-to-end: online patient discovery, multi-step booking with real-time schedule conflict prevention, waiting room queue tokenization, clinical charting and prescription generation, multi-tier billing and split marketplace payouts, inventory replenishment tracking, and clinic analytics.
 
-The system is architected around strict multi-tenancy with tenant-scoped querysets, robust role-based access control (RBAC), multi-factor authentication (MFA/TOTP), asynchronous transactional notification dispatching, and high-performance Postgres exclusion constraints for concurrent schedule safety.
+The platform is powered by an end-to-end **Razorpay** financial infrastructure:
+- **B2C Patient Booking & Invoicing**: Razorpay Orders, dynamic Payment Links with auto-expiration, and checkout verification.
+- **B2B Clinic SaaS Subscriptions**: Recurring Razorpay Subscriptions with automated 18% GST invoicing (CGST + SGST) and atomic status transitions.
+- **Marketplace Split Payouts (Razorpay Route)**: Direct clinic bank onboarding with IFSC validation, KYC verification tracking, and platform fee deductions.
+
+The backend is architected around strict multi-tenancy with tenant-scoped querysets, robust role-based access control (RBAC), multi-factor authentication (MFA/TOTP), asynchronous transactional notification dispatching via Celery/Redis, and PostgreSQL GiST exclusion constraints for concurrent schedule safety.
 
 ---
 
@@ -47,17 +51,17 @@ The system is architected around strict multi-tenancy with tenant-scoped queryse
                                │      Django 6.0 + DRF API Layer (Port 8000)  │
                                │  - Tenant Scoping & RBAC Middleware          │
                                │  - Rate Limiting & Fail-Open Throttling      │
-                               │  - Multi-Gateway Payment Orchestrator        │
+                               │  - Multi-Channel Razorpay Orchestrator       │
                                │  - Signal-Driven Audit & Notifications       │
                                └──────┬───────────────┬──────────────┬────────┘
                                       │               │              │
                     ┌─────────────────▼────┐   ┌──────▼──────┐   ┌───▼──────────────────┐
                     │ PostgreSQL 15 Engine │   │ Redis Store │   │ External Services    │
-                    │ - GiST Range Indexes │   │ - Celery    │   │ - Razorpay (B2C/B2B) │
-                    │ - ExclusionConstraint│   │   Broker    │   │ - Stripe Subscriptions│
-                    │ - Audit & EHR Tables │   │ - Cache     │   │ - SMTP / Gmail Relay │
-                    └──────────────────────┘   └──────┬──────┘   └──────────────────────┘
-                                                      │
+                    │ - GiST Range Indexes │   │ - Celery    │   │ - Razorpay Orders    │
+                    │ - ExclusionConstraint│   │   Broker    │   │ - Razorpay Subs      │
+                    │ - Audit & EHR Tables │   │ - Cache     │   │ - Razorpay Route     │
+                    └──────────────────────┘   └──────┬──────┘   │ - SMTP / Gmail Relay │
+                                                      │          └──────────────────────┘
                                                ┌──────▼──────┐
                                                │Celery Worker│
                                                │Async Emails │
@@ -75,36 +79,43 @@ The system is architected around strict multi-tenancy with tenant-scoped queryse
 
 ### 2. Doctor Schedules & Availability (`apps/doctors`)
 - **Multi-Clinic Associations (`DoctorClinic`)**: Decouples medical practitioner profiles from clinic affiliations. Enables doctors to practice across multiple clinics with distinct consultation fees, shifts, and schedules.
-- **7-Day Shift Block Engine**: Weekly shift scheduler supporting multiple discontinuous time windows per day, customizable consultation slot intervals (15, 30, 45, 60 mins), and overlap prevention.
-- **Leave Management & Doctor Ratings**: Clinically reviewed leave request lifecycle with automatic calendar slot blocking and patient consultation reviews.
+- **7-Day Shift Block Engine (`DoctorSchedule`)**: Weekly shift scheduler supporting multiple discontinuous time windows per day, customizable consultation slot intervals (15, 30, 45, 60 mins), and client/server overlap prevention.
+- **Leave Management & Doctor Ratings**: Clinically reviewed leave request lifecycle (`DoctorLeave`) with automatic calendar slot blocking and patient consultation reviews (`DoctorReview`).
 
 ### 3. Concurrency-Safe Appointments & Queue Engine (`apps/appointments`)
 - **Database-Level Exclusion Constraints**: Utilizes PostgreSQL `DateTimeRangeField` combined with a `bstrap` GiST `ExclusionConstraint` to enforce physical impossibility of double-booking consultation slots across concurrent requests.
 - **State Machine**: Deterministic transitions across `SCHEDULED`, `CONFIRMED`, `WAITING`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, and `NO_SHOW`.
-- **Public TV Queue Display**: Real-time room token display (`/queue-display`) for clinic waiting rooms with audio/visual status indicators.
+- **Public TV Queue Display (`/queue-display`)**: Real-time room token display for clinic waiting rooms with audio/visual status indicators.
+- **Doctor Running Late Broadcast**: Notifies waiting patients with adjusted estimated consultation times.
 
-### 4. Electronic Health Records & Clinical Charting (`apps/records`)
-- **Structured Consultation Records**: Standardized capture of chief complaints, symptoms, physical examination vitals (Blood Pressure, Heart Rate, Respiratory Rate, Temperature, SpO2, Weight, Height, BMI), and clinical diagnoses.
-- **Digital Prescription Builder**: Form-driven prescription generation specifying drug name, formulation, dosage, route, frequency, duration, and food instructions.
-- **Template Engine**: Reusable prescription templates categorized by diagnosis for rapid clinical charting.
+### 4. Electronic Health Records & Clinical Charting (`apps/records`, `apps/prescriptions`)
+- **Structured Consultation Records (`MedicalRecord`)**: Standardized capture of chief complaints, symptoms, physical examination vitals (Blood Pressure, Heart Rate, Respiratory Rate, Temperature, SpO2, Weight, Height, BMI), and clinical diagnoses.
+- **Digital Prescription Builder (`Prescription`)**: Form-driven prescription generation specifying drug name, formulation (tablet, syrup, injection), dosage, route, frequency, duration, and dietary instructions.
+- **Prescription Template Engine (`PrescriptionTemplate`)**: Reusable prescription templates categorized by diagnosis for rapid 1-click clinical charting.
 - **Doctor Confidential Notes**: Dedicated clinician-only private notes field scrubbed from patient-facing API serialization.
 
 ### 5. Patient Intake & Digital Onboarding (`apps/patients`)
-- **Pre-Consultation Intake Forms**: Patient-submitted medical history, chronic conditions, past surgeries, known drug allergies, and active medications.
+- **Pre-Consultation Intake Forms (`IntakeForm`)**: Patient-submitted medical history, chronic conditions, past surgeries, known drug allergies, and active medications.
 - **Patient History Records**: Centralized chronological timeline of past diagnoses, prescriptions, invoices, and completed appointments.
 
-### 6. Billing, Invoicing & Marketplace Payments (`apps/billing`)
-- **Itemized Invoicing**: Automatic compilation of doctor consultation fees, prescribed pharmaceuticals, and laboratory services with tax, discount, and status tracking (`DRAFT`, `PENDING`, `PAID`, `CANCELLED`, `REFUNDED`).
+### 6. Billing, Invoicing & Financial Ledger (`apps/billing`)
+- **Itemized Invoicing (`Invoice`)**: Automatic compilation of doctor consultation fees, prescribed pharmaceuticals, and laboratory services with tax, discount, and status tracking (`draft`, `pending`, `paid`, `expired`, `cancelled`, `refunded`, `pending_at_clinic`).
+- **Razorpay Payment Links**: Dynamic generation of online payment links with auto-expiration sent via email/SMS.
+- **Double-Entry Financial Ledger (`PaymentLedgerEntry`)**: Immutable ledger recording `DEBIT`, `CREDIT`, `REFUND`, `TRANSFER_IN`, `TRANSFER_OUT` movements.
+- **Transactional Outbox Pattern (`PaymentOutboxEvent`)**: Asynchronous, guaranteed processing of payment events, invoice emails, and PDF generation.
+- **Razorpay Webhook Engine (`/api/billing/webhook/`)**: Idempotent webhook verification storing incoming events in `WebhookEvent` to prevent duplicate processing.
 - **Resilient Key Fallback Hierarchy**: Dynamic Razorpay payment verification chain cascading across `PlatformSettings`, environment variables, and client credentials.
-- **Webhook Idempotency**: Stripe and Razorpay webhook handlers with signature verification and idempotent transaction execution.
 
 ### 7. Clinic Inventory & Stock Management (`apps/inventory`)
-- **Stock Tracking**: SKU catalog management with real-time quantities, units, unit costs, and reorder thresholds.
-- **Transaction Ledger**: Immutable audit log of every stock movement (`ADD`, `DEDUCT`, `ADJUST`) with batch tracking, expiration warnings, and automatic low-stock notifications.
+- **Stock Tracking (`InventoryItem`)**: SKU catalog management with real-time quantities, units, unit costs, and reorder thresholds.
+- **Transaction Ledger (`StockTransaction`)**: Immutable audit log of every stock movement (`ADD`, `DEDUCT`, `ADJUST`) with batch tracking, expiration warnings, and automatic low-stock notifications.
 
 ### 8. SaaS Subscription Engine (`apps/subscriptions`)
-- **Tiered Gating**: Granular feature gating across `STARTER`, `PROFESSIONAL`, and `ENTERPRISE` tiers using custom DRF permission classes (`IsFeatureSubscribed`).
-- **Billing Lifecycle**: Stripe Checkout sessions, self-service customer billing portal, prorated tier upgrades/downgrades, and automated payment failure recovery (dunning).
+- **Razorpay Recurring Subscriptions**: Automated recurring subscription lifecycle integration (`razorpay_customer_id`, `razorpay_subscription_id`, `razorpay_plan_id`).
+- **GST Compliance & Invoicing (`SubscriptionInvoice`)**: Automatic calculation of 18% GST (9% CGST + 9% SGST) with itemized tax invoices.
+- **Atomic Subscription State Machine**: Strict transition validation across `trialing`, `created`, `active`, `past_due`, `halted`, `cancelled`, and `expired`.
+- **Automated Dunning & Recovery Engine**: 10-day payment grace period, 4-stage dunning cadence (`day_1`, `day_3`, `day_5`, `day_7_final`), and recovery tracking (`DunningRecoveryLog`).
+- **Tiered Feature Gating**: Permission classes (`IsFeatureSubscribed`) guarding analytics, billing, inventory, and doctor seat limits based on active tier (`Starter`, `Professional`, `Enterprise`).
 
 ### 9. System Auditing & Notifications (`apps/audit`, `apps/notifications`)
 - **Immutable Audit Trail (`AuditLog`)**: Comprehensive recording of user actions, targeting models, IP addresses, user agents, action types (`CREATE`, `UPDATE`, `DELETE`, `LOGIN`, `LOGOUT`), and payload diffs.
@@ -118,7 +129,7 @@ The system is architected around strict multi-tenancy with tenant-scoped queryse
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Multi-Clinic Telemetry & Platform Overview | Full | - | - | - | - | - |
 | Clinic Settings, Staff Invites & Bank Setup | Full | Full | - | - | - | - |
-| SaaS Subscription Management (Stripe) | Full | Full | - | - | - | - |
+| SaaS Subscription Management (Razorpay) | Full | Full | - | - | - | - |
 | Weekly Shift Schedule Configuration | Full | Full | View/Self | - | - | - |
 | Inventory Catalog & Stock Adjustments | Full | Full | View | - | - | - |
 | Patient Queue & Walk-In Registration | Full | Full | View | Full | - | - |
@@ -166,15 +177,15 @@ The system is architected around strict multi-tenancy with tenant-scoped queryse
 
 1. **Staff Multi-Factor Authentication (MFA/TOTP)**:
    - Compulsory 2FA setup for all administrative and medical personnel (`CLINIC_ADMIN`, `DOCTOR`, `RECEPTIONIST`).
-   - Standard RFC 6238 TOTP algorithm compatible with Google Authenticator and 1Password.
-   - 8-digit cryptographically hashed backup codes with single-use consumption and unskippable route gates.
+   - Standard RFC 6238 TOTP algorithm compatible with Google Authenticator, Authy, and 1Password.
+   - 8-digit cryptographically hashed backup recovery codes with single-use consumption and unskippable route gates.
 2. **Patient Passwordless Email OTP**:
    - Secure numeric one-time passcode with 10-minute TTL, server-side cooldown timers, and brute-force lockout protection.
 3. **JWT Stateless Token Architecture**:
    - Short-lived 30-minute access tokens and 7-day rotating refresh tokens.
    - Automatic silent token refresh via Axios response interceptors on the client.
 4. **Fail-Open Rate Limiting**:
-   - Redis-backed throttling policies protecting sensitive authentication routes against brute-force attacks with graceful fallback during network degradation.
+   - Redis-backed throttling policies protecting sensitive authentication routes against brute-force attacks with graceful fallback during cache degradation.
 
 ---
 
@@ -194,7 +205,7 @@ Design Token Tokens:
   --color-border:        #EDEDE8  (Structural Dividers & Outlines)
 ```
 
-- **Layout Shell**: Responsive sidebar with collapsible states, route active indicators, breadcrumbs, live sync badges, and authenticated profile cards.
+- **Layout Shell**: Responsive sidebar with collapsible states, route active indicator pills, breadcrumbs, live sync badges, and authenticated profile cards.
 - **Component Primitives**: Standardized `Card`, `Button`, `Input`, `Table`, `Modal`, `Tabs`, and `StatusBadge` primitives.
 - **Unified Status Dictionary**: Consistent semantic pill indicators (`ACTIVE`, `CONFIRMED`, `SCHEDULED`, `PENDING`, `COMPLETED`, `CANCELLED`, `EXPIRED`, `LOW_STOCK`, `OUT_OF_STOCK`).
 
@@ -204,38 +215,42 @@ Design Token Tokens:
 
 All endpoints are hosted under `http://127.0.0.1:8000/api/` and require `Authorization: Bearer <access_token>` header unless marked Public.
 
-### Authentication & Staff MFA
+### Authentication & Staff MFA (`/api/accounts/`)
 | Method | Path | Access | Description |
 |---|---|---|---|
 | `POST` | `/api/token/` | Public | Obtain JWT token pair using credentials |
 | `POST` | `/api/token/refresh/` | Public | Refresh expired JWT access token |
-| `POST` | `/api/accounts/patient/request-otp/` | Public | Request email OTP for patient authentication |
-| `POST` | `/api/accounts/patient/verify-otp/` | Public | Verify OTP and authenticate patient |
+| `POST` | `/api/accounts/patient/otp/request/` | Public | Request email OTP for patient authentication |
+| `POST` | `/api/accounts/patient/otp/verify/` | Public | Verify OTP and authenticate patient |
 | `POST` | `/api/accounts/mfa/setup/` | Staff | Generate TOTP secret and QR code URI |
-| `POST` | `/api/accounts/mfa/verify-setup/` | Staff | Confirm TOTP code and issue backup codes |
-| `POST` | `/api/accounts/mfa/verify-login/` | Staff | Complete MFA login challenge using TOTP/backup code |
+| `POST` | `/api/accounts/mfa/confirm/` | Staff | Confirm TOTP code and issue 8-digit backup codes |
+| `POST` | `/api/accounts/mfa/verify/` | Staff | Complete MFA login challenge using TOTP code |
+| `POST` | `/api/accounts/mfa/recover/` | Staff | Recover access using one-time backup code |
 
-### Clinical Operations & Appointments
+### Clinical Operations & Appointments (`/api/appointments/`, `/api/records/`)
 | Method | Path | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/public/clinics/` | Public | List active public clinics |
 | `GET` | `/api/public/specialties/` | Public | List available medical specializations |
 | `GET` | `/api/public/doctors/<id>/slots/` | Public | Calculate available doctor consultation slots |
-| `POST` | `/api/appointments/` | Patient/Staff | Book a new consultation appointment |
+| `POST` | `/api/appointments/book/` | Patient/Staff | Book a new consultation appointment |
 | `PATCH` | `/api/appointments/<id>/status/` | Staff | Transition appointment state (Confirmed, In-Progress, etc.) |
-| `GET` | `/api/appointments/queue/` | Staff | Fetch active queue tokens for daily clinic roster |
 | `POST` | `/api/records/` | Doctor | Create structured medical consultation record |
 | `POST` | `/api/records/prescriptions/` | Doctor | Issue electronic prescription with dosage instructions |
+| `GET` | `/api/records/templates/` | Doctor | Fetch reusable diagnosis-based prescription templates |
 
-### Payments & Administration
+### Billing, Payments & Subscriptions (`/api/billing/`, `/api/subscriptions/`)
 | Method | Path | Access | Description |
 |---|---|---|---|
 | `POST` | `/api/create-order/` | Patient/Staff | Create Razorpay order for consultation booking |
 | `POST` | `/api/verify-payment/` | Patient/Staff | Verify Razorpay payment signature and confirm booking |
-| `POST` | `/api/subscriptions/checkout/` | Clinic Admin | Create Stripe Checkout Session for SaaS tier upgrade |
-| `POST` | `/api/subscriptions/portal/` | Clinic Admin | Open Stripe Billing Portal session |
-| `GET` | `/api/analytics/dashboard/` | Clinic Admin | Query aggregated revenue, appointments, and workload metrics |
-| `GET` | `/api/inventory/items/` | Clinic Admin | List clinic pharmaceutical and equipment inventory |
+| `POST` | `/api/billing/webhook/` | Public | Idempotent Razorpay webhook consumer |
+| `POST` | `/api/billing/onboard-bank/` | Clinic Admin | Onboard clinic bank account for Razorpay Route payouts |
+| `POST` | `/api/billing/invoices/<id>/generate-payment-link/` | Staff | Generate direct Razorpay payment link |
+| `POST` | `/api/subscriptions/create/` | Clinic Admin | Create Razorpay recurring subscription |
+| `POST` | `/api/subscriptions/verify/` | Clinic Admin | Verify subscription signature and activate tier |
+| `GET` | `/api/subscriptions/invoices/` | Clinic Admin | List GST subscription invoices |
+| `POST` | `/api/subscriptions/cancel/` | Clinic Admin | Cancel active recurring subscription |
 
 ---
 
@@ -247,10 +262,11 @@ The repository is covered by automated unit, integration, and browser end-to-end
 Test Architecture:
 ├── Backend Test Suite (Django / Pytest)
 │   ├── Unit tests for business logic, tenancy, and serializers
-│   ├── Integration tests for payment fallback chains and Stripe/Razorpay webhooks
+│   ├── Integration tests for Razorpay payment fallback chains and webhooks
+│   ├── Dunning transition tests and atomic subscription state validation
 │   └── Database constraint tests for schedule overlap prevention
 ├── Frontend Test Suite (Vitest / React Testing Library)
-│   ├── Component unit tests for auth forms, payment buttons, and dashboard charts
+│   ├── Component unit tests for auth forms, Razorpay checkout, and dashboard charts
 │   └── Performance unblocking and state transition tests
 └── End-to-End Suite (Playwright)
     ├── Doctor, Receptionist, and Admin invite acceptance flows
@@ -283,7 +299,7 @@ npx playwright test
 - Python 3.10+
 - Node.js 18+ & npm
 - PostgreSQL 14+
-- Redis Server (for Celery async tasks)
+- Redis Server (for Celery async tasks and caching)
 
 ---
 
@@ -373,12 +389,7 @@ EMAIL_HOST_USER=your-email@gmail.com
 EMAIL_HOST_PASSWORD=your-app-password
 FRONTEND_URL=http://localhost:3000
 
-# Stripe SaaS Subscriptions
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_SUBSCRIPTION_WEBHOOK_SECRET=whsec_...
-
-# Razorpay Patient Billing & Split Payouts
+# Razorpay (Patient Orders, Invoicing, Subscriptions, & Route Payouts)
 RAZORPAY_KEY_ID=rzp_test_...
 RAZORPAY_KEY_SECRET=your-razorpay-secret...
 RAZORPAY_WEBHOOK_SECRET=your-webhook-secret...
@@ -387,7 +398,6 @@ RAZORPAY_WEBHOOK_SECRET=your-webhook-secret...
 ### Frontend (`frontend/.env.local`)
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_...
 ```
 
