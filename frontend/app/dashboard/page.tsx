@@ -11,8 +11,10 @@ import {
   CalendarCheck, CalendarDays, CheckCircle2, 
   XCircle, Users, Stethoscope, Activity, TrendingUp 
 } from "lucide-react";
-import { SkeletonStat, SkeletonRow, Skeleton } from "@/components/ui/Skeleton";
+import { SkeletonStat, Skeleton } from "@/components/ui/Skeleton";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { motion } from "framer-motion";
 
 export default function DashboardPage() {
@@ -52,17 +54,27 @@ export default function DashboardPage() {
 
   const { stats, workload = [], trend = [] } = data ?? {};
 
+  const statItems = stats ? [
+    { label: "Appointments Today", value: stats.appointments_today, icon: CalendarCheck, color: "text-primary", bg: "bg-primary/10", border: "border-primary/20" },
+    { label: "Appointments This Week", value: stats.appointments_this_week, icon: CalendarDays, color: "text-accent", bg: "bg-accent/10", border: "border-accent/20" },
+    { label: "Completed Today", value: stats.completed_today, icon: CheckCircle2, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+    { label: "Cancelled Today", value: stats.cancelled_today, icon: XCircle, color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
+    { label: "Total Patients", value: stats.total_patients, icon: Users, color: "text-primary-dark", bg: "bg-primary/15", border: "border-primary/30" },
+    { label: "Total Doctors", value: stats.total_doctors, icon: Stethoscope, color: "text-accent", bg: "bg-accent/15", border: "border-accent/30" },
+  ] : [];
+
   return (
     <div className="space-y-8 pb-10">
 
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold heading-font text-gray-900">Clinic Dashboard</h1>
-          <p className="text-gray-500 mt-1">Overview of today's clinic performance & metrics.</p>
+          <h1 className="text-3xl font-bold heading-font text-ink">Clinic Dashboard</h1>
+          <p className="text-muted mt-1 text-sm">Overview of today's clinic performance & metrics.</p>
         </div>
-        <div className="bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2">
-           <Activity className="w-4 h-4 text-emerald-500" />
-           <span className="text-sm font-medium text-gray-700">Live Updates Active</span>
+        <div className="bg-paper px-3.5 py-1.5 rounded-xl border border-border shadow-xs flex items-center gap-2 self-start sm:self-center">
+           <Activity className="w-4 h-4 text-emerald-600 animate-pulse" />
+           <span className="text-xs font-semibold text-ink">Live Updates Active</span>
         </div>
       </div>
 
@@ -72,69 +84,58 @@ export default function DashboardPage() {
              {[1,2,3,4,5,6].map(i => <SkeletonStat key={i} />)}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-             <div className="col-span-1 bg-white shadow-sm rounded-2xl p-6 border border-gray-100 h-80">
+             <Card className="col-span-1 p-6 h-80">
                 <Skeleton className="h-6 w-1/2 mb-6" />
                 <div className="space-y-4">
-                   <Skeleton className="h-10 w-full" />
-                   <Skeleton className="h-10 w-full" />
-                   <Skeleton className="h-10 w-full" />
+                   <Skeleton className="h-10 w-full rounded-xl" />
+                   <Skeleton className="h-10 w-full rounded-xl" />
+                   <Skeleton className="h-10 w-full rounded-xl" />
                 </div>
-             </div>
-             <div className="col-span-1 lg:col-span-2 bg-white shadow-sm rounded-2xl p-6 border border-gray-100 h-80">
+             </Card>
+             <Card className="col-span-1 lg:col-span-2 p-6 h-80">
                 <Skeleton className="h-6 w-1/3 mb-6" />
                 <Skeleton className="h-48 w-full rounded-xl" />
-             </div>
+             </Card>
           </div>
         </>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-red-100 shadow-sm text-center px-4">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
-            <XCircle className="w-8 h-8 text-red-500" />
+        <Card className="flex flex-col items-center justify-center py-20 text-center px-4">
+          <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mb-4">
+            <XCircle className="w-8 h-8 text-rose-500" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-500 mb-6">Couldn't load your dashboard right now.</p>
-          <button 
-            onClick={() => refetch()}
-            className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
-          >
+          <h2 className="text-xl font-bold text-ink heading-font mb-2">Something went wrong</h2>
+          <p className="text-muted text-sm mb-6">Couldn't load your clinic dashboard right now.</p>
+          <Button onClick={() => refetch()}>
             Try Again
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : (
         <>
           {stats && (
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, staggerChildren: 0.1 }}
+              transition={{ duration: 0.4, staggerChildren: 0.08 }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             >
-              {/* Stats Cards - Array map for cleaner code */}
-              {[
-                { label: "Appointments Today", value: stats.appointments_today, icon: CalendarCheck, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
-                { label: "Appointments This Week", value: stats.appointments_this_week, icon: CalendarDays, color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-100" },
-                { label: "Completed Today", value: stats.completed_today, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
-                { label: "Cancelled Today", value: stats.cancelled_today, icon: XCircle, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
-                { label: "Total Patients", value: stats.total_patients, icon: Users, color: "text-cyan-600", bg: "bg-cyan-50", border: "border-cyan-100" },
-                { label: "Total Doctors", value: stats.total_doctors, icon: Stethoscope, color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-100" },
-              ].map((stat, idx) => (
+              {statItems.map((stat, idx) => (
                 <motion.div 
                   key={idx}
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:shadow-md hover:-translate-y-1 hover:border-blue-100 transition-all duration-300"
+                  transition={{ delay: idx * 0.04 }}
                 >
-                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-current to-transparent opacity-[0.03] rounded-bl-full -z-10 group-hover:scale-110 transition-transform ${stat.color}`}></div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center border ${stat.border} group-hover:scale-110 transition-transform`}>
-                      <stat.icon className="w-6 h-6" />
+                  <Card hoverable className="p-6 relative overflow-hidden group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center border ${stat.border} group-hover:scale-105 transition-transform`}>
+                        <stat.icon className="w-6 h-6" />
+                      </div>
                     </div>
-                  </div>
-                  <h3 className="text-gray-500 font-medium tracking-wide text-sm uppercase">{stat.label}</h3>
-                  <div className="text-3xl font-bold text-gray-900 mt-1 heading-font">
-                    <AnimatedNumber value={stat.value} />
-                  </div>
+                    <h3 className="text-muted font-bold tracking-wider text-xs uppercase">{stat.label}</h3>
+                    <div className="text-3xl font-bold text-ink mt-1 heading-font">
+                      <AnimatedNumber value={stat.value} />
+                    </div>
+                  </Card>
                 </motion.div>
               ))}
             </motion.div>
@@ -143,72 +144,83 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Doctor Workload Section */}
             <motion.div 
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -15 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="col-span-1 bg-white shadow-sm rounded-2xl p-6 border border-gray-100 flex flex-col"
+              transition={{ delay: 0.25 }}
+              className="col-span-1"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <h2 className="text-xl font-bold heading-font text-gray-900">Doctor Workload</h2>
-              </div>
-
-              {workload.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center flex-col text-center p-8 border-2 border-dashed border-gray-100 rounded-xl">
-                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3 text-gray-400">
-                    <Users className="w-6 h-6" />
+              <Card className="p-6 flex flex-col h-full">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary border border-primary/20">
+                    <TrendingUp className="w-5 h-5" />
                   </div>
-                  <p className="text-gray-500 font-medium">No active workloads right now</p>
+                  <h2 className="text-xl font-bold heading-font text-ink">Doctor Workload</h2>
                 </div>
-              ) : (
-                <div className="overflow-hidden rounded-xl border border-gray-100 flex-1">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-                      <tr>
-                        <th className="px-4 py-3 uppercase tracking-wider text-xs">Doctor</th>
-                        <th className="px-4 py-3 uppercase tracking-wider text-xs text-right">Appts</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {workload.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-gray-900 flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-700 font-bold tracking-tighter">
-                              {item.doctor.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                            </div>
-                            {item.doctor}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="inline-flex items-center justify-center px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 font-bold">
-                              {item.appointments}
-                            </span>
-                          </td>
+
+                {workload.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center flex-col text-center p-8 border-2 border-dashed border-border rounded-xl bg-warm-surface/30">
+                    <div className="w-12 h-12 bg-warm-surface rounded-full flex items-center justify-center mb-3 text-muted">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <p className="text-muted text-sm font-medium">No active workloads recorded yet</p>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-border flex-1">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-warm-surface/60 text-muted font-bold border-b border-border text-xs uppercase tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3">Doctor</th>
+                          <th className="px-4 py-3 text-right">Appts</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-border bg-paper">
+                        {workload.map((item, index) => {
+                          const displayName = item.doctor_name || (item.first_name ? `Dr. ${item.first_name} ${item.last_name || ""}`.trim() : item.doctor);
+                          const initials = (item.first_name && item.last_name)
+                            ? `${item.first_name[0]}${item.last_name[0]}`.toUpperCase()
+                            : item.doctor.substring(0, 2).toUpperCase();
+
+                          return (
+                            <tr key={index} className="hover:bg-warm-surface/40 transition-colors">
+                              <td className="px-4 py-3 font-medium text-ink flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] text-primary font-bold tracking-tight">
+                                  {initials}
+                                </div>
+                                <span className="truncate font-semibold text-xs text-ink">{displayName}</span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary font-bold font-mono text-xs">
+                                  {item.appointments}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
             </motion.div>
 
             {/* Appointment Trend Chart */}
             <motion.div 
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 15 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-              className="col-span-1 lg:col-span-2 bg-white shadow-sm rounded-2xl p-6 border border-gray-100"
+              transition={{ delay: 0.3 }}
+              className="col-span-1 lg:col-span-2"
             >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-cyan-50 rounded-lg text-cyan-600">
-                  <Activity className="w-5 h-5" />
+              <Card className="p-6 h-full flex flex-col justify-between">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-accent/10 rounded-xl text-accent border border-accent/20">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-bold heading-font text-ink">Appointment Trends</h2>
                 </div>
-                <h2 className="text-xl font-bold heading-font text-gray-900">Appointment Trends</h2>
-              </div>
-              <div className="h-[300px] w-full">
-                <AppointmentTrendChart data={trend} />
-              </div>
+                <div className="h-[300px] w-full">
+                  <AppointmentTrendChart data={trend} />
+                </div>
+              </Card>
             </motion.div>
           </div>
         </>

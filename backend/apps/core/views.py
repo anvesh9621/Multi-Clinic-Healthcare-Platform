@@ -1,5 +1,6 @@
 import os
 from uuid import uuid4
+from django.conf import settings
 from django.http import Http404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -17,7 +18,7 @@ class TestSeedInvitationView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        if os.environ.get("E2E_TEST_MODE") != "true":
+        if not settings.DEBUG and os.environ.get("E2E_TEST_MODE") != "true":
             raise Http404()
 
         role = (request.data.get("role") or "DOCTOR").upper()
@@ -89,7 +90,7 @@ class TestGetOTPView(APIView):
     authentication_classes = []
 
     def get(self, request):
-        if os.environ.get("E2E_TEST_MODE") != "true":
+        if not settings.DEBUG and os.environ.get("E2E_TEST_MODE") != "true":
             raise Http404()
 
         email = request.query_params.get("email")
@@ -117,7 +118,7 @@ class TestSeedPatientView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        if os.environ.get("E2E_TEST_MODE") != "true":
+        if not settings.DEBUG and os.environ.get("E2E_TEST_MODE") != "true":
             raise Http404()
 
         unique_id = uuid4().hex[:8]
@@ -142,7 +143,7 @@ class TestSeedStaffView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        if os.environ.get("E2E_TEST_MODE") != "true":
+        if not settings.DEBUG and os.environ.get("E2E_TEST_MODE") != "true":
             raise Http404()
 
         role = (request.data.get("role") or "DOCTOR").upper()
@@ -184,7 +185,7 @@ class TestGenerateTOTPView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        if os.environ.get("E2E_TEST_MODE") != "true":
+        if not settings.DEBUG and os.environ.get("E2E_TEST_MODE") != "true":
             raise Http404()
 
         secret = request.data.get("secret")

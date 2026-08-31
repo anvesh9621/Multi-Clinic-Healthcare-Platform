@@ -95,6 +95,9 @@ export interface ClinicDashboardStats {
 /** Single row from /analytics/doctor-workload/ → data (get_doctor_workload) */
 export interface DoctorWorkloadEntry {
   doctor: string;         // email
+  doctor_name?: string;
+  first_name?: string;
+  last_name?: string;
   appointments: number;
 }
 

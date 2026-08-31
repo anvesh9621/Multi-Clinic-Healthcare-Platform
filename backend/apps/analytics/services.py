@@ -37,11 +37,12 @@ def get_clinic_dashboard_stats(clinic):
 
 
 def get_doctor_workload(clinic):
-
     workload = (
         Appointment.objects.filter(clinic=clinic)
         .values(
-            "doctor_clinic__doctor__user__email"
+            "doctor_clinic__doctor__user__email",
+            "doctor_clinic__doctor__user__first_name",
+            "doctor_clinic__doctor__user__last_name",
         )
         .annotate(total_appointments=Count("id"))
         .order_by("-total_appointments")
@@ -50,8 +51,14 @@ def get_doctor_workload(clinic):
     results = []
 
     for item in workload:
+        first = item.get("doctor_clinic__doctor__user__first_name") or ""
+        last = item.get("doctor_clinic__doctor__user__last_name") or ""
+        doctor_name = f"Dr. {first} {last}".strip() if (first or last) else item["doctor_clinic__doctor__user__email"]
         results.append({
             "doctor": item["doctor_clinic__doctor__user__email"],
+            "doctor_name": doctor_name,
+            "first_name": first,
+            "last_name": last,
             "appointments": item["total_appointments"]
         })
 

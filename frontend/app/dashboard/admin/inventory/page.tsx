@@ -124,12 +124,12 @@ export default function InventoryDashboard() {
                   <TableCell className="text-muted font-bold tracking-wide uppercase text-xs">{item.category || "-"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className={`font-bold text-lg font-mono ${isLowStock ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      <span className={`font-bold text-lg font-mono ${isLowStock ? 'text-amber-700' : 'text-emerald-700'}`}>
                         {item.quantity}
                       </span>
                       <span className="text-muted text-[10px] font-bold uppercase tracking-wider bg-warm-surface border border-border px-1.5 py-0.5 rounded">{item.unit}</span>
                       {isLowStock && (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full uppercase tracking-wide ml-2">
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wide ml-2">
                           <AlertTriangle className="w-3 h-3" /> Low
                         </span>
                       )}
@@ -141,7 +141,7 @@ export default function InventoryDashboard() {
                       variant="ghost" 
                       size="icon"
                       onClick={() => { setAdjustingItem(item); setAdjustData({ ...adjustData, transaction_type: "ADD" }); }}
-                      className="text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                      className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
                       title="Add Stock"
                     >
                       <ArrowUpRight className="w-5 h-5" />
@@ -150,7 +150,7 @@ export default function InventoryDashboard() {
                       variant="ghost" 
                       size="icon"
                       onClick={() => { setAdjustingItem(item); setAdjustData({ ...adjustData, transaction_type: "DEDUCT" }); }}
-                      className="text-rose-600 hover:text-rose-800 hover:bg-rose-50"
+                      className="text-rose-700 hover:text-rose-800 hover:bg-rose-50"
                       title="Deduct Stock"
                     >
                       <ArrowDownRight className="w-5 h-5" />

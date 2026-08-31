@@ -110,17 +110,17 @@ function NavLink({ href, icon: Icon, label, active }: NavItem & { active: boolea
       href={href}
       className={`
         relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm
-        transition-all duration-300 group
+        transition-all duration-200 group
         ${active
-          ? "bg-blue-50 text-blue-700 font-semibold border border-blue-100 shadow-sm"
-          : "text-gray-500 hover:text-blue-600 hover:bg-gray-50"
+          ? "bg-primary/10 text-primary font-semibold border border-primary/20 shadow-xs"
+          : "text-muted hover:text-primary hover:bg-warm-surface/80"
         }
       `}
     >
       <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-150 ${active ? "" : "group-hover:scale-110"}`} />
       <span>{label}</span>
       {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full -ml-px hidden sm:block" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full -ml-px hidden sm:block" />
       )}
     </Link>
   );
@@ -213,33 +213,34 @@ export default function DashboardLayout({
   return (
     <SubscriptionProvider userRole={currentRole}>
       <NotificationProvider>
-        <div className="flex min-h-screen bg-gray-50 transition-colors duration-300 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
+        <div className="flex min-h-screen bg-warm-surface/40 transition-colors duration-300 selection:bg-primary/20 selection:text-primary overflow-hidden">
       
       {/* Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
         <div 
-          className="fixed inset-0 z-30 bg-gray-900/50 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-30 bg-ink/40 backdrop-blur-xs lg:hidden transition-opacity"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside 
-        className={`fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-100 flex flex-col h-screen overflow-y-auto flex-shrink-0 z-40 shadow-xl shadow-gray-200/20 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 w-64 bg-paper border-r border-border flex flex-col h-screen overflow-y-auto flex-shrink-0 z-40 shadow-xl lg:shadow-none transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand */}
-        <div className="px-5 py-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-5 py-6 border-b border-border flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-blue-600/30 transition-all duration-300">
+            <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-md shadow-primary/25 group-hover:bg-primary-dark transition-all duration-300">
               <HeartPulse className="w-[18px] h-[18px] text-white" />
             </div>
-            <span className="font-bold text-gray-900 text-lg tracking-tight">MediClinic</span>
+            <span className="font-bold text-ink text-lg tracking-tight heading-font">MediClinic</span>
           </Link>
           <button 
-            className="lg:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+            className="lg:hidden p-2 text-muted hover:bg-warm-surface rounded-lg transition-colors"
             onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close sidebar"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -260,7 +261,7 @@ export default function DashboardLayout({
           {roleNav.length > 0 && (
             <>
               <div className="pt-5 pb-2 px-3">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                <p className="text-[10px] font-bold text-muted/70 uppercase tracking-widest">
                   {roleLabel[currentRole] ?? currentRole}
                 </p>
               </div>
@@ -276,12 +277,12 @@ export default function DashboardLayout({
         </nav>
 
         {/* User + Logout */}
-        <div className="px-3 py-4 border-t border-gray-100 space-y-1 bg-white mt-auto">
+        <div className="px-3 py-4 border-t border-border space-y-1 bg-paper mt-auto">
           {/* Profile shortcut for patients */}
           {currentRole === "PATIENT" && (
             <Link
               href="/dashboard/patient/profile"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-all text-sm font-medium"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted hover:text-primary hover:bg-warm-surface/80 transition-all text-sm font-medium"
             >
               <User className="w-4 h-4" />
               My Profile
@@ -289,24 +290,24 @@ export default function DashboardLayout({
           )}
 
           {/* User card */}
-          <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-gray-50/80 border border-gray-100 hover:border-gray-200 transition-colors shadow-sm">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-warm-surface/60 border border-border hover:border-primary/30 transition-colors shadow-xs">
             <div className="relative">
-              <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-inner">
+              <div className="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-inner">
                 {initials}
               </div>
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full shadow-sm"></div>
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-paper rounded-full shadow-xs"></div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-gray-900 text-xs font-semibold truncate">
+              <p className="text-ink text-xs font-semibold truncate">
                 {user ? (user.first_name ? `${user.first_name} ${user.last_name ?? ""}` : user.email) : "Loading profile..."}
               </p>
-              <p className="text-gray-500 text-[10px] truncate uppercase tracking-wider font-medium">{currentRole.replace("_", " ")}</p>
+              <p className="text-muted text-[10px] truncate uppercase tracking-wider font-semibold">{currentRole.replace("_", " ")}</p>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all text-sm font-medium mt-2"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-muted hover:text-red-600 hover:bg-red-50/70 transition-all text-sm font-medium mt-1"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -317,11 +318,12 @@ export default function DashboardLayout({
       {/* ── Main Content ─────────────────────────────────────────────── */}
       <main className="flex-1 overflow-auto relative flex flex-col">
         {/* Top Header for Notifications */}
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-20 flex-shrink-0">
+        <header className="h-16 bg-paper/85 backdrop-blur-md border-b border-border flex items-center justify-between px-6 sticky top-0 z-20 flex-shrink-0">
           <div className="flex items-center">
             <button 
-              className="lg:hidden p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              className="lg:hidden p-2 -ml-2 text-muted hover:bg-warm-surface rounded-lg transition-colors"
               onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open sidebar"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />

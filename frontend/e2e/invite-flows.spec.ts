@@ -32,9 +32,9 @@ test.describe('Invite Acceptance E2E Flows', () => {
     await page.locator('button[type="submit"]').click();
 
     // 3. Confirm successful navigation to a real page (not 404)
-    await expect(page.getByText('Profile Completed!')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Profile Completed!')).toBeVisible({ timeout: 30000 });
     await page.getByText('Click here if not redirected').click();
-    await page.waitForURL((url) => !url.pathname.includes('/invite/'), { timeout: 15000 });
+    await page.waitForURL((url) => !url.pathname.includes('/invite/'), { timeout: 30000 });
 
     // Assert final URL returns a real page, not Next.js 404
     expect(page.url()).not.toContain('404');

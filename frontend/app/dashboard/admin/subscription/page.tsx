@@ -255,10 +255,10 @@ export default function SubscriptionPage() {
             <div className="mt-4 flex items-end gap-3">
               <span className="text-4xl font-black text-ink capitalize tracking-tight heading-font">{currentPlan}</span>
               <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                currentStatus === "active" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
-                currentStatus === "trialing" ? "bg-blue-100 text-blue-800 border border-blue-200" :
-                currentStatus === "past_due" ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                "bg-gray-100 text-gray-800 border border-gray-200"
+                currentStatus === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                currentStatus === "trialing" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                currentStatus === "past_due" ? "bg-red-50 text-red-700 border border-red-200" :
+                "bg-warm-surface text-muted border border-border"
               }`}>
                 {currentStatus.replace("_", " ")}
               </span>

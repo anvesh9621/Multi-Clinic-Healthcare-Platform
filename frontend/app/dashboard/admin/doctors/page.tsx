@@ -185,8 +185,8 @@ export default function AdminDoctorsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Staff Management</h1>
-          <p className="text-gray-500 mt-1">Manage your doctors and pending invitations</p>
+          <h1 className="text-3xl font-bold tracking-tight text-ink heading-font">Staff Management</h1>
+          <p className="text-muted mt-1 text-sm">Manage your doctors and pending invitations</p>
         </div>
         <Button onClick={() => setShowModal(true)}>
           <UserPlus className="w-5 h-5 mr-2" />
@@ -214,7 +214,7 @@ export default function AdminDoctorsPage() {
 
       {/* Search */}
       <Input
-        icon={<Search className="w-5 h-5" />}
+        icon={<Search className="w-5 h-5 text-muted" />}
         type="text"
         placeholder="Search by name, email, or specialization…"
         value={search}
@@ -225,13 +225,13 @@ export default function AdminDoctorsPage() {
       {/* Content Grid */}
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       ) : activeTab === "doctors" ? (
         filteredDoctors.length === 0 ? (
           <Card className="text-center py-20 text-muted">
             <Stethoscope className="w-12 h-12 mx-auto mb-3 text-muted" />
-            <p className="font-semibold text-lg text-ink">{search ? "No doctors match your search." : "No active doctors yet."}</p>
+            <p className="font-semibold text-lg text-ink heading-font">{search ? "No doctors match your search." : "No active doctors yet."}</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -262,17 +262,17 @@ export default function AdminDoctorsPage() {
               filteredInvites.map((invite) => (
                 <TableRow key={invite.id}>
                   <TableCell>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                        <Mail className="w-5 h-5 text-primary" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                        <Mail className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="font-bold text-ink text-base">{invite.email}</span>
+                      <span className="font-bold text-ink text-sm">{invite.email}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{invite.specialization}</TableCell>
-                  <TableCell>{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="font-medium text-ink text-sm">{invite.specialization}</TableCell>
+                  <TableCell className="text-muted text-sm">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-center">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
                       invite.status === "PENDING" ? "bg-amber-50 border-amber-200 text-amber-700" :
                       invite.status === "ACCEPTED" ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
                       "bg-red-50 border-red-200 text-red-700"
@@ -294,13 +294,13 @@ export default function AdminDoctorsPage() {
         {inviteSuccess.length > 0 ? (
           <div className="text-center space-y-4 py-4">
             <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Send className="w-8 h-8 text-emerald-500" />
+              <Send className="w-8 h-8 text-emerald-600" />
             </div>
             <h3 className="text-2xl font-bold text-ink heading-font">Invitations Sent!</h3>
-            <p className="text-muted max-w-sm mx-auto">
+            <p className="text-muted max-w-sm mx-auto text-sm">
               Sent {inviteSuccess.length} invitation(s) successfully. They will receive a secure link to create their profile.
               <br /><br />
-              <span className="text-amber-600 font-semibold bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 inline-block">📋 Check runserver terminal for links</span>
+              <span className="text-amber-700 font-semibold bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 inline-block text-xs">📋 Check runserver terminal for links</span>
             </p>
             <div className="flex gap-4 justify-center pt-8">
               <Button variant="secondary" onClick={resetModal}>Close</Button>
@@ -310,7 +310,7 @@ export default function AdminDoctorsPage() {
         ) : (
           <form onSubmit={handleCreate} className="space-y-6">
             {error && (
-              <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm font-semibold shadow-sm">
+              <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm font-semibold shadow-xs">
                 <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                 {error}
               </div>
@@ -324,9 +324,9 @@ export default function AdminDoctorsPage() {
                 value={form.emails}
                 onChange={(e) => setForm((f) => ({ ...f, emails: e.target.value }))}
                 placeholder={"dr.sharma@gmail.com, dr.kapoor@gmail.com\n(Separate with commas or newlines)"}
-                className="w-full px-4 py-3 bg-white border border-border rounded-xl text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-sm resize-none"
+                className="w-full px-4 py-3 bg-paper border border-border rounded-xl text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-xs resize-none"
               />
-              <p className="text-muted text-sm mt-2">You can enter multiple emails at once.</p>
+              <p className="text-muted text-xs mt-2">You can enter multiple emails at once.</p>
             </div>
 
             <div>
@@ -336,7 +336,7 @@ export default function AdminDoctorsPage() {
                   required
                   value={form.specialization}
                   onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}
-                  className="w-full px-4 py-3 bg-white border border-border rounded-xl text-ink appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-sm"
+                  className="w-full px-4 py-3 bg-paper border border-border rounded-xl text-ink appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-xs"
                 >
                   <option value="">Select specialization…</option>
                   {SPECIALIZATIONS.map((s) => (
@@ -347,11 +347,11 @@ export default function AdminDoctorsPage() {
               </div>
             </div>
 
-            <div className="flex items-start gap-3 px-5 py-4 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 shadow-sm">
-              <UserPlus className="w-5 h-5 shrink-0 text-blue-600 mt-0.5" />
+            <div className="flex items-start gap-3 px-5 py-4 bg-primary/10 border border-primary/20 rounded-xl text-ink text-sm shadow-xs">
+              <UserPlus className="w-5 h-5 shrink-0 text-primary mt-0.5" />
               <div>
-                <strong className="block mb-1 text-blue-900">Streamlined Onboarding</strong>
-                Doctors will fill out their own profile details when they accept the invite.
+                <strong className="block mb-1 text-ink font-semibold">Streamlined Onboarding</strong>
+                <span className="text-muted">Doctors will fill out their own profile details when they accept the invite.</span>
               </div>
             </div>
 
@@ -375,59 +375,51 @@ export default function AdminDoctorsPage() {
 // ─── Doctor Card ──────────────────────────────────────────────────────────────
 function DoctorCard({ doctor }: { doctor: DoctorEntry }) {
   const initials = `${doctor.first_name?.[0] || ""}${doctor.last_name?.[0] || ""}`.toUpperCase() || "DR";
-  const AVATAR_COLORS = [
-    "from-blue-600 to-indigo-600",
-    "from-purple-600 to-fuchsia-600",
-    "from-emerald-600 to-teal-600",
-    "from-rose-600 to-pink-600",
-    "from-amber-500 to-orange-500",
-  ];
-  const colorClass = AVATAR_COLORS[doctor.id % AVATAR_COLORS.length];
 
   return (
-    <Card hoverable className="p-6 flex flex-col h-full">
+    <Card hoverable className="p-6 flex flex-col h-full group">
       <div className="flex items-start gap-4 mb-5">
         {doctor.profile_photo ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={doctor.profile_photo}
             alt={doctor.first_name}
-            className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shadow-sm"
+            className="w-14 h-14 rounded-2xl object-cover border border-border shadow-xs"
           />
         ) : (
-          <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${colorClass} shadow-sm flex items-center justify-center text-white font-bold text-xl shrink-0`}>
+          <div className="w-14 h-14 rounded-2xl bg-primary text-white shadow-xs flex items-center justify-center font-bold text-xl shrink-0">
             {initials}
           </div>
         )}
         <div className="flex-1 min-w-0 pt-0.5">
-          <h3 className="font-bold text-gray-900 text-lg truncate group-hover:text-blue-600 transition-colors">
+          <h3 className="font-bold text-ink text-lg truncate group-hover:text-primary transition-colors heading-font">
             Dr. {doctor.first_name || "New Doctor"} {doctor.last_name || ""}
           </h3>
-          <p className="text-blue-600 text-sm font-semibold">{doctor.specialization}</p>
+          <p className="text-primary text-sm font-semibold">{doctor.specialization}</p>
         </div>
       </div>
 
       <div className="space-y-3 flex-1">
-        <div className="flex items-center gap-3 text-gray-600 text-sm">
-          <Mail className="w-4 h-4 text-gray-400 shrink-0" />
+        <div className="flex items-center gap-3 text-muted text-sm">
+          <Mail className="w-4 h-4 text-muted/70 shrink-0" />
           <span className="truncate">{doctor.doctor_email}</span>
         </div>
         {doctor.experience_years > 0 && (
-          <div className="flex items-center gap-3 text-gray-600 text-sm">
-            <Award className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="font-medium">{doctor.experience_years} year{doctor.experience_years !== 1 ? "s" : ""} experience</span>
+          <div className="flex items-center gap-3 text-muted text-sm">
+            <Award className="w-4 h-4 text-muted/70 shrink-0" />
+            <span className="font-medium text-ink">{doctor.experience_years} year{doctor.experience_years !== 1 ? "s" : ""} experience</span>
           </div>
         )}
         {doctor.qualifications && (
-          <div className="flex items-center gap-3 text-gray-600 text-sm">
-            <Stethoscope className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="truncate font-medium">{doctor.qualifications}</span>
+          <div className="flex items-center gap-3 text-muted text-sm">
+            <Stethoscope className="w-4 h-4 text-muted/70 shrink-0" />
+            <span className="truncate font-medium text-ink">{doctor.qualifications}</span>
           </div>
         )}
         {doctor.languages_spoken?.length > 0 && (
-          <div className="flex items-center gap-3 text-gray-600 text-sm">
-            <Globe className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="truncate text-gray-500">{doctor.languages_spoken.join(", ")}</span>
+          <div className="flex items-center gap-3 text-muted text-sm">
+            <Globe className="w-4 h-4 text-muted/70 shrink-0" />
+            <span className="truncate">{doctor.languages_spoken.join(", ")}</span>
           </div>
         )}
       </div>
@@ -437,7 +429,7 @@ function DoctorCard({ doctor }: { doctor: DoctorEntry }) {
           <span className="text-muted font-medium">Consultation Fee: </span>
           <span className="text-ink font-bold text-lg font-mono">₹{doctor.consultation_fee || "0"}</span>
         </div>
-        <span className="flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-full font-bold">
+        <span className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full font-bold">
           <CheckCircle className="w-3.5 h-3.5" />
           Active
         </span>
