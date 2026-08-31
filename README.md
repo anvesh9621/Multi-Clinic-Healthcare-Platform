@@ -1,240 +1,293 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/MediClinic-Healthcare%20Platform-blue?style=for-the-badge&logo=heart&logoColor=white" alt="MediClinic" />
+# MediClinic — Multi-Tenant Healthcare & Clinic Management Platform
 
-# MediClinic — Multi-Clinic Healthcare Platform
-
-**A full-stack, role-based healthcare management system for modern clinics.**  
-From appointment booking to billing, prescriptions to inventory — all in one platform.
+**A scalable, enterprise-ready healthcare platform engineered for modern clinics, multi-specialty practices, and hospital networks.**
 
 [![Django](https://img.shields.io/badge/Django-6.0-092E20?style=flat-square&logo=django&logoColor=white)](https://www.djangoproject.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Django REST Framework](https://img.shields.io/badge/DRF-3.15-A30000?style=flat-square&logo=django&logoColor=white)](https://www.django-rest-framework.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15_(App_Router)-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Stripe](https://img.shields.io/badge/Stripe-Integrated-635BFF?style=flat-square&logo=stripe&logoColor=white)](https://stripe.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-[![Lint](https://github.com/anvesh9621/Multi-Clinic-Healthcare-Platform/actions/workflows/lint.yml/badge.svg)](https://github.com/anvesh9621/Multi-Clinic-Healthcare-Platform/actions/workflows/lint.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-Design_Tokens-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Razorpay](https://img.shields.io/badge/Razorpay-Route_%26_Checkout-0C2340?style=flat-square&logo=razorpay&logoColor=white)](https://razorpay.com/)
+[![Stripe](https://img.shields.io/badge/Stripe-SaaS_Subscriptions-635BFF?style=flat-square&logo=stripe&logoColor=white)](https://stripe.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Environment Variables](#-environment-variables) · [API Reference](#-api-reference) · [Roles & Permissions](#-roles--permissions) · [Subscription Plans](#-subscription-plans)
+[System Architecture](#system-architecture) &bull; [Domain Models & Features](#domain-models--feature-breakdown) &bull; [Security & Authentication](#security--authentication-architecture) &bull; [Design System](#design-system--frontend-architecture) &bull; [API Specification](#api-specification) &bull; [Testing Strategy](#testing-strategy) &bull; [Getting Started](#getting-started) &bull; [Environment Configuration](#environment-configuration)
 
 </div>
 
 ---
 
-## 📋 Table of Contents
+## Executive Summary
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [Environment Variables](#-environment-variables)
-- [API Reference](#-api-reference)
-- [Roles & Permissions](#-roles--permissions)
-- [Subscription Plans](#-subscription-plans)
-- [Key Design Decisions](#-key-design-decisions)
-- [Future Enhancements](#-future-enhancements)
-- [Contributing](#-contributing)
-- [License](#-license)
+MediClinic is an enterprise-grade, multi-tenant Electronic Health Record (EHR) and clinic management platform. It standardizes and automates clinic workflows end-to-end: online patient discovery, multi-step booking with real-time schedule conflict prevention, waiting room queue tokenization, clinical charting and prescription generation, multi-tier billing and split marketplace payouts, inventory replenishment tracking, and clinic analytics.
+
+The system is architected around strict multi-tenancy with tenant-scoped querysets, robust role-based access control (RBAC), multi-factor authentication (MFA/TOTP), asynchronous transactional notification dispatching, and high-performance Postgres exclusion constraints for concurrent schedule safety.
 
 ---
 
-## 🌟 Overview
-
-MediClinic is a **production-grade, multi-tenant healthcare management platform** built to digitize the complete operational workflow of a clinic — from the moment a patient books an appointment to post-consultation billing and prescription management.
-
-It is designed around **five distinct user roles**, each with their own dashboard and permissions, making it suitable for solo practitioners all the way up to large multi-specialty hospital networks.
-
-> **Problem it solves:** Most clinics still rely on paper registers, manual phone bookings, and disconnected spreadsheets. MediClinic replaces all of that with a single, unified, real-time platform.
-
----
-
-## ✨ Features
-
-### For Patients
-- 🗓️ **5-Step Booking Wizard**: Seamless single-page flow (Clinic → Doctor → Date/Time → Pay).
-- 💳 **Online & In-Clinic Payments**: Integrated with Razorpay (UPI, Cards, Netbanking) with fallback to "Pay at Clinic".
-- 👤 **Inline Authentication**: Register or login without losing your booking progress.
-- 📋 Pre-visit digital intake form (symptoms, allergies, medications)
-- 🩺 View medical records and doctor notes after consultation
-- 💊 Access digital prescriptions
-- 💳 View and pay invoices online via Razorpay/Stripe
-- 🔔 Appointment confirmation and reminder notifications
-
-### For Doctors
-- 📅 View daily appointment schedule
-- 📝 Write structured medical records (symptoms, diagnosis, vitals, notes)
-- 💊 Create prescriptions with reusable prescription templates
-- 📊 Private notes per patient (not visible to patients)
-- 🏥 Works across multiple clinic associations from a single account
-
-### For Receptionists
-- 👤 Register walk-in patients on the spot
-- 📆 Book appointments on behalf of patients
-- 🔢 Manage live patient queue with token system
-- 📋 Review patient intake forms before consultation
-
-### For Clinic Admins
-- 👨‍⚕️ Invite and manage doctors via email (UUID invite tokens)
-- 📦 Inventory management with low-stock restock alerts
-- 🧾 Full billing and invoice management
-- 📈 Analytics dashboard (appointments, revenue, patient trends)
-- 🔐 Audit log — complete history of every action taken in the clinic
-- 💳 Manage subscription plan via Stripe
-
-### For Super Admins
-- 🌐 Platform-wide visibility across all clinics
-- 🛠️ Django admin panel for system configuration
-- 📊 Cross-clinic analytics and monitoring
-
-### Platform-Wide
-- 🖥️ **Live Queue Display** — public screen (TV-ready) showing current serving token
-- 🔒 **JWT Authentication** — secure, stateless auth with token rotation
-- 📧 **Email Notifications** — async via Celery + Gmail SMTP
-- 🔄 **Stripe Webhook Integration** — reliable subscription lifecycle management
-
----
-
-## 🛠 Tech Stack
-
-### Backend
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| Framework | Django 6.0 + Django REST Framework | REST API, ORM, Admin |
-| Database | PostgreSQL 15 | Primary datastore |
-| Auth | `djangorestframework-simplejwt` | JWT (30-min access / 7-day refresh) |
-| Async Tasks | Celery + Redis | Non-blocking emails & background jobs |
-| Payments | Stripe & Razorpay | Stripe (B2B SaaS Subscriptions), Razorpay (B2C Patient Payments) |
-| Email | SMTP via Gmail | Transactional emails |
-| Media | Local filesystem (`/media/`) | Doctor profile photos |
-
-### Frontend
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| Framework | Next.js 15 (App Router) | SSR + CSR hybrid rendering |
-| Language | TypeScript | Type safety |
-| Styling | Tailwind CSS | Utility-first CSS |
-| HTTP Client | Axios | API calls with JWT interceptor |
-| State | React Context API | Auth state, user info |
-| Icons | Lucide React | Consistent iconography |
-
----
-
-## 🏗 Architecture
+## System Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        Browser / Client                      │
-└───────────────────────────┬──────────────────────────────────┘
-                            │ HTTPS
-┌───────────────────────────▼──────────────────────────────────┐
-│              Next.js Frontend  (localhost:3000)               │
-│  ┌───────────────────────┐   ┌──────────────────────────┐   │
-│  │  SSR — Public Pages   │   │  CSR — Dashboard Pages   │   │
-│  │  (Landing, Specialties│   │  (Role-based dashboards) │   │
-│  │   Queue Display)      │   │                          │   │
-│  └───────────────────────┘   └────────────┬─────────────┘   │
-│                                           │  Axios + Bearer   │
-└───────────────────────────────────────────┼──────────────────┘
-                                            │
-┌───────────────────────────────────────────▼──────────────────┐
-│              Django REST API  (localhost:8000)                │
-│   JWT Middleware → Role Permission Check → Business Logic    │
-│                                                               │
-│   apps/  accounts  · clinics  · doctors   · patients        │
-│          appointments · records · billing · inventory        │
-│          notifications · subscriptions · analytics · audit   │
-└──────┬───────────────┬──────────────────┬────────────────────┘
-       │               │                  │
-  ┌────▼─────┐   ┌─────▼──────┐   ┌──────▼─────┐
-  │PostgreSQL│   │   Redis    │   │   Stripe   │
-  │          │   │  (Celery   │   │    API     │
-  │ (DB)     │   │   Broker)  │   │            │
-  └──────────┘   └─────┬──────┘   └──────┬─────┘
-                       │                  │
-                 ┌─────▼──────┐    ┌──────▼─────┐
-                 │ Gmail SMTP │    │  Webhooks  │
-                 │  (Emails)  │    │  → Django  │
-                 └────────────┘    └────────────┘
-```
-
-### Appointment Lifecycle
-
-```
-SCHEDULED → CONFIRMED → WAITING → IN_PROGRESS → COMPLETED
-    │                                                 │
-    └──────────────► CANCELLED ◄─────────────────────┘
-    └──────────────► NO_SHOW
+                               ┌──────────────────────────────────────────────┐
+                               │           Client Layer (Browser / TV)        │
+                               └──────────────────────┬───────────────────────┘
+                                                      │ HTTPS / WSS
+                               ┌──────────────────────▼───────────────────────┐
+                               │    Next.js 15 App Router Frontend (Port 3000)│
+                               │  - Server Components (SSR Landing & Public)  │
+                               │  - Client Components (Interactive Portals)   │
+                               │  - Design System Tokens (Teal / Warm Paper)  │
+                               │  - Axios Interceptors with Token Rotation    │
+                               └──────────────────────┬───────────────────────┘
+                                                      │ JSON REST API / Bearer JWT
+                               ┌──────────────────────▼───────────────────────┐
+                               │      Django 6.0 + DRF API Layer (Port 8000)  │
+                               │  - Tenant Scoping & RBAC Middleware          │
+                               │  - Rate Limiting & Fail-Open Throttling      │
+                               │  - Multi-Gateway Payment Orchestrator        │
+                               │  - Signal-Driven Audit & Notifications       │
+                               └──────┬───────────────┬──────────────┬────────┘
+                                      │               │              │
+                    ┌─────────────────▼────┐   ┌──────▼──────┐   ┌───▼──────────────────┐
+                    │ PostgreSQL 15 Engine │   │ Redis Store │   │ External Services    │
+                    │ - GiST Range Indexes │   │ - Celery    │   │ - Razorpay (B2C/B2B) │
+                    │ - ExclusionConstraint│   │   Broker    │   │ - Stripe Subscriptions│
+                    │ - Audit & EHR Tables │   │ - Cache     │   │ - SMTP / Gmail Relay │
+                    └──────────────────────┘   └──────┬──────┘   └──────────────────────┘
+                                                      │
+                                               ┌──────▼──────┐
+                                               │Celery Worker│
+                                               │Async Emails │
+                                               └─────────────┘
 ```
 
 ---
 
-## 📁 Project Structure
+## Domain Models & Feature Breakdown
+
+### 1. Multi-Tenant Clinic Management (`apps/clinics`)
+- **Tenant Isolation**: Data isolation enforced at database query level via `TenantScopedAPIView` and `ClinicQuerysetMixin`.
+- **Marketplace Payouts (Razorpay Route)**: Direct onboarding of clinic bank accounts with IFSC verification, linked account tracking (`not_started`, `kyc_submitted`, `kyc_under_review`, `kyc_verified`, `kyc_rejected`), and split-settlement platform fees.
+- **Receptionist Seat Allocation**: Governed single-receptionist-per-clinic seat model with UUID-based email invitations and automated token invalidation.
+
+### 2. Doctor Schedules & Availability (`apps/doctors`)
+- **Multi-Clinic Associations (`DoctorClinic`)**: Decouples medical practitioner profiles from clinic affiliations. Enables doctors to practice across multiple clinics with distinct consultation fees, shifts, and schedules.
+- **7-Day Shift Block Engine**: Weekly shift scheduler supporting multiple discontinuous time windows per day, customizable consultation slot intervals (15, 30, 45, 60 mins), and overlap prevention.
+- **Leave Management & Doctor Ratings**: Clinically reviewed leave request lifecycle with automatic calendar slot blocking and patient consultation reviews.
+
+### 3. Concurrency-Safe Appointments & Queue Engine (`apps/appointments`)
+- **Database-Level Exclusion Constraints**: Utilizes PostgreSQL `DateTimeRangeField` combined with a `bstrap` GiST `ExclusionConstraint` to enforce physical impossibility of double-booking consultation slots across concurrent requests.
+- **State Machine**: Deterministic transitions across `SCHEDULED`, `CONFIRMED`, `WAITING`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`, and `NO_SHOW`.
+- **Public TV Queue Display**: Real-time room token display (`/queue-display`) for clinic waiting rooms with audio/visual status indicators.
+
+### 4. Electronic Health Records & Clinical Charting (`apps/records`)
+- **Structured Consultation Records**: Standardized capture of chief complaints, symptoms, physical examination vitals (Blood Pressure, Heart Rate, Respiratory Rate, Temperature, SpO2, Weight, Height, BMI), and clinical diagnoses.
+- **Digital Prescription Builder**: Form-driven prescription generation specifying drug name, formulation, dosage, route, frequency, duration, and food instructions.
+- **Template Engine**: Reusable prescription templates categorized by diagnosis for rapid clinical charting.
+- **Doctor Confidential Notes**: Dedicated clinician-only private notes field scrubbed from patient-facing API serialization.
+
+### 5. Patient Intake & Digital Onboarding (`apps/patients`)
+- **Pre-Consultation Intake Forms**: Patient-submitted medical history, chronic conditions, past surgeries, known drug allergies, and active medications.
+- **Patient History Records**: Centralized chronological timeline of past diagnoses, prescriptions, invoices, and completed appointments.
+
+### 6. Billing, Invoicing & Marketplace Payments (`apps/billing`)
+- **Itemized Invoicing**: Automatic compilation of doctor consultation fees, prescribed pharmaceuticals, and laboratory services with tax, discount, and status tracking (`DRAFT`, `PENDING`, `PAID`, `CANCELLED`, `REFUNDED`).
+- **Resilient Key Fallback Hierarchy**: Dynamic Razorpay payment verification chain cascading across `PlatformSettings`, environment variables, and client credentials.
+- **Webhook Idempotency**: Stripe and Razorpay webhook handlers with signature verification and idempotent transaction execution.
+
+### 7. Clinic Inventory & Stock Management (`apps/inventory`)
+- **Stock Tracking**: SKU catalog management with real-time quantities, units, unit costs, and reorder thresholds.
+- **Transaction Ledger**: Immutable audit log of every stock movement (`ADD`, `DEDUCT`, `ADJUST`) with batch tracking, expiration warnings, and automatic low-stock notifications.
+
+### 8. SaaS Subscription Engine (`apps/subscriptions`)
+- **Tiered Gating**: Granular feature gating across `STARTER`, `PROFESSIONAL`, and `ENTERPRISE` tiers using custom DRF permission classes (`IsFeatureSubscribed`).
+- **Billing Lifecycle**: Stripe Checkout sessions, self-service customer billing portal, prorated tier upgrades/downgrades, and automated payment failure recovery (dunning).
+
+### 9. System Auditing & Notifications (`apps/audit`, `apps/notifications`)
+- **Immutable Audit Trail (`AuditLog`)**: Comprehensive recording of user actions, targeting models, IP addresses, user agents, action types (`CREATE`, `UPDATE`, `DELETE`, `LOGIN`, `LOGOUT`), and payload diffs.
+- **Signal-Driven Notifications**: Real-time in-app alerts and asynchronous transactional email dispatch via Celery workers for bookings, cancellations, and staff invites.
+
+---
+
+## Role-Based Access Control (RBAC) Matrix
+
+| Feature / Domain | Super Admin | Clinic Admin | Doctor | Receptionist | Patient | Public |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Multi-Clinic Telemetry & Platform Overview | Full | - | - | - | - | - |
+| Clinic Settings, Staff Invites & Bank Setup | Full | Full | - | - | - | - |
+| SaaS Subscription Management (Stripe) | Full | Full | - | - | - | - |
+| Weekly Shift Schedule Configuration | Full | Full | View/Self | - | - | - |
+| Inventory Catalog & Stock Adjustments | Full | Full | View | - | - | - |
+| Patient Queue & Walk-In Registration | Full | Full | View | Full | - | - |
+| Clinical Charting & Prescriptions | Full | - | Full (Assigned) | - | - | - |
+| Doctor Private Notes | - | - | Full (Author) | - | - | - |
+| Patient Intake Forms | Full | Full | View (Assigned) | View | Full (Self) | - |
+| Online Appointment Booking | Full | Full | - | Full (Assigned) | Full (Self) | - |
+| Medical Records & Prescriptions View | Full | - | Full (Assigned) | - | View (Self) | - |
+| Public Doctor Directory & Queue TV | Full | Full | Full | Full | Full | Full |
+
+---
+
+## Security & Authentication Architecture
 
 ```
-mediclinic-system/
-├── backend/                        # Django project root
-│   ├── config/
-│   │   ├── settings.py             # All configuration (env-driven)
-│   │   ├── urls.py                 # Root URL router
-│   │   ├── celery.py               # Celery app + task discovery
-│   │   └── exceptions.py          # Custom DRF exception handler
-│   ├── apps/
-│   │   ├── accounts/               # Custom User model, JWT, invites
-│   │   ├── clinics/                # Clinic model + Stripe fields
-│   │   ├── doctors/                # Doctor, DoctorClinic, Schedule, Leaves, Reviews
-│   │   ├── patients/               # Patient profile, IntakeForm
-│   │   ├── appointments/           # Appointment + overlap exclusion constraint
-│   │   ├── records/                # MedicalRecord, Prescription, Templates
-│   │   ├── billing/                # Invoice, InvoiceItem, PaymentTransaction
-│   │   ├── inventory/              # InventoryItem, StockTransaction
-│   │   ├── subscriptions/          # Subscription, Stripe checkout, Webhooks
-│   │   ├── notifications/          # Notification model + Django signals
-│   │   ├── analytics/              # Aggregated read-only stats views
-│   │   ├── audit/                  # AuditLog — full action history
-│   │   └── core/                   # Shared utilities
-│   └── manage.py
-│
-└── frontend/                       # Next.js project root
-    ├── app/
-    │   ├── page.tsx                 # Public landing page (SSR)
-    │   ├── login/                   # JWT login
-    │   ├── register/                # Patient registration
-    │   ├── invite/                  # Doctor invite acceptance
-    │   ├── subscribe/               # Plan selection + Stripe redirect
-    │   ├── queue-display/           # Public queue TV screen
-    │   ├── specialties/[specialty]/ # Public doctor listing
-    │   └── dashboard/
-    │       ├── layout.tsx           # Auth guard + sidebar
-    │       ├── admin/               # Clinic Admin dashboard
-    │       ├── doctor/              # Doctor dashboard
-    │       ├── receptionist/        # Receptionist dashboard
-    │       ├── (patient)/           # Patient-specific pages
-    │       └── super-admin/         # Platform-wide admin
-    ├── components/                  # Reusable UI components
-    ├── services/                    # Axios API call layer
-    ├── context/                     # React Context (Auth, User)
-    └── hooks/                       # Custom React hooks
+                    ┌────────────────────────────────────────────────────────┐
+                    │               Incoming Request Authentication          │
+                    └───────────────────────────┬────────────────────────────┘
+                                                │
+                          ┌─────────────────────┴─────────────────────┐
+                          │                                           │
+               [ Staff Login Flow ]                         [ Patient Login Flow ]
+                          │                                           │
+             Password + Email Credentials                    Email OTP Verification
+                          │                                           │
+             MFA Status Verification Check                 Rate Limited (3 req / 60s)
+                          │                                           │
+          ┌───────────────┴───────────────┐                  OTP Expiration (10 mins)
+          │                               │                           │
+   [ MFA Enrolled ]             [ MFA Not Enrolled ]                  │
+          │                               │                           │
+   TOTP / Backup Code           Mandatory Setup Gate                  │
+   Verification                  (Secret + QR Code)                   │
+          │                               │                           │
+          └───────────────┬───────────────┘                           │
+                          │                                           │
+                          └─────────────────────┬─────────────────────┘
+                                                │
+                                    ┌───────────▼───────────┐
+                                    │  Issue JWT Token Pair │
+                                    │  - 30 min Access Token│
+                                    │  - 7 day Refresh Token│
+                                    └───────────────────────┘
+```
+
+1. **Staff Multi-Factor Authentication (MFA/TOTP)**:
+   - Compulsory 2FA setup for all administrative and medical personnel (`CLINIC_ADMIN`, `DOCTOR`, `RECEPTIONIST`).
+   - Standard RFC 6238 TOTP algorithm compatible with Google Authenticator and 1Password.
+   - 8-digit cryptographically hashed backup codes with single-use consumption and unskippable route gates.
+2. **Patient Passwordless Email OTP**:
+   - Secure numeric one-time passcode with 10-minute TTL, server-side cooldown timers, and brute-force lockout protection.
+3. **JWT Stateless Token Architecture**:
+   - Short-lived 30-minute access tokens and 7-day rotating refresh tokens.
+   - Automatic silent token refresh via Axios response interceptors on the client.
+4. **Fail-Open Rate Limiting**:
+   - Redis-backed throttling policies protecting sensitive authentication routes against brute-force attacks with graceful fallback during network degradation.
+
+---
+
+## Design System & Frontend Architecture
+
+The MediClinic frontend adheres to an architectural design system implemented with strict semantic tokens, entirely replacing generic Tailwind palettes:
+
+```
+Design Token Tokens:
+  --color-primary:       #0F7B6C  (Deep Surgical Teal)
+  --color-primary-dark:  #0B5A4F  (Deep Teal Hover)
+  --color-accent:        #E8734A  (Coral Action Highlight)
+  --color-ink:           #111827  (Primary Text Hierarchy)
+  --color-muted:         #6B7280  (Secondary Text & Labels)
+  --color-paper:         #FFFFFF  (Pure Card & Modal Background)
+  --color-warm-surface:  #F4F1EA  (Subtle Organic Background Canvas)
+  --color-border:        #EDEDE8  (Structural Dividers & Outlines)
+```
+
+- **Layout Shell**: Responsive sidebar with collapsible states, route active indicators, breadcrumbs, live sync badges, and authenticated profile cards.
+- **Component Primitives**: Standardized `Card`, `Button`, `Input`, `Table`, `Modal`, `Tabs`, and `StatusBadge` primitives.
+- **Unified Status Dictionary**: Consistent semantic pill indicators (`ACTIVE`, `CONFIRMED`, `SCHEDULED`, `PENDING`, `COMPLETED`, `CANCELLED`, `EXPIRED`, `LOW_STOCK`, `OUT_OF_STOCK`).
+
+---
+
+## API Specification
+
+All endpoints are hosted under `http://127.0.0.1:8000/api/` and require `Authorization: Bearer <access_token>` header unless marked Public.
+
+### Authentication & Staff MFA
+| Method | Path | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/token/` | Public | Obtain JWT token pair using credentials |
+| `POST` | `/api/token/refresh/` | Public | Refresh expired JWT access token |
+| `POST` | `/api/accounts/patient/request-otp/` | Public | Request email OTP for patient authentication |
+| `POST` | `/api/accounts/patient/verify-otp/` | Public | Verify OTP and authenticate patient |
+| `POST` | `/api/accounts/mfa/setup/` | Staff | Generate TOTP secret and QR code URI |
+| `POST` | `/api/accounts/mfa/verify-setup/` | Staff | Confirm TOTP code and issue backup codes |
+| `POST` | `/api/accounts/mfa/verify-login/` | Staff | Complete MFA login challenge using TOTP/backup code |
+
+### Clinical Operations & Appointments
+| Method | Path | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/public/clinics/` | Public | List active public clinics |
+| `GET` | `/api/public/specialties/` | Public | List available medical specializations |
+| `GET` | `/api/public/doctors/<id>/slots/` | Public | Calculate available doctor consultation slots |
+| `POST` | `/api/appointments/` | Patient/Staff | Book a new consultation appointment |
+| `PATCH` | `/api/appointments/<id>/status/` | Staff | Transition appointment state (Confirmed, In-Progress, etc.) |
+| `GET` | `/api/appointments/queue/` | Staff | Fetch active queue tokens for daily clinic roster |
+| `POST` | `/api/records/` | Doctor | Create structured medical consultation record |
+| `POST` | `/api/records/prescriptions/` | Doctor | Issue electronic prescription with dosage instructions |
+
+### Payments & Administration
+| Method | Path | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/create-order/` | Patient/Staff | Create Razorpay order for consultation booking |
+| `POST` | `/api/verify-payment/` | Patient/Staff | Verify Razorpay payment signature and confirm booking |
+| `POST` | `/api/subscriptions/checkout/` | Clinic Admin | Create Stripe Checkout Session for SaaS tier upgrade |
+| `POST` | `/api/subscriptions/portal/` | Clinic Admin | Open Stripe Billing Portal session |
+| `GET` | `/api/analytics/dashboard/` | Clinic Admin | Query aggregated revenue, appointments, and workload metrics |
+| `GET` | `/api/inventory/items/` | Clinic Admin | List clinic pharmaceutical and equipment inventory |
+
+---
+
+## Testing Strategy
+
+The repository is covered by automated unit, integration, and browser end-to-end (E2E) suites:
+
+```
+Test Architecture:
+├── Backend Test Suite (Django / Pytest)
+│   ├── Unit tests for business logic, tenancy, and serializers
+│   ├── Integration tests for payment fallback chains and Stripe/Razorpay webhooks
+│   └── Database constraint tests for schedule overlap prevention
+├── Frontend Test Suite (Vitest / React Testing Library)
+│   ├── Component unit tests for auth forms, payment buttons, and dashboard charts
+│   └── Performance unblocking and state transition tests
+└── End-to-End Suite (Playwright)
+    ├── Doctor, Receptionist, and Admin invite acceptance flows
+    ├── Token reuse prevention and expiration validation
+    ├── Patient passwordless OTP authentication lifecycle
+    └── Staff MFA enrollment, navigation gate, and backup code recovery
+```
+
+### Running Test Suites
+
+```bash
+# 1. Run Backend Pytest Suite
+cd backend
+.\venv\Scripts\python.exe -m pytest
+
+# 2. Run Frontend Vitest Suite
+cd frontend
+npm run test
+
+# 3. Run Playwright End-to-End Suite
+cd frontend
+npx playwright test
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
-
-- **Python** 3.10+
-- **Node.js** 18+
-- **PostgreSQL** 14+
-- **Redis** (for Celery — optional in development, runs eagerly via `CELERY_TASK_ALWAYS_EAGER=True`)
-- **Git**
+- Python 3.10+
+- Node.js 18+ & npm
+- PostgreSQL 14+
+- Redis Server (for Celery async tasks)
 
 ---
 
-### 1. Clone the Repository
-
+### Step 1: Clone Repository
 ```bash
 git clone https://github.com/anvesh9621/Multi-Clinic-Healthcare-Platform.git
 cd Multi-Clinic-Healthcare-Platform
@@ -242,243 +295,104 @@ cd Multi-Clinic-Healthcare-Platform
 
 ---
 
-### 2. Backend Setup (Django)
-
+### Step 2: Backend Setup
 ```bash
 cd backend
 
-# Create and activate a virtual environment
+# Create and activate virtual environment
 python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS / Linux
-source venv/bin/activate
+.\venv\Scripts\activate      # Windows
+# source venv/bin/activate   # Linux / macOS
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up environment variables (see section below)
+# Configure environment variables
 cp .env.example .env
-# Edit .env with your values
 
-# Run database migrations
+# Apply database migrations
 python manage.py migrate
 
-# (Optional) Create a superuser for the Django admin panel
+# (Optional) Create superuser for Django administration
 python manage.py createsuperuser
 
-# Start the development server
-python manage.py runserver
+# Start development API server
+python manage.py runserver 127.0.0.1:8000
 ```
-
-> The Django API will be available at **http://127.0.0.1:8000/**  
-> Django Admin panel at **http://127.0.0.1:8000/admin/**
 
 ---
 
-### 3. Frontend Setup (Next.js)
-
-Open a **new terminal window**:
-
+### Step 3: Frontend Setup
 ```bash
 cd frontend
 
 # Install dependencies
 npm install
 
-# Set up environment variables
+# Configure environment variables
 cp .env.local.example .env.local
-# Edit .env.local with your values
 
-# Start the development server
+# Start Next.js development server
 npm run dev
 ```
 
-> The frontend will be available at **http://localhost:3000/**
+The frontend application will be available at `http://localhost:3000` and the backend API at `http://127.0.0.1:8000/api/`.
 
 ---
 
-### 4. (Optional) Start Celery Worker
-
-Required for **real email delivery** in production. In development, tasks run synchronously.
-
+### Step 4: Asynchronous Task Worker (Optional for Local Development)
 ```bash
-# From the backend directory, with venv activated
+cd backend
 celery -A config worker --loglevel=info
 ```
 
 ---
 
-## 🔐 Environment Variables
+## Environment Configuration
 
 ### Backend (`backend/.env`)
-
 ```env
-# Django
-SECRET_KEY=your-secret-key-here
+# Django Core
+SECRET_KEY=your-secure-django-secret-key
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
-# Database (PostgreSQL)
+# PostgreSQL Database
 DB_NAME=mediclinic_db
 DB_USER=postgres
-DB_PASSWORD=your-db-password
+DB_PASSWORD=your-secure-password
 DB_HOST=localhost
 DB_PORT=5432
 
-# Email (SMTP)
-EMAIL_HOST_USER=your-gmail@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
-
-# Frontend URL (used in invite emails)
-FRONTEND_URL=http://localhost:3000
-
-# Celery / Redis
+# Redis & Celery
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
-# Stripe (Subscriptions)
+# Transactional Email (SMTP)
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+FRONTEND_URL=http://localhost:3000
+
+# Stripe SaaS Subscriptions
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_SUBSCRIPTION_WEBHOOK_SECRET=whsec_...
 
-# Razorpay (Patient Payments)
+# Razorpay Patient Billing & Split Payouts
 RAZORPAY_KEY_ID=rzp_test_...
-RAZORPAY_KEY_SECRET=your-secret...
+RAZORPAY_KEY_SECRET=your-razorpay-secret...
 RAZORPAY_WEBHOOK_SECRET=your-webhook-secret...
 ```
 
 ### Frontend (`frontend/.env.local`)
-
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_...
 ```
 
 ---
 
-## 📡 API Reference
+## License
 
-All endpoints are prefixed with `http://localhost:8000/api/`.  
-Authentication uses **Bearer JWT tokens** in the `Authorization` header.
-
-| Prefix | Description |
-|---|---|
-| `POST /api/token/` | Obtain JWT access + refresh tokens |
-| `POST /api/token/refresh/` | Refresh an expired access token |
-| `api/accounts/` | Register, profile, password reset, invite accept |
-| `api/doctors/` | Doctor CRUD, schedules, leaves, invitations, reviews |
-| `api/appointments/` | Book, list, update status, queue management |
-| `api/patients/` | Patient profile, intake forms, appointment history |
-| `api/records/` | Medical records, prescriptions, prescription templates |
-| `api/billing/` | Invoices, invoice items, payment transactions |
-| `api/inventory/` | Inventory items, stock transactions, alerts |
-| `api/analytics/` | Aggregated stats (appointments, revenue, occupancy) |
-| `api/notifications/` | List notifications, mark as read |
-| `api/clinics/` | Clinic CRUD |
-| `api/subscriptions/` | Checkout session, webhook handler, plan status |
-| `api/public/specialties/` | Unauthenticated — for landing page |
-| `api/public/doctors/` | Unauthenticated — for landing page |
-
----
-
-## 👥 Roles & Permissions
-
-The platform uses a **role-based access control (RBAC)** system enforced at the API level via custom DRF permission classes.
-
-| Role | Scope | Key Capabilities |
-|---|---|---|
-| `SUPER_ADMIN` | All clinics | Full platform access, Django admin |
-| `CLINIC_ADMIN` | Own clinic | Manage doctors, staff, billing, inventory, subscription |
-| `DOCTOR` | Own clinic | Appointments, medical records, prescriptions, schedules |
-| `RECEPTIONIST` | Own clinic | Book appointments, patient queue, intake forms |
-| `PATIENT` | Own data | Book appointments, view records, pay invoices |
-
-> **Note:** Staff roles (`CLINIC_ADMIN`, `DOCTOR`, `RECEPTIONIST`) must be associated with a clinic. Patients register globally without a clinic association.
-
----
-
-## 💳 Subscription Plans
-
-MediClinic uses a **SaaS subscription model** powered by Stripe. Feature access is gated at the API level based on the clinic's active plan.
-
-| Feature | Starter | Professional | Enterprise |
-|---|---|---|---|
-| **Price** | $0 / month | $49 / month | $199 / month |
-| **Doctors** | 1 | Up to 10 | Unlimited |
-| **Appointments** | 50 / month | Unlimited | Unlimited |
-| **Medical Records & EHR** | ✅ | ✅ | ✅ |
-| **Analytics Dashboard** | ❌ | ✅ | ✅ |
-| **Billing & Invoicing** | ❌ | ✅ | ✅ |
-| **Inventory Management** | ❌ | ✅ | ✅ |
-| **Multi-Clinic Support** | ❌ | ❌ | ✅ |
-| **White-Label Branding** | ❌ | ❌ | ✅ |
-| **Support** | Community | Priority | 24/7 SLA |
-| **Free Trial** | — | 14 days | 14 days |
-
----
-
-## 🧠 Key Design Decisions
-
-### 1. Database-Level Overlap Prevention
-Appointment double-booking is prevented using a **PostgreSQL `ExclusionConstraint`** on a `DateTimeRangeField`. This means it is physically impossible — not just application-level impossible — to create two overlapping appointments for the same doctor.
-
-### 2. Doctor–Clinic Bridge Table (`DoctorClinic`)
-A doctor can work at multiple clinics. The `DoctorClinic` join table stores clinic-specific data (consultation fee, schedule, leaves) separately — avoiding duplication and enabling true multi-clinic doctor accounts.
-
-### 3. Custom User Model
-Django's `AUTH_USER_MODEL` is overridden with a custom `User` model extending `AbstractBaseUser`. This adds `role` and `clinic` fields directly to the user, enabling clean JWT claims and permission checks without extra DB joins.
-
-### 4. Subscription as a First-Class Model
-The `Subscription` model is separate from `Clinic` (1-to-1 relationship). It stores all Stripe IDs, trial dates, and billing period data cleanly — making it easy to handle webhooks idempotently.
-
-### 5. Celery for Non-Blocking Emails
-All email delivery (appointment confirmations, invites, password resets) runs through **Celery tasks**. In development, `CELERY_TASK_ALWAYS_EAGER=True` runs tasks synchronously so no Redis is needed — just flip to `False` in production.
-
-### 6. Audit Logging
-Every significant action (create, update, delete, login, logout, book, cancel) is recorded in the `AuditLog` table with user, clinic, action type, object reference, IP address, and timestamp — providing full traceability.
-
----
-
-## 🔭 Future Enhancements
-
-- [ ] 📱 **React Native Mobile App** — patient-facing booking and records on iOS/Android
-- [ ] 🎥 **Telemedicine / Video Calls** — WebRTC-based in-app video consultations
-- [ ] 📲 **SMS Notifications** — appointment reminders via Twilio
-- [ ] 🤖 **AI Symptom Checker** — pre-booking chatbot to guide patients
-- [ ] 📄 **PDF Generation** — downloadable prescriptions and invoices
-- [ ] 🗺️ **Clinic Map View** — find nearest clinic via Google Maps integration
-- [ ] 🌐 **Multi-language Support** — localization for regional languages
-- [ ] 🔗 **FHIR API** — HL7 FHIR compliance for hospital system interoperability
-- [ ] 🧠 **Predictive Analytics** — no-show prediction and demand forecasting
-- [ ] 🏥 **Insurance Integration** — direct claim submission and tracking
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/your-feature-name`
-3. Commit your changes: `git commit -m "feat: add prescription PDF export"`
-4. Push to the branch: `git push origin feature/your-feature-name`
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-Made with ❤️ for better healthcare
-
-**[⬆ Back to top](#mediclinic--multi-clinic-healthcare-platform)**
-
-</div>
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for complete details.
